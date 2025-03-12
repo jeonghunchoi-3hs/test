@@ -34,7 +34,7 @@
 			<div id="content" class="content">
 
 				<p class="page_title">파일스토리지
-				<span class="root f14">Home <span class="arrow_ab"> &#8227; </span><a href="${wasPath}/mbr/main"> 콘솔</a>  <span class="arrow_ab"> &#8227; </span> 자원현황  <span class="arrow_ab"> &#8227; </span> <b><a href="${wasPath}/mbr/project/persistentvolume/">파일스토리지  </a> </b>
+				<span class="root f14">Home <span class="arrow_ab"> &#8227; </span><a href="${wasPath}/mbr/main"> 콘솔</a>  <span class="arrow_ab"> &#8227; </span> 자원현황  <span class="arrow_ab"> &#8227; </span> <b><a href="${wasPath}/mbr/project/persistentvolume/">파일스토리지</a> </b>
 			    </span>
 				</p>
 
