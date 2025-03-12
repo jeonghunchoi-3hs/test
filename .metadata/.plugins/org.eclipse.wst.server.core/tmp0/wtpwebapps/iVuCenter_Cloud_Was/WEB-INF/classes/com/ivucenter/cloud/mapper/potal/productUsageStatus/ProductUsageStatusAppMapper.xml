@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.productUsageStatus.app.ProductUsageStatusAppDAO">
+
+    <select id="list" parameterType="CustomProductUsageStatusAppVO" resultType="CustomProductUsageStatusAppVO">
+		SELECT * 
+		  FROM 
+			(
+			SELECT 
+				  CC.customer_name 		as customer_name
+				, CC.customer_id 		as customer_id
+				, OP.cloud_id 			as cloud_id 
+				, OC.cloud_name 		as cloud_name 
+				, OC.cloud_type 		as cloud_type 
+				, OP.project_id 		as project_id 
+				, OP.project_name 		as project_name 
+				, OP.project_alias		as project_alias 
+				, APP.app_name 			as app_name 
+				, APP.app_name_space 	as app_name_space 
+				, APP.app_alias			as app_alias 
+				, APP.pod				as pod 
+				, APP.volume 			as volume 
+				, APP.service_cnt		as service_cnt 
+				, APP.routes_cnt 		as routes_cnt 
+				, APP.builds_cnt 		as builds_cnt 
+				, APP.deployment_config_cnt	as deployment_config_cnt 				
+				, APP.hourly_flag 		as hourly_flag 
+				, APP.reg_datetime 		as reg_datetime 
+				, APP.pvc_yn			as pvc_yn 
+				, APP.os_product_seq	as os_product_seq 
+				, PRODOS.vm_image_id 	as template_name
+				, PRODOS.vm_image_name  as template_name_space
+			FROM (
+				SELECT
+					  project_id 
+					, app_uid 
+					, app_name 
+					, app_name_space
+					, app_alias
+					, pod
+					, volume
+					, service_cnt
+					, routes_cnt 
+					, builds_cnt 
+					, deployment_config_cnt					
+					, kind 
+					, if(hourly_flag = 'N', '월', '시간') as hourly_flag
+					, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') as reg_datetime
+					, pvc_yn
+					, os_product_seq 
+					, api_version
+				FROM oss_app 
+				WHERE del_flag = 'N'
+				) APP
+			LEFT JOIN oss_project OP
+				ON OP.project_id  = APP.project_id 
+			LEFT JOIN oss_cloud  OC 
+				ON OP.cloud_id = OC.cloud_id 
+			LEFT JOIN cmm_customer CC 
+				ON OP.customer_id = CC.customer_id 
+			LEFT JOIN bss_product_os PRODOS
+				ON APP.os_product_seq = PRODOS.product_seq
+			WHERE 1 = 1
+			and oc.cloud_id != 'eac2cb70-2293-48be-b131-8c5a3035e610'
+			AND OP.project_id is not null 
+			AND OP.delete_flag = 'N'
+				) A
+		WHERE
+			1=1
+	    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND
+    		(
+    			A.app_name like CONCAT('%',#{keyword},'%')
+    			OR A.app_alias like CONCAT('%',#{keyword},'%')
+    			OR A.template_name like CONCAT('%',#{keyword},'%')
+    		)
+	    	</if>
+	    	<if test="searchKind != 'searchAll' and keyword != '' ">
+				AND A.${searchKind} like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="orderColumn != '' and orderColumn != null">
+				ORDER BY ${orderColumn} ${orderDir}
+			</if>	
+	    	<if test="!length.equals(0)">
+				LIMIT #{start}, #{length}
+			</if>
+	</select>
+
+    <select id="total" parameterType="CustomProductUsageStatusAppVO" resultType="CustomProductUsageStatusAppVO">
+    	SELECT
+			COUNT(*) 								AS length
+			, IFNULL(FORMAT(SUM(pod), 0), 0) 		AS pod
+			, IFNULL(FORMAT(SUM(volume), 0), 0) 	AS volume
+			, IFNULL(FORMAT(SUM(service_cnt), 0), 0) 				AS service_cnt
+			, IFNULL(FORMAT(SUM(routes_cnt), 0), 0) 				AS routes_cnt
+			, IFNULL(FORMAT(SUM(builds_cnt), 0), 0) 				AS builds_cnt   	
+			, IFNULL(FORMAT(SUM(deployment_config_cnt), 0), 0) 		AS deployment_config_cnt   	
+	  	FROM
+    	(
+		SELECT * 
+		  FROM 
+			(
+			SELECT 
+				  OP.project_name 		as project_name 
+				, OP.project_alias		as project_alias 
+				, APP.app_name 			as app_name 
+				, APP.app_name_space 	as app_name_space 
+				, APP.app_alias			as app_alias 
+				, APP.pod				as pod 
+				, APP.volume 			as volume
+				, APP.service_cnt
+				, APP.routes_cnt
+				, APP.builds_cnt
+				, APP.deployment_config_cnt 
+				, PRODOS.vm_image_id 	as template_name
+			FROM (
+				SELECT    project_id
+						, app_uid
+						, app_name
+						, app_name_space
+						, app_alias
+						, pod
+						, volume
+						, service_cnt
+						, routes_cnt 
+						, builds_cnt 
+						, deployment_config_cnt
+						, kind
+						, if(hourly_flag = 'N', '월', '시간') as hourly_flag
+						, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') as reg_datetime
+						, pvc_yn
+						, os_product_seq
+						, api_version
+				FROM oss_app 
+				WHERE del_flag = 'N'
+				) APP
+			LEFT JOIN oss_project 		as OP
+				ON OP.project_id  = APP.project_id 
+			LEFT JOIN oss_cloud  		as OC 
+				ON OP.cloud_id = OC.cloud_id 
+			LEFT JOIN cmm_customer 		as CC 
+				ON OP.customer_id = CC.customer_id 
+			LEFT JOIN bss_product_os PRODOS
+				ON APP.os_product_seq = PRODOS.product_seq
+			WHERE 1 = 1
+			and oc.cloud_id != 'eac2cb70-2293-48be-b131-8c5a3035e610'
+			AND OP.project_id is not null 
+			AND OP.delete_flag = 'N'
+			) A
+			WHERE
+				1=1
+		    	<if test="searchKind == 'searchAll' and keyword != '' ">
+	    		AND
+	    		(
+	    			A.app_name like CONCAT('%',#{keyword},'%')
+	    			OR A.app_alias like CONCAT('%',#{keyword},'%')
+	    			OR A.template_name like CONCAT('%',#{keyword},'%')
+	    		)
+		    	</if>
+		    	<if test="searchKind != 'searchAll' and keyword != '' ">
+					AND A.${searchKind} like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="cloudId != null ">
+			    AND A.cloud_id like CONCAT('%',#{cloudId},'%')
+		        </if>
+		) X
+		WHERE 1=1
+	</select>
+
+    <select id="total_old" parameterType="CustomProductUsageStatusAppVO" resultType="CustomProductUsageStatusAppVO">
+    	SELECT
+			COUNT(*) AS length
+			, IFNULL(FORMAT(SUM(vcpus), 0), 0) AS vcpus
+			, IFNULL(FORMAT(SUM(mem_gb), 0), 0) AS mem_gb
+			, IFNULL(FORMAT(SUM(disk_gb), 0), 0) AS disk_gb
+    	FROM(
+			SELECT
+				OP.project_name
+				, OV.vcpus
+				, OV.mem_gb
+				, OV.disk_gb
+			FROM (
+				SELECT
+					project_id
+					, vcpus
+					, mem_gb
+					, disk_gb
+				FROM oss_vm
+				WHERE del_flag = 'N'
+				AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				<if test="searchKey3 != '' ">
+					AND hourly_flag = #{searchKey3}
+				</if>
+			) OV
+			LEFT JOIN oss_project OP
+			ON OP.project_id = OV.project_id
+
+			LEFT JOIN cmm_customer CC
+			ON OP.customer_id=CC.customer_id
+
+			LEFT JOIN cmm_company CC2
+			ON CC.ref_company_id = CC2.company_id
+
+			LEFT JOIN cmm_company CC3
+			ON CC2.up_company_id = CC3.company_id
+
+			WHERE 1=1
+			AND OP.project_id is not null
+			AND OP.delete_flag = 'N'
+			<if test="searchKey0 != '' ">
+				AND CC3.company_name = #{searchKey0}
+			</if>
+			<if test="searchKey1 != '' ">
+				AND CC.customer_name = #{searchKey1}
+			</if>
+			<if test="searchKey2 != '' ">
+				AND OP.project_alias = #{searchKey2}
+			</if>
+		) A
+		WHERE 1=1
+    	<if test="keyword != '' ">
+    	 	<if test="searchKind != '' ">
+    	 		AND A.${searchKind} like CONCAT('%',#{keyword},'%')
+    	 	</if>
+		</if>
+	</select>
+
+</mapper>

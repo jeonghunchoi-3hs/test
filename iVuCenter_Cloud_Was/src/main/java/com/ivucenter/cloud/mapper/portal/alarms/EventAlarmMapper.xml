@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.alarms.event.EventAlarmDAO">
+    
+    <insert id="insertHistory" parameterType="CustomEventAlarmVO">
+ 		INSERT INTO event_alarm_history(
+			event_id
+			, vm_id
+			, item_type
+			, threadhold
+			, state
+			, reg_datetime
+		)VALUES(
+			#{eventId}
+			, #{vmId}
+			, #{itemType}
+			, #{threadhold}
+			, #{state}
+			, NOW()
+		)
+    </insert>
+    
+	<select id="cnt" resultType="Int" parameterType="CustomEventAlarmVO">
+		SELECT 
+			COUNT(*)
+		FROM event_alarm
+		WHERE vm_id = #{vmId}
+		AND	item_type = #{itemType}
+		AND threadhold = #{threadhold}
+		AND state = 'OPEN'
+    </select>
+    
+
+    <insert id="insert" parameterType="CustomEventAlarmVO">
+ 		INSERT INTO event_alarm(
+			event_id
+			, vm_id
+			, item_type
+			, threadhold
+			, event_cnt
+			, state
+			, reg_datetime
+		)VALUES(
+			#{eventId}
+			, #{vmId}
+			, #{itemType}
+			, #{threadhold}
+			, 1
+			, #{state}
+			, NOW()
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomEventAlarmVO">
+	 	UPDATE event_alarm 
+		SET			
+			state = state+1
+		WHERE vm_id = #{vmId}
+		AND	item_type = #{itemType}
+		AND threadhold = #{threadhold}
+		AND state = 'OPEN'
+    </update>
+
+    
+  
+
+</mapper>

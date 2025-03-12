@@ -1,0 +1,2198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.req.project.ReqProjectDAO">
+
+  	<!-- 프로젝트 신청  아이디 중복체크  나중에 이동-->
+    <select id="setProjectNamechk" resultType="int">
+		SELECT
+			COUNT(project_name)
+		FROM
+			req_project
+		where project_name=#{projectName}
+  	</select>
+
+  	<!-- 프로젝트 1차승인자  체크-->
+    <select id="setProjectApprove1chk" resultType="int">
+		SELECT
+				COUNT(*)
+		  FROM
+				sr_approval_member
+		WHERE
+				request_seq = #{reqProjectSeq}
+				AND step_id = 'WF3000A0'
+  	</select>
+  	<!-- 프로젝트 2차승인자  체크-->
+    <select id="setProjectApprove2chk" resultType="int">
+		SELECT
+				COUNT(*)
+		  FROM
+				sr_approval_member
+		WHERE
+				request_seq = #{reqProjectSeq}
+				AND step_id = 'WF3000B0'
+  	</select>
+
+
+  	<select id="setManagerTypechk" resultType="int">
+
+        SELECT
+				  COUNT(*)
+		  FROM
+				  req_project_manager
+		WHERE
+				  project_manager_type IS NULL
+				  AND req_project_seq = #{reqProjectSeq}
+  	</select>
+
+  	<!-- 프로젝트 관리자  체크-->
+    <select id="setProjectManagerChk" resultType="int">
+		SELECT
+		 	COUNT(req_project_seq)
+		FROM
+			req_project_manager
+		WHERE req_project_seq = #{reqProjectSeq}
+  	</select>
+
+	<!--프로젝트 신청현황  리스트(관리자)-->
+	<!-- 결재라인 변경에따른 쿼리 변경 임시주석 2020.05.28 -->
+	<!--
+    <select id="list" resultType="CustomReqProjectVO" parameterType="CustomReqProjectVO">
+		SELECT
+			a.project_price,
+			a.req_project_seq,
+			a.customer_id,
+			a.project_alias,
+			a.network_etc,
+			a.project_description,
+			a.reg_user_id,
+			a.reg_user_name,
+			a.reg_datetime AS reg_datetime,
+			DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2,
+			IF(a.complete_flag='N','처리중','완료') AS complete_flag,
+			a.project_manager_name,
+			a.dept_name,
+			a.user_tel,
+			a.customer_name,
+	        a.step_id,
+	        a.step_level,
+	        a.apprv_state
+		FROM
+		(
+			SELECT
+				aa.req_project_seq
+				,aa.project_price
+				,aa.customer_id
+				,aa.project_alias
+				,aa.network_etc
+				,aa.project_description
+				,aa.reg_user_id
+				,aa.reg_datetime
+				,aa.complete_flag
+				, bb.user_name AS reg_user_name
+				, cc.project_manager_id
+				, cc.project_manager_name
+				, cc.dept_name
+				, cc.user_tel
+				, cc.customer_name
+				, cc.step_id
+				, cc.step_level
+				, cc.apprv_state
+			FROM
+				req_project aa
+			INNER JOIN
+				(SELECT user_id, user_name FROM cmm_user) bb
+			ON aa.reg_user_id = bb.user_id
+			INNER JOIN
+				(
+				SELECT
+					a.project_manager_id,
+					a.req_project_seq,
+					b.user_name AS project_manager_name,
+					b.user_tel,
+					c.dept_name,
+					d.customer_name,
+					ss.step_id,
+					ss.step_level,
+					ssr.apprv_state
+				FROM
+					req_project_manager a
+				INNER JOIN
+					cmm_user b
+				ON a.project_manager_id = b.user_id
+				LEFT JOIN
+					cmm_department c
+				ON b.dept_code = c.dept_code
+				LEFT JOIN
+					cmm_customer d
+				ON b.customer_id = d.customer_id
+				LEFT JOIN
+					(SELECT * FROM sr_approval_step WHERE apprv_state = 'APPRV_PROCESSING') ss
+				ON a.req_project_seq = ss.request_seq
+				LEFT JOIN
+					(SELECT * FROM sr_approval_step WHERE apprv_state = 'APPRV_REJECTED') ssr
+				ON a.req_project_seq = ssr.request_seq
+
+				WHERE
+					project_manager_type = '01'
+				) cc
+			ON aa.req_project_seq = cc.req_project_seq
+		) a
+
+		WHERE
+			1=1
+			<if test="searchAll == 'my' ">
+	 			<if test="userId != 'admin' ">
+	 			AND a.step_id IN (SELECT DISTINCT step_id FROM approval_model_member WHERE user_id = #{userId}	)
+	 			</if>
+		 	AND a.step_level <![CDATA[>]]> 4
+			</if>
+
+			<if test="searchKind == 'projectName' and keyword != ''">
+			AND a.project_alias like CONCAT('%',#{keyword},'%')
+			</if>
+
+			<if test="searchKind == 'deptName' and keyword != ''">
+			AND a.dept_name like CONCAT('%',#{keyword},'%')
+			</if>
+
+			<if test="searchKind == 'projectManager' and keyword != ''">
+			AND a.project_manager_name like CONCAT('%',#{keyword},'%')
+			</if>
+
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			AND
+			(
+				a.project_alias like CONCAT('%',#{keyword},'%')
+				OR
+				a.dept_name like CONCAT('%',#{keyword},'%')
+				OR
+				a.project_manager_name like CONCAT('%',#{keyword},'%')
+			)
+			</if>
+
+		ORDER BY
+			reg_datetime desc
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+
+  	</select>
+  	-->
+
+  	<select id="list" resultType="CustomReqProjectVO" parameterType="CustomReqProjectVO">
+		SELECT
+			*
+		FROM
+		(
+			SELECT
+				  RP.req_project_seq
+			    , IF(SASH.apprv_datetime IS NULL , '-', DATE_FORMAT(SASH.apprv_datetime,'%Y-%m-%d %H:%i')) AS h_apprv_datetime
+				, RP.project_price
+				, RP.customer_id
+				, RP.project_alias
+				, RP.network_etc
+				, RP.project_description
+				, RP.reg_user_id
+				, RP.reg_datetime
+				, DATE_FORMAT(RP.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, IF(RP.complete_flag = 'N','처리중','완료') AS complete_flag
+				, CU2.user_name AS reg_user_name
+				, RPM.project_manager_id
+				, CU.user_name AS project_manager_name
+		        , IF(CD.dept_name IS NULL, '-', CD.dept_name) AS dept_name
+				, CU.user_tel
+				, CC.customer_name
+				, SAS.step_id
+				, SAS.step_level
+				, SAS.apprv_state
+				, SAS.apprv_schedule_user_id
+				, CD3.dept_name as dept_name2
+
+			    , (SELECT COUNT(request_seq) FROM sr_approval_step_his SASH WHERE SASH.request_seq = RP.req_project_seq) AS sr_approval_step_his_count
+
+			FROM	     req_project RP
+			INNER JOIN req_project_manager RPM
+			ON RP.req_project_seq = RPM.req_project_seq AND RPM.project_manager_type = '01'
+			INNER JOIN cmm_user CU  /* 프로잭트 매니저 */
+			ON RPM.project_manager_id = CU.user_id
+			LEFT JOIN (SELECT * FROM sr_approval_step WHERE step_id = 'WF1000H0') SASH ON  RP.req_project_seq = SASH.request_seq
+			LEFT JOIN	 cmm_customer CC
+			ON CU.customer_id = CC.customer_id
+			LEFT JOIN	 cmm_department CD
+			ON CU.dept_code = CD.dept_code
+			LEFT JOIN  cmm_user CU2		/*프로젝트 신청자 */
+			ON RP.reg_user_id = CU2.user_id
+			LEFT JOIN (
+	 					SELECT dept_code
+						 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+						 , TRIM(dept_name) AS dept_name_only
+						FROM  cmm_department
+						WHERE del_flag != 'Y'
+						START WITH up_code IS null
+						CONNECT BY PRIOR dept_code=up_code
+						ORDER SIBLINGS BY dept_code) CD3
+			ON CD3.dept_code = CU.dept_code
+			LEFT JOIN sr_approval_step SAS /* 프로젝트 승인 상태 */
+			ON RP.req_project_seq = SAS.request_seq
+			AND SAS.apprv_state in ('APPRV_PROCESSING'
+				<if test="roleYn == true || userId == 'admin'">
+					<if test="searchAll != 'my' ">
+					, 'APPRV_REJECTED'
+					</if>
+					, 'APPRV_UNASSIGNED'
+				</if>
+			)
+			WHERE RP.del_flag = 'N'
+		) a
+		WHERE
+			1=1
+			<if test="searchAll == 'my' ">
+	 			<if test="userId != 'admin' ">
+	 			AND
+	 			(
+	 				a.apprv_schedule_user_id = #{userId}
+	 				<if test="roleYn == true">
+	 				OR a.apprv_state = 'APPRV_UNASSIGNED'
+	 				</if>
+	 			)
+	 			</if>
+		 	AND a.step_level <![CDATA[>]]> 4
+			</if>
+
+			<if test="searchKind == 'projectName' and keyword != ''">
+			AND a.project_alias like CONCAT('%',#{keyword},'%')
+			</if>
+
+			<if test="searchKind == 'deptName' and keyword != ''">
+			AND a.dept_name like CONCAT('%',#{keyword},'%')
+			</if>
+
+			<if test="searchKind == 'projectManager' and keyword != ''">
+			AND a.project_manager_name like CONCAT('%',#{keyword},'%')
+			</if>
+
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			AND
+			(
+				a.project_alias like CONCAT('%',#{keyword},'%')
+				OR
+				a.dept_name like CONCAT('%',#{keyword},'%')
+				OR
+				a.project_manager_name like CONCAT('%',#{keyword},'%')
+			)
+			</if>
+
+		ORDER BY
+			a.reg_datetime desc
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+
+  	</select>
+
+  	<!--프로젝트 admin 신청  리스트-->
+    <select id="getProjectList" resultType="CustomReqProjectVO" parameterType="CustomReqProjectVO">
+
+   		SELECT *
+   		FROM (
+
+            SELECT
+				    RP.project_alias
+				    , RP.status_flag
+		 			, DATE_FORMAT(RP.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+		 			, RP.req_project_seq
+		 			, CU.user_name AS reg_user_name
+					, RP.customer_id
+					, CC.customer_name
+					, CD.dept_name
+					, RP.mod_datetime
+					, (SELECT COUNT(request_seq) FROM sr_approval_step_his SASH WHERE SASH.request_seq = RP.req_project_seq) AS sr_approval_step_his_count
+
+			FROM	 req_project RP
+			LEFT JOIN req_project_manager RPM ON RPM.project_manager_type = '01' AND RP.req_project_seq = RPM.req_project_seq
+			LEFT JOIN cmm_user CU ON RP.reg_user_id = CU.user_id
+			LEFT JOIN cmm_customer CC ON RP.customer_id = CC.customer_id
+			LEFT JOIN cmm_department CD ON RP.dept_code = CD.dept_code
+			<!-- WHERE a.req_project_seq IN (SELECT DISTINCT req_project_seq FROM req_project_manager WHERE project_manager_id =  #{userId}) -->
+			WHERE RP.reg_user_id = #{userId}
+			AND ((RP.status_flag  IN ('01','02','03'))
+				OR (DATE_FORMAT(RP.reg_datetime,'%Y') =  DATE_FORMAT(NOW(), '%Y')))
+		)
+   		WHERE 1=1
+		<if test="searchKind == 'customerName' and keyword != ''">
+		AND
+			customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'projectAlias' and keyword != ''">
+		AND
+			project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND
+			(
+			customer_name like CONCAT('%',#{keyword},'%')
+			OR
+			project_alias like CONCAT('%',#{keyword},'%')
+			)
+		</if>
+
+		ORDER BY reg_datetime2 DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+		<!--미승인 프로젝트 리스트-->
+       	<select id="getProjectApproveList" resultType="CustomReqProjectVO" parameterType="CustomReqProjectVO">
+			SELECT
+			     a.project_alias
+			    ,a.status_flag
+	 			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+	 			,a.req_project_seq
+	 			,f.user_name AS reg_user_name
+				,a.customer_id
+				,d.customer_name
+				,e.dept_name
+				,a.mod_datetime
+				,a.status_flag
+		FROM
+				<if test="projectAt == 'searchAll'">
+					req_project a
+				</if>
+				<if test="projectAt == '02'">
+					(SELECT * FROM req_project WHERE status_flag IN ('01','02')) a
+				</if>
+				<if test="projectAt == '03'">
+					(SELECT * FROM req_project WHERE status_flag IN ('03')) a
+				</if>
+				<if test="projectAt == '04'">
+					(SELECT * FROM req_project WHERE status_flag IN ('04')) a
+				</if>
+
+			LEFT JOIN
+				req_project_manager b
+			ON (b.project_manager_type = '01' AND a.req_project_seq = b.req_project_seq)
+			LEFT JOIN
+				cmm_user f
+			ON f.user_id = a.reg_user_id
+			LEFT JOIN
+				cmm_customer d
+			ON a.customer_id = d.customer_id
+			LEFT JOIN
+				cmm_department e
+			ON a.dept_code = e.dept_code
+			INNER JOIN
+				(
+					SELECT
+						DISTINCT request_seq
+					FROM
+						sr_approval_step
+					WHERE
+						apprv_state ='APPRV_PROCESSING'
+						AND step_level <![CDATA[<=]]> 4
+						<if test="userId != 'admin' ">
+						AND apprv_schedule_user_id = #{userId}
+						</if>
+				) t
+			ON a.req_project_seq = t.request_seq
+
+			ORDER BY
+				reg_datetime2 DESC
+			<if test="!length.equals(0)">
+				LIMIT #{start}, #{length}
+			</if>
+		</select>
+
+  	<!--미승인 프로젝트 admin 신청  리스트-->
+    <select id="getProjectAdminList" resultType="CustomReqProjectVO" >
+    	SELECT
+    		*
+    	FROM(
+			SELECT
+				a.req_project_seq,
+				a.customer_id,
+				a.project_alias,
+				a.network_etc,
+				a.project_description,
+				a.reg_user_id,
+				a.reg_user_name,
+				a.reg_datetime AS reg_datetime,
+				DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2, /* 등록 일시*/
+				IF(a.complete_flag='N','처리중','완료') AS complete_flag,
+				b.customer_name,
+				b.company_name
+			FROM
+				(
+					SELECT
+						aa.*
+						, bb.user_name AS reg_user_name
+					FROM req_project aa
+					LEFT JOIN (SELECT user_id, user_name FROM cmm_user) bb
+					ON aa.reg_user_id = bb.user_id
+
+				) a, cmm_customer b
+			WHERE
+				a.customer_id = b.customer_id
+			AND
+				a.reg_user_id = #{userId}
+			AND
+				a.complete_flag='N'
+			<if test="searchKind == 'customerName' and keyword != ''">
+			AND
+				b.customer_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'projectAlias' and keyword != ''">
+			AND
+				a.project_alias like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			AND
+				(
+				b.customer_name like CONCAT('%',#{keyword},'%')
+				OR
+				a.project_alias like CONCAT('%',#{keyword},'%')
+				)
+
+			</if>
+    	)A
+		ORDER BY reg_datetime2 DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+  	</select>
+
+
+
+
+
+  	<!--미승인 프로젝트 신청  리스트-->
+    <select id="getProjectListOld" resultType="CustomReqProjectVO" >
+		SELECT
+			req_project_seq,
+			(SELECT company_id FROM cmm_customer WHERE customer_id =a.customer_id)AS company_id,
+			project_name,
+			project_alias,
+			project_description,
+			a.customer_id,
+			reg_datetime,
+			apprv_state,
+			request_type
+		FROM
+			req_project a
+		where
+			apprv_state <![CDATA[<>]]> 'APPRV_COMPLETED'
+		order by reg_datetime desc
+
+  	</select>
+
+  	<!-- 프로젝트 신청 현황  리스트-->
+    <select id="projectStatusList" resultType="CustomReqProjectVO" parameterType="CustomReqProjectVO">
+		SELECT
+			a.req_project_seq,
+			a.customer_id,
+			a.project_alias,
+			a.network_etc,
+			a.project_description,
+			a.reg_datetime,
+			IF(a.complete_flag='N','처리중','완료') AS complete_flag,
+			b.customer_name,
+			b.company_name
+		FROM
+			req_project a, cmm_customer b
+		WHERE
+			a.customer_id = b.customer_id
+		AND
+			a.reg_user_id = #{customerId}
+		<if test="appvKind != ''">
+		AND
+			a.apprv_state = #{appvKind}
+		</if>
+		<if test="searchKind == 'customerName' and keyword != ''">
+		AND
+			b.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'projectAlias' and keyword != ''">
+		AND
+			a.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND
+			(
+			b.customer_name like CONCAT('%',#{keyword},'%')
+			OR
+			a.project_alias like CONCAT('%',#{keyword},'%')
+			)
+
+		</if>
+		ORDER BY a.reg_datetime desc
+				<if test="!length.equals(0)">
+					LIMIT #{start}, #{length}
+				</if>
+  	</select>
+
+  	 <!-- 프로젝트 신청  내용-->
+    <select id="getProjectView" resultType="CustomReqProjectVO">
+	    SELECT
+	             OP.project_name AS oss_project_name
+                , RP.project_name AS req_project_name
+                , RP.req_project_description
+				, RP.req_project_seq
+				, RP.customer_id
+				, CC.customer_name as project_customer_name
+				, RP.dept_code as project_dept_code
+				, CD.dept_name as project_dept_name
+				, RP.project_alias
+				, RP.project_manager_id
+				, RP.network_etc
+				, RP.project_description
+				, RP.close_flag
+				, RP.close_description
+				, RP.reg_datetime
+				, RP.reg_user_id
+				, RP.mod_datetime
+				, RP.mod_user_id
+				, RP.del_flag
+				, RP.complete_flag
+				, RP.project_price
+				, DATE_FORMAT(RP.project_start_datetime, '%Y-%m-%d') AS project_start_datetime
+				, DATE_FORMAT(RP.project_end_datetime, '%Y-%m-%d') AS project_end_datetime
+				, CM.company_name
+				, DATE_FORMAT(RP.reg_datetime, '%Y-%m-%d %H:%i') AS project_reg_datetime
+				, (SELECT user_name FROM cmm_user WHERE user_id = RP.reg_user_id) as reg_user_name
+				, (SELECT company_name FROM cmm_company WHERE company_id = cm.up_company_id) as up_company_name
+				, (SELECT COUNT(*) FROM oss_project OP WHERE RP.req_project_seq = OP.program_seq ) AS length
+				, status_flag
+				, RPM.project_manager_id	 as project_admini_strator_id
+				, CU2.user_name AS project_admini_strator_name
+				, CD2.dept_name AS project_admini_strator_dept_name
+	            , CONCAT(TRIM(RPM.project_manager_id),' / ',TRIM(CU2.user_name),' / ',TRIM(CD2.dept_name)) as project_admini_strator_info
+				, CU2.user_name	 AS manager_name
+				, CD3.dept_name AS dept_name2
+				,RP.paas
+				,RP.quota_yn
+				,RP.cpu_req
+				,RP.mem_req
+				,RP.volume_req
+				,RP.pod_req
+				,RP.cpu_limit
+				,RP.mem_limit
+		FROM req_project RP
+		INNER JOIN (SELECT * FROM req_project_manager WHERE project_manager_type = '01') RPM
+		            ON RP.req_project_seq = RPM.req_project_seq
+		LEFT JOIN cmm_customer CC
+			ON RP.customer_id = CC.customer_id
+	    LEFT OUTER JOIN cmm_department CD
+			ON RP.dept_code = CD.dept_code
+        LEFT JOIN cmm_user CU2
+            ON RPM.project_manager_id =  CU2.user_id
+        LEFT JOIN cmm_department CD2
+            ON CU2.dept_code = CD2.dept_code
+		LEFT OUTER JOIN (SELECT * FROM oss_project_box WHERE delete_flag = 'N') OP
+			ON RP.req_project_seq = OP.program_seq
+		LEFT JOIN cmm_company CM
+			ON CC.ref_company_id = CM.company_id
+		LEFT JOIN (
+ 					SELECT dept_code
+						 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+						 , TRIM(dept_name) AS dept_name_only
+					FROM  cmm_department
+					WHERE del_flag != 'Y'
+					START WITH up_code IS null
+					CONNECT BY PRIOR dept_code=up_code
+					ORDER SIBLINGS BY dept_code) CD3
+			ON CD3.dept_code = CU2.dept_code
+	  WHERE RP.req_project_seq= #{reqProjectSeq}
+
+  	</select>
+
+    <select id="getProjectCloudView" resultType="CustomReqProjectVO">
+
+	    <!--   SELECT RPC.cloud_id
+		             , OC.cloud_name
+		             , OC.cloud_type
+		             , RPC.cpu_limit
+					 , RPC.mem_limit
+					 , RPC.cpu_req
+					 , RPC.mem_req
+					 , RPC.volume_req
+					 , RPC.pod_req
+					 , RPC.storage_req
+					 , RPC.quota_yn
+					 , RPC.pod_cpu_min
+					 , RPC.pod_cpu_max
+					 , RPC.pod_mem_min
+					 , RPC.pod_mem_max
+					 , RPC.limit_range_cpu_min
+					 , RPC.limit_range_cpu_max
+					 , RPC.limit_range_mem_min
+					 , RPC.limit_range_mem_max
+					 , RPC.limit_range_cpu_default
+					 , RPC.limit_range_mem_default
+					 , RPC.limit_range_cpu_default_request
+					 , RPC.limit_range_mem_default_request
+					 , RPC.limit_range_cpu_limit_request_ratio
+					 , RPC.limit_range_mem_limit_request_ratio
+
+		      FROM req_project RP
+     INNER JOIN req_project_cloud RPC
+		         ON RP.req_project_seq = RPC.req_project_seq
+	 INNER JOIN oss_cloud OC
+		         ON RPC.cloud_id = OC.cloud_id
+		   WHERE RP.req_project_seq= #{reqProjectSeq}
+ -->
+
+           SELECT
+	                   RPC.cloud_id
+	                  ,OP.cloud_id as oss_project_cloud_id
+		             , OC.cloud_name
+		             , OC.cloud_type
+		             , RPC.cpu_limit
+					 , RPC.mem_limit
+					 , RPC.cpu_req
+					 , RPC.mem_req
+					 , RPC.volume_req
+					 , RPC.pod_req
+					 , RPC.storage_req
+					 , RPC.quota_yn
+					 , RPC.pod_cpu_min
+					 , RPC.pod_cpu_max
+					 , RPC.pod_mem_min
+					 , RPC.pod_mem_max
+					 , RPC.limit_range_cpu_min
+					 , RPC.limit_range_cpu_max
+					 , RPC.limit_range_mem_min
+					 , RPC.limit_range_mem_max
+					 , RPC.limit_range_cpu_default
+					 , RPC.limit_range_mem_default
+					 , RPC.limit_range_cpu_default_request
+					 , RPC.limit_range_mem_default_request
+					 , RPC.limit_range_cpu_limit_request_ratio
+					 , RPC.limit_range_mem_limit_request_ratio
+
+             FROM oss_cloud OC
+	   LEFT JOIN req_project_cloud RPC ON RPC.cloud_id = OC.cloud_id
+	   LEFT JOIN req_project RP ON RPC.req_project_seq = RP.req_project_seq
+	   LEFT JOIN oss_project OP ON RPC.cloud_id = OP.cloud_id
+	           AND OP.program_seq = RP.req_project_seq
+           WHERE	RPC.req_project_seq = #{reqProjectSeq}
+  	</select>
+
+  	<!-- 프로젝트 신청 선택한 네트워크 리스트 -->
+<!--
+    <select id="getProjectNetSlist" resultType="CustomReqProjectVO">
+		SELECT
+			net_dflt_kind,
+			net_dflt_kind_name,
+			req_project_seq,
+			select_flag
+		FROM
+			req_project_network
+		where req_project_seq=#{reqProjectSeq}
+  	</select>
+-->
+
+  	<select id="getUserInfo" parameterType="String" resultType="CustomCmmUserVO">
+
+  		SELECT
+  			 b.*
+  			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS project_reg_datetime
+  			,c.dept_name AS dept_name
+  		FROM req_project a
+  			LEFT JOIN cmm_user b
+  			ON a.reg_user_id = b.user_id
+  			LEFT JOIN cmm_department c
+  			ON b.dept_code = c.dept_code
+  		WHERE	a.req_project_seq = #{reqProjectSeq}
+
+  	</select>
+
+
+  	<!-- 프로젝트 신청 내용입력 -->
+    <update id="setProjectForminsert" parameterType="CustomReqProjectVO" >
+    	INSERT INTO req_project
+			(
+				req_project_seq,
+				project_alias,
+				project_manager_id,
+				network_etc,
+				project_description,
+				customer_id,
+				reg_datetime,
+				reg_user_id,
+				project_start_datetime,
+				project_end_datetime,
+				project_price,
+				dept_code,
+				status_flag,
+				paas
+
+			)
+			VALUES
+			(
+				#{reqProjectSeq},
+				#{projectAlias},
+				#{projectManagerId},
+				#{networkEtc},
+				#{projectDescription},
+				#{projectCustomerId},
+				NOW(),
+				#{regUserId},
+				#{projectStartDatetime},
+				<if test="projectEndDatetime == ''">
+				NULL,
+				</if>
+				<if test="projectEndDatetime != ''">
+				#{projectEndDatetime},
+				</if>
+				#{projectPrice},
+				#{projectDeptCode},
+				#{statusFlag},
+				#{paas}
+			)
+  	</update>
+
+  	<!-- 프로젝트 신청 내용입력 -->
+    <insert id="setProjectCloudForminsert" parameterType="CustomReqProjectVO" >
+
+	      INSERT INTO req_project_cloud
+	            (
+				   req_project_seq,
+				   cloud_id,
+				   reg_user_id,
+				   reg_datetime
+	            )
+	            VALUES
+				(
+				   #{reqProjectSeq},
+				   #{cloudId},
+				   #{regUserId},
+				   NOW()
+				 )
+
+  	</insert>
+
+
+   	<!-- 프로젝트 AdminiStrator insert -->
+    <insert id="setProjectAdminiStratorInsert" parameterType="CustomReqProjectVO">
+			INSERT INTO
+				req_project_manager (
+					req_project_seq,
+					project_manager_id,
+					reg_datetime,
+					reg_user_id,
+					project_manager_type
+				)
+			VALUES
+				(
+					#{reqProjectSeq},
+					#{adminiStratorId},
+					NOW(),
+					#{userId},
+					'01'
+				)
+
+				ON DUPLICATE KEY
+					UPDATE
+					req_project_seq = #{reqProjectSeq},
+					project_manager_id = #{adminiStratorId},
+					reg_user_id = #{userId},
+					project_manager_type = '01'
+  	</insert>
+
+
+  	<!-- 프로젝트 신청후 manager -->
+    <update id="setProjectManagerUpdate" parameterType="CustomReqProjectVO">
+
+			UPDATE req_project_manager
+			      SET save_yn = 'Y'
+			 WHERE req_project_seq = #{reqProjectSeq}
+
+  	</update>
+
+  	<!-- 프로젝트 신청 내용수정 -->
+    <update id="setProjectFormEdit" parameterType="CustomReqProjectVO" >
+		UPDATE req_project
+			SET
+				project_name = #{projectName},
+				project_alias = #{projectAlias},
+				project_description = #{projectDescription},
+				mod_datetime = NOW(),
+				mod_user_id = #{modUserId}
+		WHERE
+			req_project_seq = #{reqProjectSeq}
+  	</update>
+
+  	<!-- 프로젝트 신청 내용수정시 네트워크 초기화 -->
+    <update id="setProjectNetdel" parameterType="CustomReqProjectVO" >
+		UPDATE req_project_network
+			SET
+				del_flag = 'Y'
+			WHERE
+				req_project_seq = #{reqProjectSeq}
+  	</update>
+
+  	<!--네트워크 리스트-->
+<!--
+    <select id="getProjectNetList" resultType="CustomReqProjectVO">
+		SELECT 	code_id,
+			code_name
+		FROM
+			cmm_code
+		where code_key_id=#{codeKeyId} and parent_code_id=#{codeKeyId}
+		order by code_id asc
+  	</select>
+-->
+<!--
+    <select id="getProjectNetList2" resultType="CustomReqProjectVO" parameterType="CustomReqProjectVO" >
+		SELECT
+			A.*
+			, IF(B.code_id IS NULL, 'disabled="disabled"', '') AS disabled
+		FROM(
+			SELECT
+				code_id
+				, code_name
+			FROM cmm_code
+			WHERE code_key_id=#{codeId}
+			AND parent_code_id=#{codeId}
+			ORDER BY code_id ASC
+		)A
+		LEFT JOIN(
+			SELECT
+				CONCAT('NETDFLT_', REPLACE(CN.work_kind, 'WORKKIND_', ''), REPLACE(CN.work_net_kind, 'WORKNET_', '')) AS code_id
+			FROM cmm_network CN
+			LEFT JOIN cmm_company CC
+			ON CN.company_id = CC.company_id
+			LEFT JOIN cmm_customer CUST
+			ON CC.company_id = CUST.ref_company_id
+			LEFT JOIN cmm_user CU
+			ON CUST.customer_id = CU.customer_id
+			WHERE CU.user_id = #{regUserId}
+		)B
+		ON A.code_id = B.code_id
+  	</select>
+-->
+
+  	<!-- 네트워크 신청 내용입력 -->
+    <insert id="setProjectNetinsert" parameterType="CustomReqProjectVO" >
+		INSERT INTO req_project_network
+			(
+				req_project_seq
+				, net_dflt_kind
+				, net_dflt_kind_name
+				, select_flag
+				, reg_datetime
+				, reg_user_id
+				, mod_datetime
+				, mod_user_id
+				, del_flag
+			)
+		VALUES
+			(
+				#{reqProjectSeq}
+				, #{netDfltKind}
+				, #{netDfltKindName}
+				, #{selectFlag}
+				, NOW()
+				, #{regUserId}
+				, #{modDatetime}
+				, #{modUserId}
+				, #{delFlag}
+			)
+  	</insert>
+
+  	<update id="updateReqProjectCloudLimit" parameterType="CustomReqProjectVO" >
+
+  		UPDATE 	req_project_cloud
+  		SET
+  			  cpu_limit = #{cpuLimit}
+  			, mem_limit = #{memLimit}
+  			, cpu_req = #{cpuReq}
+  			, mem_req = #{memReq}
+  			, volume_req = #{volumeReq}
+  			, pod_req = #{podReq}
+  			, storage_req = #{storageReq}
+  			, quota_yn = #{quotaYn}
+
+  			, pod_cpu_min = #{podCpuMin}
+  			, pod_cpu_max = #{podCpuMax}
+  			, pod_mem_min = #{podMemMin}
+  			, pod_mem_max = #{podMemMax}
+
+			, limit_range_cpu_min = #{limitRangeCpuMin}
+			, limit_range_cpu_max =#{limitRangeCpuMax}
+			, limit_range_mem_min =#{limitRangeMemMin}
+			, limit_range_mem_max =#{limitRangeMemMax}
+			, limit_range_cpu_default =#{limitRangeCpuDefault}
+			, limit_range_mem_default =#{limitRangeMemDefault}
+			, limit_range_cpu_default_request =#{limitRangeCpuDefaultRequest}
+			, limit_range_mem_default_request =#{limitRangeMemDefaultRequest}
+			, limit_range_cpu_limit_request_ratio =#{limitRangeCpuLimitRequestRatio}
+			, limit_range_mem_limit_request_ratio =#{limitRangeMemLimitRequestRatio}
+
+  		WHERE	req_project_seq = #{reqProjectSeq}
+  		    AND cloud_id = #{cloudId}
+
+  	</update>
+
+
+  	<update id="updateReqProjectCompeteFlag" parameterType="CustomReqProjectVO" >
+
+  		UPDATE 	req_project SET
+  	         complete_flag = 'Y'
+  		WHERE	req_project_seq = #{reqProjectSeq}
+
+  	</update>
+
+
+  	<!-- 승인모델 단계  리스트 -->
+    <select id="getApprovalModelSteplist" resultType="CustomReqCustomerVO">
+		SELECT
+			step_id,
+			model_id,
+			step_name,
+			step_level,
+			left_step_id,
+			right_step_id
+
+		FROM
+			approval_model_step
+		where
+			model_id=(SELECT model_id FROM sr_approval_flow WHERE flow_id='AFW0020')
+  	</select>
+
+  	<!-- 프로젝트신청 내용입력후  sr_approval_step(서비스 요청 승인단계입력)-->
+    <update id="setSrApprovalStepinsert" parameterType="CustomReqCustomerVO" >
+		INSERT INTO sr_approval_step
+				(
+					step_id,
+					request_seq,
+					flow_id,
+					step_name,
+					step_level,
+					left_step_id,
+					right_step_id,
+					apprv_state
+				)
+		VALUES
+				(
+					#{stepId},
+					#{requestSeq},
+					'AFW0020',   <!--고정(프로젝트 승인 신청)-->
+					#{stepName},
+					#{stepLevel},
+					#{leftStepId},
+					#{rightStepId},
+					#{apprvState}
+				)
+  	</update>
+
+  	<!-- 프로젝트신청 내용입력후  sr_approval_member(서비스 요청 승인 구성원 입력)-->
+    <update id="setSrApprovalMemberinsert" parameterType="CustomReqCustomerVO" >
+		INSERT INTO sr_approval_member
+			(
+				step_id,
+				request_seq,
+				flow_id,
+				user_id,
+				apprv_auth_flag,
+				mail_recv_flag,
+				sms_recv_flag,
+				push_recv_flag
+			)
+		VALUES
+			(
+				#{stepId},
+				#{requestSeq},
+				'AFW0020',   <!--고정(회원사 승인 신청)-->
+				#{userId},
+				#{apprvAuthFlag},
+				#{mailRecvFlag},
+				#{smsRecvFlag},
+				#{pushRecvFlag}
+			)
+  	</update>
+
+  	<!-- 승인모델 단계 구성원 리스트 -->
+    <select id="getApprovalModelMemberlist" resultType="CustomReqCustomerVO">
+		SELECT
+			a.step_id,
+			a.user_id,
+			a.apprv_auth_flag,
+			a.mail_recv_flag,
+			a.sms_recv_flag,
+			a.push_recv_flag
+		FROM
+			approval_model_member 	a , approval_model_step b
+		WHERE a.step_id=b.step_id
+		AND b.model_id=(SELECT model_id FROM sr_approval_flow WHERE flow_id='AFW0020')
+  	</select>
+
+  	 <!-- 프로젝트 승인 step 리스트 내용-->
+    <select id="getProjectAppSteplist" resultType="CustomReqCustomerVO">
+		SELECT
+			step_id,
+			request_seq,
+			flow_id,
+			step_name,
+			step_level,
+			left_step_id,
+			right_step_id,
+			apprv_state,
+			apprv_user_id,
+			apprv_user_name,
+			apprv_datetime,
+			apprv_description
+		FROM
+			sr_approval_step
+		where  request_seq=#{reqProjectSeq} ORDER BY step_level ASC
+  	</select>
+
+
+    <select id="managerList" resultType="CustomReqCustomerVO" parameterType="CustomReqProjectVO">
+
+                  SELECT
+     	 		                 d.customer_id
+     	 		                ,d.customer_name
+     	 		                ,b.manager_id AS user_id
+     	 		                ,c.user_name
+     	 		                ,c.user_authority
+     	 		                ,c.user_phone
+     	 		                ,c.user_tel
+     	 		                ,c.user_mail
+     	 		                ,c.user_level
+     	 		                ,CONCAT(c.user_name,c.user_level) as user_name_level
+     	 		                ,b.manager_type AS project_manager_type
+     	 		                ,e.dept_name
+     	 		                ,f.code_name AS project_manager_type_name
+     	 		                ,CD.dept_name AS dept_name2
+     	 		        FROM oss_project_box a
+     	 		  LEFT JOIN oss_project_manager b ON a.project_box_id = b.project_id
+     	 		  LEFT JOIN cmm_user c ON b.manager_id = c.user_id
+     	 		  LEFT JOIN cmm_customer d ON c.customer_id = d.customer_id
+     	 		  LEFT JOIN cmm_department e ON c.dept_code = e.dept_code
+     	 		  LEFT JOIN (SELECT * FROM cmm_code WHERE code_key_id = 'PROJECT_MANAGER_TYPE') f ON b.manager_type = f.code_id
+     	 		  LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD
+				ON c.dept_code = CD.dept_code
+     	 		      WHERE a.project_box_id = #{projectBoxId}
+     	 		          AND a.delete_flag = 'N'
+
+	  			<if test="managerType != null and managerType !=''">
+				  AND b.manager_type != '01'
+				</if>
+  	</select>
+
+    <select id="reqManagerList" resultType="CustomReqCustomerVO">
+              SELECT
+					     b.customer_id
+						,b.customer_name
+						,c.dept_code
+						,c.dept_name
+						,a.user_id
+						,a.user_name
+						,a.user_authority
+						,a.user_phone
+						,a.user_tel
+						,a.user_level
+						,a.user_mail
+						,d.project_manager_type
+	                    ,f.code_name as project_manager_type_name
+	                    ,CD.dept_name AS dept_name2
+			     FROM (SELECT * FROM req_project_manager WHERE req_project_seq = #{reqProjectSeq}) d
+		   LEFT JOIN req_project t ON d.req_project_seq=t.req_project_seq
+		   LEFT JOIN cmm_user a ON d.project_manager_id=a.user_id
+		   LEFT JOIN cmm_customer b ON a.customer_id=b.customer_id
+		   LEFT JOIN cmm_department c ON a.dept_code = c.dept_code
+		   LEFT JOIN (SELECT code_name, code_id, code_value FROM cmm_code WHERE code_key_id = 'PROJECT_MANAGER_TYPE') f ON d.project_manager_type = f.code_value
+		    LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD
+				ON c.dept_code = CD.dept_code
+  	</select>
+
+    <select id="reqWiteManagerList" resultType="CustomReqCustomerVO">
+              SELECT
+					     b.customer_id
+						,b.customer_name
+						,c.dept_code
+						,c.dept_name
+						,a.user_id
+						,a.user_name
+						,a.user_authority
+						,a.user_phone
+						,a.user_tel
+						,a.user_mail
+						,d.project_manager_type
+	                    ,f.code_name as project_manager_type_name
+			     FROM (SELECT * FROM req_project_manager WHERE req_project_seq = #{reqProjectSeq}) d
+		   LEFT JOIN req_project t ON d.req_project_seq=t.req_project_seq
+		   LEFT JOIN cmm_user a ON d.project_manager_id=a.user_id
+		   LEFT JOIN cmm_customer b ON a.customer_id=b.customer_id
+		   LEFT JOIN cmm_department c ON a.dept_code = c.dept_code
+		   LEFT JOIN (SELECT code_name, code_id FROM cmm_code WHERE code_key_id = 'PROJECT_MANAGER_TYPE') f ON d.project_manager_type = f.code_id
+  	</select>
+
+
+  	<!--승인 프로젝트 신청  리스트-->
+    <select id="getOkProjectList" resultType="CustomReqProjectVO">
+		SELECT
+			project_id,
+			project_name,
+			project_alias,
+			customer_id,
+			project_manager_id,
+			reg_datetime
+		FROM
+			oss_project
+		WHERE delete_flag = 'N'
+		order by reg_datetime desc
+  	</select>
+
+  	<!-- Datatable  승인프로젝트 리스트-->
+    <select id="projectOkList" parameterType="CustomReqProjectVO" resultType="CustomReqProjectVO">
+		SELECT
+    		*
+    	FROM
+    	(
+			SELECT
+				PJ.project_box_id 			/* 프로젝트 ID */
+				, PJ.project_name			/* 프로젝트명 */
+				, PJ.project_alias			/* 프로젝트 별칭 */
+				, PJ.customer_id			/* 회원사 아이디 */
+				, CC.customer_name			/* 회원사명 */
+				, (SELECT user_name FROM cmm_user WHERE user_id = RP.reg_user_id) AS reg_user_name /* 프로젝트 신청자 명 */
+				, PJ.project_manager_id		/* 프로젝트 관리자 ID */
+				, CD.dept_name AS project_manager_dept_name /* 프로젝트 관리자 부서이름 */
+				, CU.user_name AS project_manager_name	 	/* 프로젝트 관리자  명 */
+				, RPM.manager_id	 as project_admini_strator_id
+				, CU2.user_name AS project_admini_strator_name
+				, CD2.dept_name AS project_admini_strator_dept_name
+	      		, CONCAT(TRIM(RPM.manager_id),' / ',TRIM(CU2.user_name),' / ',TRIM(CD2.dept_name)) as project_admini_strator_info
+				, DATE_FORMAT(PJ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2 /* 등록 일시 */
+			FROM	oss_project_box PJ
+			LEFT JOIN req_project RP 				ON PJ.program_seq = RP.req_project_seq
+			LEFT JOIN oss_project_manager RPM 		ON PJ.project_box_id = RPM.project_id
+			 AND RPM.manager_type = '01'
+			LEFT JOIN cmm_user CU2 					ON RPM.manager_id =  CU2.user_id
+			LEFT JOIN cmm_department CD2 			ON CU2.dept_code = CD2.dept_code
+			LEFT JOIN cmm_customer CC 				ON PJ.customer_id = CC.customer_id
+			LEFT JOIN cmm_user CU					ON PJ.project_manager_id = CU.user_id
+			LEFT JOIN cmm_department CD				ON CU.dept_code = CD.dept_code
+
+			WHERE
+				(RP.complete_flag = 'Y' OR RP.complete_flag IS NULL OR PJ.project_box_id IS NOT NULL)
+				<if test="searchKind == 'projectAlias' and keyword != ''">
+				AND PJ.project_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'projectName' and keyword != ''">
+				AND PJ.project_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'searchAll' and keyword != ''">
+				AND
+				(
+					PJ.project_alias like CONCAT('%',#{keyword},'%')
+					OR
+					PJ.project_name like CONCAT('%',#{keyword},'%')
+				)
+				</if>
+				AND PJ.delete_flag <![CDATA[<>]]> 'Y'
+
+    	)TOT
+
+			<if test="userId != 'admin'">
+		       WHERE (TOT.project_manager_id = #{userId} OR TOT.project_admini_strator_id = #{userId})
+			</if>
+			<if test="userId == 'admin'">
+				WHERE 1=1
+			</if>
+
+	    GROUP BY TOT.project_box_id
+		ORDER BY
+			TOT.reg_datetime2 DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+
+  	</select>
+
+	<!-- 프로젝트 oss-->
+	<select id="getOkProjectView" resultType="CustomReqProjectVO">
+		SELECT
+		    OP.project_box_id AS project_box_id			/* 프로젝트 ID */
+		    , OP.project_name AS project_name
+		    , OP.project_alias AS project_alias
+		    , CC.customer_name AS customer_name    	/* 프로젝트 회원사명*/
+		    , TRIM(CD.dept_name) AS dept_name		/* 프로젝트 부서명 */
+		    , DATE_FORMAT(OP.project_start_datetime, '%Y-%m-%d') AS project_start_datetime
+        	, DATE_FORMAT(OP.project_end_datetime, '%Y-%m-%d') AS project_end_datetime
+        	, OP.description AS description			/* 프로젝트 설명 */
+		    , OP.program_seq AS program_seq		    /* 프로젝트 req_project 테이블 , 프로젝트 첨부파일 ID */
+		    , OP.project_price AS project_price		/* 프로젝트 가격 */
+		    , CU2.user_name AS reg_user_name		/* 프로젝트 신청자 */
+		    , CU.user_id AS manager_id				/* 프로젝트 관리자 ID*/
+		    , CU.user_name AS manager_name
+		    , CU.user_tel AS manager_tel
+		    , CU.user_tel_ex AS manager_tel_ex
+		    , CU.user_phone AS manager_phone
+		    , CD2.dept_code							/* 프로젝트 관리자 부서코드 */
+        	, CONCAT(TRIM(CU.user_id),' / ',TRIM(CU.user_name),' / ',TRIM(CD2.dept_name)) AS project_admini_strator_info
+        	, CD3.dept_name AS dept_name2
+		FROM oss_project_box OP
+		INNER JOIN cmm_customer CC			ON OP.customer_id = CC.customer_id 	/* 프로젝트 회원사정보 */
+		INNER JOIN cmm_department CD		ON OP.dept_code = CD.dept_code 		/* 프로젝트 부서정보 */
+		INNER JOIN cmm_user CU2				ON OP.reg_user_id=CU2.user_id  		/* 프로젝트 신청자 */
+		INNER JOIN oss_project_manager OPM	ON OP.project_box_id = OPM.project_id AND OPM.manager_type = '01'
+		LEFT JOIN cmm_user CU				ON OPM.manager_id = CU.user_id 	 	/* 프로젝트 관리자 */
+		LEFT JOIN cmm_department CD2		ON CU.dept_code = CD2.dept_code 	/* 프로젝트 관리자 부서정보 */
+		LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD3
+				ON CD3.dept_code = CD2.dept_code
+		WHERE
+			op.project_box_id = #{projectBoxId}
+			AND op.delete_flag='N'
+
+  	</select>
+
+	<!-- 프로젝트 oss-->
+	<select id="getProjectBoxId" resultType="CustomReqProjectVO">
+		SELECT
+		    OP.project_box_id AS project_box_id			/* 프로젝트 ID */
+		FROM oss_project OP
+		WHERE
+			op.project_id = #{projectId}
+  	</select>
+
+  	<!-- 프로젝트 req -->
+    <select id="getProjectWrite" resultType="CustomReqProjectVO">
+		SELECT
+			RP.req_project_seq AS req_project_seq /* 프로젝트 신청 ID */
+		    , RP.project_name AS project_name
+		    , RP.project_alias AS project_alias
+		    , CC.customer_name AS customer_name    	/* 프로젝트 회원사명 */
+		    , TRIM(CD.dept_name) AS dept_name		/* 프로젝트 부서명 */
+		    , DATE_FORMAT(RP.project_start_datetime, '%Y-%m-%d') AS project_start_datetime
+        	, DATE_FORMAT(RP.project_end_datetime, '%Y-%m-%d') AS project_end_datetime
+        	, RP.project_description AS description	/* 프로젝트 설명 */
+		    , RP.project_price AS project_price		/* 프로젝트 가격 */
+		    , CU2.user_name AS reg_user_name		/* 프로젝트 신청자 */
+		    , CU.user_id AS manager_id				/* 프로젝트 관리자 ID*/
+		    , CU.user_name AS manager_name			/* 프로젝트 관리자 명*/
+		    , CU.user_tel AS manager_tel			/* 프로젝트 관리자 국번*/
+		    , CU.user_tel_ex AS manager_tel_ex		/* 프로젝트 관리자 사번*/
+		    , CU.user_phone AS manager_phone		/* 프로젝트 관리자 핸드폰*/
+		FROM req_project RP
+		LEFT JOIN cmm_customer CC 			ON RP.customer_id = CC.customer_id		/* 프로젝트 회원사정보 */
+		LEFT JOIN cmm_department CD 		ON RP.dept_code = CD.dept_code			/* 프로젝트 부서정보 */
+		LEFT JOIN cmm_user CU2 				ON RP.reg_user_id=CU2.user_id   		/* 프로젝트 신청자 */
+		INNER JOIN req_project_manager OPM  ON RP.req_project_seq = OPM.req_project_seq AND OPM.project_manager_type = '01'
+		LEFT JOIN cmm_user CU 				ON OPM.project_manager_id=CU.user_id 	/* 프로젝트 관리자 */
+		WHERE RP.req_project_seq = #{req_project_seq}
+  	</select>
+
+  	<!--프로젝트 회원사 멤버 리스트-->
+
+    <select id="getCustomerMemberList" resultType="CustomReqUserVO">
+		SELECT
+			a.user_id,
+			a.user_name,
+			a.customer_id,
+			a.user_phone,
+			a.user_tel,
+			a.user_mail,
+			a.sms_recv_flag,
+			a.del_flag
+
+<!-- 			(SELECT company_name FROM req_customer WHERE customer_id=a.customer_id) AS company_name		  -->
+		FROM
+			cmm_user a
+		where
+			a.del_flag <![CDATA[<>]]> 'Y'
+		and
+			a.customer_id=#{customerId}
+  	</select>
+
+	<!-- 프로젝트 PM 업데이트-->
+    <update id="setProjectPmupdate" parameterType="CustomReqProjectVO" >
+		UPDATE oss_project
+			SET
+				project_manager_id = #{userId}
+			WHERE
+				project_id = #{projectId}
+  	</update>
+
+	<!-- 프로젝트 status_flag update -->
+    <update id="reqProjectStatusUpdate04" parameterType="String" >
+		UPDATE req_project
+		SET
+			status_flag = '04'
+	    WHERE
+	    	req_project_seq = #{reqProjectSeq}
+  	</update>
+
+
+  	<!--프로젝트  회원사 멤버 검색 리스트-->
+    <select id="getCustomerMemberSerachList" resultType="CustomReqUserVO">
+		SELECT
+			a.user_id,
+			a.user_name,
+			a.customer_id,
+			a.user_phone,
+			a.user_tel,
+			a.user_mail,
+			a.sms_recv_flag,
+			a.del_flag
+			<!--(SELECT company_name FROM req_customer WHERE customer_id=a.customer_id) AS company_name	-->
+		FROM
+			cmm_user a
+		where a.del_flag <![CDATA[<>]]> 'Y' and a.customer_id=#{customerId} and a.user_name LIKE CONCAT('%',#{userName},'%')
+  	</select>
+
+  	<!-- PM 설정 관련 start  -->
+
+  	<!-- PM 설정 대상 리스트 -->
+    <select id="getPmPopList" parameterType="CustomReqProjectVO" resultType="CustomReqUserVO">
+		SELECT
+			a.*,
+			(SELECT COUNT(*)
+			FROM oss_project
+			WHERE project_id=#{projectId}
+			AND project_manager_id=a.user_id) AS pm_yn
+		FROM
+			cmm_user a, cmm_customer b
+		WHERE
+			1=1
+		AND
+			a.del_flag <![CDATA[<>]]> 'Y'
+		AND
+			a.customer_id = b.customer_id
+		AND
+			SUBSTRING(a.user_authority,13,1) = '1'
+		AND
+			a.customer_id = #{customerId}
+		<if test='keyword !="" or keyword !=null'>
+		AND(
+			a.user_name LIKE CONCAT('%',#{keyword},'%')
+			OR
+			a.user_id LIKE CONCAT('%',#{keyword},'%')
+			)
+		</if>
+
+  	</select>
+
+  	<!-- 승인 프로젝트 정보 수정 -->
+  	<update id="okProjectHistoryInsert" parameterType="CustomReqProjectVO" >
+
+				INSERT INTO
+					    oss_project_history (
+						project_id,
+						project_alias,
+						description,
+						mod_datetime,
+						mod_user_id,
+						project_start_datetime,
+						project_end_datetime,
+						project_price
+					)
+				VALUES
+					(
+						#{projectBoxId},
+						#{projectAlias},
+						#{description},
+						NOW(),
+						#{userId},
+						#{projectStartDatetime},
+						<if test="projectEndDatetime == ''">
+						NULL,
+						</if>
+						<if test="projectEndDatetime != ''">
+						#{projectEndDatetime},
+						</if>
+						#{projectPrice}
+					);
+
+  	    </update>
+
+
+  	    <update id="okOssProjectAdminiStratorInsert" parameterType="CustomReqProjectVO" >
+
+			INSERT INTO oss_project_manager (
+					project_id,
+					manager_id,
+					manager_type,
+					reg_datetime,
+					reg_user_id
+				)
+			VALUES
+				(
+					#{projectBoxId},
+					#{adminiStratorId},
+					'01',
+					NOW(),
+					#{userId}
+				)
+
+					ON DUPLICATE KEY
+					UPDATE
+					project_id = #{projectBoxId},
+					manager_id = #{adminiStratorId},
+					manager_type = '01'
+
+  	    </update>
+
+
+  	    <update id="okOssProjectAdminiStratorUpdate" parameterType="CustomReqProjectVO" >
+
+	        UPDATE oss_project_manager set
+				        manager_id = #{adminiStratorId},
+				        manager_type = '01'
+	        WHERE project_id = #{projectBoxId}
+	            AND manager_type = '01'
+
+  	    </update>
+
+  	<!-- OSS 프로젝트 정보 수정 -->
+  	<update id="okProjectUpdate" parameterType="CustomReqProjectVO" >
+	   UPDATE
+	  			 oss_project
+	  		SET
+	  			 project_alias = #{projectAlias}
+	  			,project_start_datetime = #{projectStartDatetime}
+
+	  			<if test="projectEndDatetime == ''">
+	  			,project_end_datetime = NULL
+	  			</if>
+	  			<if test="projectEndDatetime != ''">
+	  			,project_end_datetime = #{projectEndDatetime}
+	  			</if>
+	  			,description = #{description}
+	  			,project_price = #{projectPrice}
+	  			,project_manager_id = #{adminiStratorId}
+	  		WHERE
+	  			project_box_id = #{projectBoxId}
+  	</update>
+
+  	<update id="okProjectBoxUpdate" parameterType="CustomReqProjectVO" >
+	   UPDATE
+	  			 oss_project_box
+	  		SET
+	  			 project_alias = #{projectAlias}
+	  			,project_start_datetime = #{projectStartDatetime}
+
+	  			<if test="projectEndDatetime == ''">
+	  			,project_end_datetime = NULL
+	  			</if>
+	  			<if test="projectEndDatetime != ''">
+	  			,project_end_datetime = #{projectEndDatetime}
+	  			</if>
+	  			,description = #{description}
+	  			,project_price = #{projectPrice}
+	  			,project_manager_id = #{adminiStratorId}
+	  		WHERE
+	  			project_box_id = #{projectBoxId}
+  	</update>
+
+  	<!-- REQ 프로젝트 정보 수정 -->
+  	<update id="projectUpdate" parameterType="CustomReqProjectVO" >
+	   UPDATE
+	  			 req_project
+	  		SET
+	  			 project_alias = #{projectAlias}
+	  			,project_start_datetime = #{projectStartDatetime}
+	  			<if test="projectEndDatetime == ''">
+	  			,project_end_datetime = NULL
+	  			</if>
+	  			<if test="projectEndDatetime != ''">
+	  			,project_end_datetime = #{projectEndDatetime}
+	  			</if>
+	  			,project_description = #{description}
+	  			,project_price = #{projectPrice}
+	  			,customer_id = #{projectCustomerId}
+	  			,dept_code = #{projectDeptCode}
+	  		WHERE
+	  			req_project_seq = #{reqProjectSeq}
+  	</update>
+
+
+
+  	<!-- 프로젝트 관리자 insert -->
+  	<insert id="projectAdminiStratorInsert" parameterType="CustomReqProjectVO" >
+
+	  			INSERT INTO
+						req_project_manager (
+							req_project_seq,
+							project_manager_id,
+							reg_datetime,
+							reg_user_id,
+							project_manager_type
+						)
+					VALUES
+						(
+							#{reqProjectSeq},
+							#{projectAdminiStratorId},
+							NOW(),
+							#{userId},
+							'01'
+						);
+  	</insert>
+
+
+  	<!-- 프로젝트 관리자 insert -->
+  	<update id="projectAdminiStratorUpdate" parameterType="CustomReqProjectVO" >
+
+	  			UPDATE req_project_manager SET
+			  			    project_manager_id = #{projectAdminiStratorId},
+			  			    project_manager_type = '01'
+	  			WHERE  project_manager_type = '01'
+	  			    AND  req_project_seq= #{reqProjectSeq}
+
+
+  	</update>
+
+  	<!-- 프로젝트 재신청 스텝 재등록 -->
+  	<insert id="srApprovalStepInsert" parameterType="CustomReqCustomerVO" >
+
+		MERGE INTO sr_approval_step A
+        USING (
+        SELECT
+		        #{stepId} AS step_id,
+				#{requestSeq} AS request_seq,
+				'AFW0040' AS flow_id,
+				#{stepName} AS step_name,
+				#{stepLevel} AS step_level,
+				#{leftStepId} AS left_step_id,
+				#{rightStepId} AS right_step_id,
+				#{apprvState} AS apprv_state,
+				#{apprvScheduleUserId} AS apprv_schedule_user_id
+				FROM db_root
+              ) B
+              ON (    A.step_id = B.step_id
+                   AND A.request_seq = B.request_seq
+              ) WHEN MATCHED THEN
+                     UPDATE
+                        SET
+
+		            A.step_name = B.step_name,
+					A.step_level = B.step_level,
+					A.left_step_id = B.left_step_id,
+					A.right_step_id = B.right_step_id,
+					A.apprv_user_id = NULL,
+					A.apprv_user_name = NULL,
+					A.apprv_description = NULL,
+					A.apprv_datetime = NULL,
+					A.apprv_state = B.apprv_state,
+					A.apprv_schedule_user_id = B.apprv_schedule_user_id
+
+                WHEN NOT MATCHED THEN
+                INSERT
+                (
+			        A.step_id,
+					A.request_seq,
+					A.flow_id,
+					A.step_name,
+					A.step_level,
+					A.left_step_id,
+					A.right_step_id,
+					A.apprv_state,
+					A.apprv_schedule_user_id
+                ) VALUES
+                (
+			        B.step_id,
+					B.request_seq,
+					B.flow_id,
+					B.step_name,
+					B.step_level,
+					B.left_step_id,
+					B.right_step_id,
+					B.apprv_state,
+					B.apprv_schedule_user_id
+                )
+
+  	</insert>
+
+  	<!-- 프로젝트 재신청 스탭 초기화  -->
+  	<update id="srApprovalStepUpdate" parameterType="CustomReqProjectVO" >
+		UPDATE sr_approval_step
+		SET
+			apprv_user_id = NULL
+			,apprv_user_name = NULL
+			,apprv_description = NULL
+			,apprv_datetime = NULL
+			,apprv_state = 'APPRV_WAITING'
+		WHERE
+			request_seq = #{reqProjectSeq}
+  	</update>
+
+  	<update id="srApprovalStepApprv1StateUpdate" parameterType="CustomReqProjectVO" >
+		UPDATE sr_approval_step
+		SET
+			apprv_state = 'APPRV_PROCESSING',
+			apprv_schedule_user_id = #{userIdReview}
+		WHERE
+			request_seq = #{reqProjectSeq}
+			AND step_level = '1'
+  	</update>
+
+  	<update id="srApprovalStepApprv2StateUpdate" parameterType="CustomReqProjectVO" >
+		UPDATE sr_approval_step
+		SET
+			apprv_schedule_user_id = #{userIdApprove}
+		WHERE
+			request_seq = #{reqProjectSeq}
+			AND step_level = '2'
+  	</update>
+
+  	<update id="reqProjectStatusUpdate" parameterType="CustomReqProjectVO" >
+			UPDATE req_project
+			SET
+				status_flag = '02'
+			   ,complete_flag = 'N'
+			 WHERE
+			 	req_project_seq = #{reqProjectSeq}
+  	</update>
+
+  	 <delete id="reqProjectDelete" parameterType="CustomReqProjectVO" >
+	  		DELETE FROM
+	  			req_project
+	  		WHERE
+	  			req_project_seq = #{reqProjectSeq}
+	  </delete>
+	  <delete id="reqProjectManagerDelete" parameterType="CustomReqProjectVO" >
+	  		DELETE FROM
+	  			req_project_manager
+	  		WHERE
+	  			req_project_seq = #{reqProjectSeq}
+	  </delete>
+	  <delete id="srApprovalStepDelete" parameterType="CustomReqProjectVO" >
+	  		DELETE FROM
+	  			sr_approval_step
+	  		WHERE
+	  			request_seq = #{reqProjectSeq}
+	  </delete>
+	   <delete id="cmmFileDelete" parameterType="CustomReqProjectVO" >
+	  		DELETE FROM
+	  			       cmm_file
+	  		WHERE program_name =  'projectFile'
+	  		    AND program_seq = #{reqProjectSeq}
+	  </delete>
+
+
+  	<!-- PM 설정 관련 end  -->
+  	<!--박현오 프로젝트 관련 -->
+  <!--  	프로젝트 신청현황 리스트 상세조회-->
+    <select id="detail" parameterType="CustomReqProjectVO" resultType="CustomReqProjectVO">
+		SELECT
+			req_project_seq,
+			a.project_name,
+			project_alias,
+			project_description,
+			customer_id,
+			reg_datetime	,
+			request_type,
+			c.customer_name ,
+			c.company_name,
+			(SELECT company_name FROM cmm_company WHERE company_id = co.up_company_id)up_company_name,
+			(SELECT project_id FROM oss_project WHERE project_name=a.project_name) AS project_id
+		FROM
+			req_project a
+			INNER JOIN cmm_customer c
+			a.cutomer_id = c.customer_id
+			INNER JOIN cmm_company co
+			co.company_id = c.ref_company_id
+		where 	req_project_seq=#{reqProjectSeq}
+	</select>
+
+<!-- 	  	프로젝트 마지막 승인 신청현황 등록-->
+  	<insert id="insert" parameterType="CustomReqProjectVO" >
+  	insert into oss_project
+		(project_id,
+		company_id,
+		customer_id,
+		project_manager_id,
+		project_name,
+		project_alias,
+		reg_datetime,
+		reg_user_id,
+		delete_flag
+	)
+	VALUES
+		(
+		#{projectId},
+		#{companyId},
+		#{customerId},
+		#{projectManagerId},
+		#{projectName},
+		#{projectAlias},
+		#{regDatetime},
+		#{regUserId},
+		#{delFlag}
+	)
+
+  	</insert>
+  <!--   	프로젝트 신규 마지막 승인 신청현황 수정-->
+  	<update id="newUpdate" parameterType="CustomReqProjectVO" >
+  		update
+  			req_project
+  		set
+			apprv_state = 'APPRV_COMPLETED'
+  		where
+  			req_project_seq = #{reqProjectSeq}
+  	</update>
+
+ <!--   	프로젝트 해지 마지막 승인 신청현황 수정-->
+  	<update id="update" parameterType="CustomReqProjectVO" >
+  		update
+  			req_project
+  		set
+			apprv_state = 'APPRV_COMPLETED',
+			del_flag='Y'
+  		where
+  			req_project_seq = #{reqProjectSeq}
+		and
+			 request_type <![CDATA[=]]> 'REQTYPE_EXPR'
+  	</update>
+ <!--   	프로젝트 해지 마지막 승인 신청현황 수정-->
+  	<update id="ossUpdate" parameterType="CustomReqProjectVO" >
+  		update
+  			oss_project
+  		set
+			delete_flag = 'Y'
+  		where
+  			project_id = #{projectId}
+
+  	</update>
+
+ <!--   	프로젝트 신청현황 상세 리스트 승인멤버 조회-->
+    <select id="approvalList" parameterType="CustomReqProjectVO" resultType="CustomReqProjectVO">
+		select
+			a.request_seq,
+			a.step_name,
+			a.step_level,
+			a.apprv_state,
+			a.step_id,
+			a.right_step_id,
+			a.apprv_description
+<!--  		(SELECT code_name FROM cmm_code WHERE  code_id=#{codeKeyId} AND code_key_id=#{codeKeyId} ) AS apprv_code_name -->
+		from
+				sr_approval_step a
+	 		where
+				a.request_seq = #{requestSeq}
+	</select>
+
+<!--  	   	프로젝트 신청현황 상세 리스트 승인멤버 유저 아이디 조회-->
+    <select id="approvalUserId" parameterType="CustomReqProjectVO" resultType="CustomReqProjectVO">
+			select
+				user_id
+				,step_id
+			from
+				sr_approval_member
+	 		where
+				request_seq = #{requestSeq}
+			GROUP BY step_id
+	</select>
+
+	<!--   	프로젝트 승인 스텝정보 수정-->
+	<update id="stepUpdate" parameterType="CustomReqProjectVO" >
+	  		UPDATE
+	  			sr_approval_step
+	  		SET
+	  		apprv_description=#{apprvDescription},
+				apprv_state = #{apprvState}
+	  		WHERE
+	  			request_seq = #{requestSeq}
+	  		AND
+	  			step_level =#{stepLevel}
+	</update>
+
+	<!--  	   	프로젝트 신청현황 상세 리스트 승인멤버 유저 아이디 조회-->
+    <select id="getProjectCatalogueCnt" parameterType="CustomReqProjectVO" resultType="int">
+			select
+				COUNT(project_id)
+			from
+				oss_vm
+	 		where
+				project_id = #{projectId}	and del_flag <![CDATA[<>]]> 'Y'
+
+	</select>
+
+	<!-- 프로젝트  해지신청 내용입력 -->
+    <update id="setprojectReqExpr" parameterType="CustomReqProjectVO" >
+    	INSERT INTO req_project
+			(
+				req_project_seq,
+				project_name,
+				project_alias,
+				project_description,
+				customer_id,
+				apprv_state,
+				reg_datetime,
+				reg_user_id,
+				request_type
+			)
+			VALUES
+			(
+				#{reqProjectSeq},
+				#{projectName},
+				#{projectAlias},
+				#{projectDescription},
+				#{customerId},
+				#{apprvState},
+				NOW(),
+				#{regUserId},
+				#{requestType}
+			)
+  	</update>
+
+	<!--  	   사용자 승인 모뎁 승인처리중인	프로젝트  PM아이디 조회 -->
+    <select id="getAppPmmemberCnt" parameterType="CustomReqProjectVO" resultType="int">
+			SELECT
+				COUNT(a.user_id)
+			FROM
+				sr_approval_member a, sr_approval_step b,
+				(
+				SELECT c.order_no FROM bss_order c, bss_order_product d, bss_order_product_vm e
+				WHERE e.project_id=#{projectId} AND d.order_product_seq=e.order_product_seq AND c.order_no=d.order_no
+				) f
+	 		WHERE
+				a.user_id = #{projectManagerId}
+			AND a.request_seq = b.request_seq AND b.apprv_state = 'APPRV_PROCESSING' AND a.request_seq=f.order_no
+	</select>
+
+
+	<!-- 작업완료처리 -->
+	<update id="setProjectWorkComplete" parameterType="CustomReqProjectVO">
+		UPDATE
+			req_project
+		SET
+			complete_flag = 'Y'
+			, close_description = #{closeDescription}
+		WHERE
+			req_project_seq = #{reqProjectSeq}
+	</update>
+
+	<update id="updateProject" parameterType="CustomReqProjectVO">
+		UPDATE
+			req_project
+		SET
+            <if test="projectName != null">
+				project_name = #{projectName},
+			</if>
+			<if test="reqProjectDescription != null">
+				req_project_description = #{reqProjectDescription},
+			</if>
+				mod_user_id = #{modUserId},
+				mod_datetime = NOW(),
+			<if test="completeFlag != null">
+             complete_flag = #{completeFlag},
+			</if>
+			status_flag = '04'
+
+		WHERE
+			req_project_seq = #{reqProjectSeq}
+	</update>
+
+		<update id="cancelledProject" parameterType="CustomReqProjectVO">
+		UPDATE
+			req_project
+		SET
+            <if test="projectName != null">
+				project_name = #{projectName},
+			</if>
+				mod_user_id = #{modUserId},
+				mod_datetime = NOW(),
+			<if test="completeFlag != null">
+             complete_flag = #{completeFlag},
+			</if>
+			status_flag = '06'
+
+		WHERE
+			req_project_seq = #{reqProjectSeq}
+	</update>
+
+	<delete id="deleteProjectApproveUserDelete" parameterType="CustomReqProjectVO">
+		DELETE FROM sr_approval_member
+		WHERE request_seq = #{reqProjectSeq}
+		AND user_id = #{userId}
+	</delete>
+
+	<delete id="projectManagerUserDelete" parameterType="CustomReqProjectVO">
+		DELETE FROM req_project_manager
+		WHERE req_project_seq = #{reqProjectSeq}
+		AND project_manager_id = #{userId}
+	</delete>
+
+	<delete id="ossProjectManagerUserDelete" parameterType="CustomReqProjectVO">
+		DELETE FROM oss_project_manager
+		WHERE project_id = #{projectBoxId}
+		AND manager_id = #{userId}
+	</delete>
+
+	<delete id="projectManagerUserUpdate" parameterType="CustomReqProjectVO">
+          UPDATE req_project_manager
+                set del_flag = 'Y'
+           WHERE req_project_seq = #{projectId}
+               AND project_manager_id = #{userId}
+	</delete>
+
+	<update id="projectManagerTypeUdate" parameterType="CustomReqProjectVO">
+		UPDATE req_project_manager SET
+		project_manager_type = #{projectManagerType}
+		WHERE req_project_seq = #{reqProjectSeq}
+		AND project_manager_id = #{userId}
+	</update>
+
+	<update id="ossProjectManagerTypeUdate" parameterType="CustomReqProjectVO">
+		UPDATE oss_project_manager SET
+		manager_type = #{projectManagerType}
+		WHERE project_id = #{projectBoxId}
+		AND manager_id = #{userId}
+	</update>
+
+	<select id="reqProjectManagerTypeCheck" parameterType="CustomReqProjectVO" resultType="int">
+			SELECT
+				COUNT(*)
+			FROM
+				req_project_manager
+	 		WHERE
+				req_project_seq = #{reqProjectSeq}
+			AND project_manager_type = '01'
+	</select>
+
+	<select id="reqProjectManagerTypeCheckOne" parameterType="CustomReqProjectVO" resultType="int">
+			SELECT
+				COUNT(*)
+			FROM
+				req_project_manager
+	 		WHERE req_project_seq = #{reqProjectSeq}
+			AND project_manager_id = #{userId}
+			AND project_manager_type = '01'
+	</select>
+
+	<select id="ossProjectManagerTypeCheck" parameterType="CustomReqProjectVO" resultType="int">
+			SELECT
+				COUNT(*)
+			FROM
+				oss_project_manager
+	 		WHERE
+				project_id = #{projectBoxId}
+			AND manager_type = '01'
+	</select>
+
+	<select id="ossProjectManagerTypeCheckOne" parameterType="CustomReqProjectVO" resultType="int">
+			SELECT
+				COUNT(*)
+			FROM
+				oss_project_manager
+	 		WHERE project_id = #{projectBoxId}
+			AND manager_id = #{userId}
+			AND manager_type = '01'
+	</select>
+
+	<select id="cloudProjectInfo" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+			SELECT
+				A.*
+				, B.*
+				, IFNULL(ROUND(C.mem_used /1024,0),0) AS mem_used
+				, IFNULL(C.vcpu_used,0) AS vcpu_used
+				, IFNULL(C.vm_used,0) AS vm_used
+				, IFNULL(C.disk_used,0) AS disk_used
+				, IFNULL(C.nas_used,0) AS nas_used
+			FROM
+				oss_project A
+			LEFT JOIN
+				oss_cloud B ON A.cloud_id =B.cloud_id
+			LEFT JOIN
+				oss_availability C ON A.project_id = C.project_id
+			WHERE project_box_id = #{projectBoxId}
+			<if test="cloudType != null and cloudType.equals('LaaS')">
+			        AND  ( B.cloud_type ='openstack' OR B.cloud_type ='vmware' OR B.cloud_type ='nutanix')
+		    </if>
+		    <if test="cloudType != null and cloudType.equals('PaaS')">
+			        AND  ( B.cloud_type ='openshift')
+		    </if>
+
+	</select>
+
+	<select id="cloudProjectInfoLass" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+			SELECT
+				A.*
+				, B.*
+				, SUM(IFNULL(ROUND(C.mem_used /1024,0),0)) AS mem_used
+				, SUM(IFNULL(C.vcpu_used,0)) AS vcpu_used
+				, SUM(IFNULL(C.vm_used,0)) AS vm_used
+				, SUM(IFNULL(C.disk_used,0)) AS disk_used
+				, SUM(IFNULL(C.nas_used,0)) AS nas_used
+			FROM
+				oss_project A
+			LEFT JOIN
+				oss_cloud B ON A.cloud_id =B.cloud_id
+			LEFT JOIN
+				oss_availability C ON A.project_id = C.project_id
+			WHERE project_box_id = #{projectBoxId}
+			<if test="cloudType != null and cloudType.equals('LaaS')">
+			        AND  ( B.cloud_type != 'openshift')
+		    </if>
+		    <if test="cloudType != null and cloudType.equals('PaaS')">
+			        AND  ( B.cloud_type = 'openshift')
+		    </if>
+             group by B.cloud_type
+	</select>
+
+	 	<!-- 프로젝트 클라우드 체크-->
+    <select id="reqProjectCloudChk" resultType="int">
+		SELECT
+		 	COUNT(req_project_seq)
+		FROM
+			req_project_cloud
+		WHERE req_project_seq = #{reqProjectSeq}
+		    AND cloud_id = #{cloudId}
+  	</select>
+
+  	<select id="ossProjectChkListCount" parameterType="CustomReqProjectVO" resultType="int">
+			  SELECT COUNT(*) FROM oss_project a
+			   INNER JOIN req_project b
+			   ON a.program_seq = b.req_project_seq
+			   WHERE b.status_flag = '02'
+			   AND b.complete_flag = 'N'
+			   AND a.delete_flag = 'N'
+			   AND a.program_seq = #{programSeq}
+  	</select>
+
+
+  	 <select id="reqProjectCloudChkList"  resultType="int">
+		  SELECT COUNT(req_project_seq)
+			FROM req_project_cloud
+			WHERE req_project_seq = #{reqProjectSeq}
+			    AND cloud_id IN
+			<foreach collection="cloudIds" item="item" index="index" separator="," open="(" close=")">
+			#{item}
+			</foreach>
+	 </select>
+
+
+ 	 <delete id="deleteReqProjectCloud" >
+            DELETE FROM req_project_cloud
+		     WHERE req_project_seq = #{reqProjectSeq}
+		     AND  cloud_id IN
+
+
+		<foreach collection="cloudIds" item="item" index="index" separator="," open="(" close=")">
+		#{item}
+		</foreach>
+    </delete>
+
+
+    <select id="getReqProjectCloudQuota" resultType="CustomReqProjectVO" parameterType="CustomReqProjectVO">
+
+		SELECT
+			req_project_cloud_seq,
+			req_project_seq,
+			cloud_id,
+			reg_user_id,
+			reg_datetime,
+			mod_user_id,
+			mod_datetime,
+			delete_flag,
+			quota_yn,
+			cpu_limit,
+			mem_limit,
+			cpu_req,
+			mem_req,
+			volume_req,
+			storage_req,
+			pod_req,
+			pod_cpu_min,
+			pod_cpu_max,
+			pod_mem_min,
+			pod_mem_max,
+			limit_range_cpu_min,
+			limit_range_cpu_max,
+			limit_range_mem_min,
+			limit_range_mem_max,
+			limit_range_cpu_default,
+			limit_range_mem_default,
+			limit_range_cpu_default_request,
+			limit_range_mem_default_request,
+			limit_range_cpu_limit_request_ratio,
+			limit_range_mem_limit_request_ratio
+		FROM req_project_cloud
+		WHERE  cloud_id = #{cloudId}
+		AND req_project_seq = #{reqProjectSeq}
+		AND quota_yn = 'Y'
+
+	</select>
+
+    <select id="getProjectSubnetList" resultType="CustomReqProjectVO" parameterType="CustomReqProjectVO">
+
+			SELECT
+				subnet_id,
+				subnet_name,
+				subnet_alias,
+				default_subnet_yn,
+				reg_datetime,
+				reg_user_id,
+				mod_datetime,
+				mod_user_id,
+				delete_flag
+			FROM oss_cloud_subnet
+		WHERE default_subnet_yn = 'N'
+		AND cloud_id = #{cloudId}
+
+	</select>
+
+    <select id="getProjectDefaultSubnet" resultType="CustomReqProjectVO" parameterType="CustomReqProjectVO">
+
+			SELECT
+				subnet_id,
+				subnet_name,
+				subnet_alias,
+				default_subnet_yn,
+				reg_datetime,
+				reg_user_id,
+				mod_datetime,
+				mod_user_id,
+				delete_flag
+			FROM oss_cloud_subnet
+		WHERE default_subnet_yn = 'Y'
+		AND cloud_id = #{cloudId}
+
+	</select>
+
+
+
+	 <select id="getReqProjectQuota" parameterType="CustomReqProjectVO" resultType="CustomReqProjectVO">
+
+			SELECT  b.cloud_id,
+	                    a.cpu_req,
+	                    cast (a.mem_req as int) * 1024 as mem_req,
+	                    a.storage_req,
+	                    b.project_id
+                FROM req_project_cloud a
+	    INNER JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') b
+	                ON  a.req_project_seq = b.program_seq
+	          WHERE a.cloud_id = #{cloudId}
+	              AND b.project_id = #{projectId}
+
+
+	</select>
+
+</mapper>

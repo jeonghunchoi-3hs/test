@@ -1,0 +1,306 @@
+package com.ivucenter.cloud.api.nutanix;
+
+import java.util.Iterator;
+import java.util.List;
+
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
+import com.google.gson.JsonObject;
+import com.ivucenter.cloud.portal.cmm.cloud.CustomOssCloudVO;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@SuppressWarnings("unused")
+public class NutanixTest {
+	
+	static boolean logDetail = !true;
+	
+	public static void main(String[] args) throws Exception {
+		CustomOssCloudVO cloudVo = new CustomOssCloudVO();
+		cloudVo.setCalmServer("https://invisionit.iptime.org:9443");   
+		cloudVo.setCalmAdminUser("admin");
+		cloudVo.setCalmAdminPassword("Invision456#");
+		cloudVo.setAdminUsername("admin");
+		cloudVo.setAdminPassword("Invision456#");
+		cloudVo.setApiGatewayServer("https://invisionit.iptime.org:9440/");  
+		
+		getEnvironmentList(cloudVo);
+		
+		
+	//	String env_uuid = "04697d55-1240-4df2-8287-d4463d1ce103";
+		
+//		getEnvironment(cloudVo, env_uuid);
+		
+	//	createEnvironment(cloudVo, env_uuid);
+		
+	//	getProjectList(cloudVo);
+		
+		
+		// defualt project uuid
+		String default_project_uuid = "f3473a39-8f17-4ca3-84ae-eae479aef066";
+		
+//		getProject(cloudVo, default_project_uuid);
+		
+//		getProject(cloudVo, "821c3a84-2c6b-417d-8f38-d9759b1a87ac");
+		
+		String project_name = "TEST_PRJ 3hs";
+		String project_description = "TEST_PRJ 한글";
+		int vcpu_limit = 8;
+		int memory_gb = 11;
+		int storage_gb = 12;
+		String account_uuid = "88fc8328-946d-4495-939d-bd044d1a5441";
+		String default_subnet_uuid = "7d96cd0c-5bf5-42c7-8532-e374276ecb79";
+		String subnet_uuid = "7d96cd0c-5bf5-42c7-8532-e374276ecb79";
+		
+//		createProject(cloudVo, project_name, project_description, vcpu_limit, memory_gb, storage_gb, account_uuid, default_subnet_uuid, subnet_uuid) ;
+		
+//		getVmList(cloudVo);
+
+		String vm_uuid = "d453e1f6-99c4-4a10-8370-d117b8cdd000";
+//		getVmDetail(cloudVo, vm_uuid);
+		
+		String vmdisk_uuid = "6e39f8aa-70f4-421c-933b-f20530b8922c";
+		String device_uuid = "c53fb07f-b426-446c-a7fd-c348fd9e1746";
+		String storage_container_uuid = "2b7cf718-a65c-45b4-81bc-33e900ab801f";
+		
+		String host_uuid = "5c1d5762-6264-4d08-89b8-402c90933568";
+		
+		long mb_size = 100l;
+//		attachVmDisk(cloudVo, vm_uuid, storage_container_uuid, mb_size);
+//		updateVmDisk(cloudVo, vm_uuid, vmdisk_uuid, device_uuid, storage_container_uuid, mb_size);
+//		detachVmDisk(cloudVo, vm_uuid, vmdisk_uuid, device_uuid);
+		// 온라인 상태일때 vcpu memory를 동시에 업데이트 할수 없음
+//		updateVmVcpus(cloudVo, vm_uuid, 4);
+//		updateVmMemory(cloudVo, vm_uuid, 5120);
+//		updateVmPowerState(cloudVo, vm_uuid, host_uuid, NutanixPowerState.OFF);
+		
+		String task_uuid = "ef081deb-17d2-476e-ae77-110f25d23637";
+//		getTaskStatus(cloudVo, task_uuid);
+		
+//		getBlueprintList(cloudVo);
+		
+		String blueprint_uuid = "286a1aff-f3ab-3ec5-ef20-92282d575e36";
+//		getBlueprintResource(cloudVo, blueprint_uuid);
+		
+		String app_profile_reference_name = "Default";
+		String app_profile_reference_uuid = "4c06bdcf-4acd-4358-c9fd-8ea5e81111ae";
+		String app_profile_reference_kind = "app_profile";
+		String app_name = "TEST APP 3hs 3";
+		String app_description = "TEST APP 3hs API TEST 3";
+		
+//		launchBlueprint(cloudVo, blueprint_uuid, app_profile_reference_name, app_profile_reference_uuid, app_profile_reference_kind, app_name, app_description);
+		
+		String request_id = "2be9f8ea-c5ec-4157-aed4-2daaa8e75922";
+//		getBlueprintStatus(cloudVo, blueprint_uuid, request_id);
+		
+		String app_uuid = "0ad9890f-8849-4f68-8538-658a423f0570";
+//		getAppDetail(cloudVo, app_uuid);
+		
+		// 해당 vm이 같이 삭제됨
+//		deleteApp(cloudVo, app_uuid);
+	}
+
+	private static void getBlueprintStatus(CustomOssCloudVO cloudVo, String blueprint_uuid, String request_id) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.getBlueprintStatus(cloudVo, blueprint_uuid, request_id);
+		log.debug("application_uuid : "+nutanixObject.getObject("status").getValue("application_uuid"));
+			log.debug("app_name : "+nutanixObject.getObject("status").getValue("app_name"));
+			log.debug("state : "+nutanixObject.getObject("status").getValue("state"));
+			log.debug("--------------------------------");
+	}
+	
+	private static void getAppDetail(CustomOssCloudVO cloudVo, String app_uuid) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.getAppDetail(cloudVo, app_uuid);
+			log.debug("application_uuid : "+nutanixObject.getObject("metadata").getValue("uuid"));
+			log.debug("app_name : "+nutanixObject.getObject("metadata").getValue("name"));
+			log.debug("state : "+nutanixObject.getObject("status").getValue("state"));
+			log.debug("--------------------------------");
+	}
+	
+	private static void deleteApp(CustomOssCloudVO cloudVo, String app_uuid) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.deleteApp(cloudVo, app_uuid);
+			log.debug("application_uuid : "+nutanixObject.getObject("metadata").getValue("uuid"));
+			log.debug("app_name : "+nutanixObject.getObject("metadata").getValue("name"));
+			log.debug("state : "+nutanixObject.getObject("status").getValue("state"));
+			log.debug("--------------------------------");
+	}
+	
+	private static void launchBlueprint(CustomOssCloudVO cloudVo, String blueprint_uuid, String app_profile_reference_name,
+			String app_profile_reference_uuid, String app_profile_reference_kind, String app_name,
+			String app_description) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.launchBlueprint(cloudVo, blueprint_uuid, app_profile_reference_name,
+				app_profile_reference_uuid, app_profile_reference_kind, app_name, app_description);
+		
+		log.debug(nutanixObject.getObject("status").getValue("request_id").toString());
+		log.debug("--------------------------------");
+	}
+
+	private static void getBlueprintResource(CustomOssCloudVO cloudVo, String blueprint_uuid) throws Exception {
+		NutanixObject blueprintResourceList = NutanixUtils.getBlueprint(cloudVo, blueprint_uuid);
+		
+		for (NutanixObject nutanixObject : blueprintResourceList.getBlueprintResources()) {
+			log.debug("app_profile_reference name : "+nutanixObject.getObject("app_profile_reference").getValue("name"));
+			log.debug("app_profile_reference uuid : "+nutanixObject.getObject("app_profile_reference").getValue("uuid"));
+			log.debug("app_profile_reference kind : "+nutanixObject.getObject("app_profile_reference").getValue("kind"));
+		}
+	}
+
+	private static void getBlueprintList(CustomOssCloudVO cloudVo) throws Exception {
+		NutanixObject blueprintList = NutanixUtils.getBlueprintList(cloudVo);
+		
+		for (NutanixObject nutanixObject : blueprintList.getBlueprints()) {
+			log.debug("name : "+nutanixObject.getObject("metadata").getValue("name"));
+			log.debug("uuid : "+nutanixObject.getObject("metadata").getValue("uuid"));
+			log.debug("spec_version : "+nutanixObject.getObject("metadata").getValue("spec_version"));
+			log.debug("project_reference name : "+nutanixObject.getObject("metadata").getObject("project_reference").getValue("name"));
+			log.debug("project_reference uuid : "+nutanixObject.getObject("metadata").getObject("project_reference").getValue("uuid"));
+			log.debug("project_reference AppFamily : "+nutanixObject.getObject("metadata").getObject("categories").getValue("AppFamily"));
+			log.debug("state : "+nutanixObject.getObject("status").getValue("state"));
+		}
+	}
+
+	private static void getTaskStatus(CustomOssCloudVO cloudVo, String task_uuid) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.getTaskStatus(cloudVo, task_uuid);
+		log.debug("operation_type : "+nutanixObject.getValue("operation_type"));
+		log.debug("error_code : "+nutanixObject.getObject("meta_response").getValue("error_code"));
+		log.debug("percentage_complete : "+nutanixObject.getValue("percentage_complete"));
+		log.debug("progress_status : "+nutanixObject.getValue("progress_status"));
+	}
+	
+	private static void attachVmDisk(CustomOssCloudVO cloudVo, String vm_uuid, String storage_container_uuid, long mb_size) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.attachDisk(cloudVo, vm_uuid, storage_container_uuid, mb_size);
+		log.debug("task_uuid : "+nutanixObject.getValue("task_uuid"));
+	}
+
+	private static void updateVmDisk(CustomOssCloudVO cloudVo, String vm_uuid, String vmdisk_uuid, String device_uuid,
+			String storage_container_uuid, long mb_size) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.updateDisk(cloudVo, vm_uuid, vmdisk_uuid, device_uuid, storage_container_uuid, mb_size);
+		log.debug("task_uuid : "+nutanixObject.getValue("task_uuid"));
+	}
+	
+	private static void updateVmVcpus(CustomOssCloudVO cloudVo, String vm_uuid, int num_vcpus) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.updateVmVcpus(cloudVo, vm_uuid, num_vcpus);
+		log.debug("task_uuid : "+nutanixObject.getValue("task_uuid"));
+	}
+	
+	private static void updateVmMemory(CustomOssCloudVO cloudVo, String vm_uuid, int memory_mb) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.updateVmMemory(cloudVo, vm_uuid, memory_mb);
+		log.debug("task_uuid : "+nutanixObject.getValue("task_uuid"));
+	}
+	
+	private static void updateVmPowerState(CustomOssCloudVO cloudVo, String vm_uuid, String host_uuid, NutanixPowerState power_state) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.updateVmPowerState(cloudVo, vm_uuid, host_uuid, power_state);
+		log.debug("task_uuid : "+nutanixObject.getValue("task_uuid"));
+	}
+
+	private static void detachVmDisk(CustomOssCloudVO cloudVo, String vm_uuid, String vmdisk_uuid, String device_uuid) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.detachDisk(cloudVo, vm_uuid, vmdisk_uuid, device_uuid);
+		log.debug("task_uuid : "+nutanixObject.getValue("task_uuid"));
+	}
+	
+	private static void getVmDetail(CustomOssCloudVO cloudVo, String vm_uuid) throws Exception {
+		NutanixObject vmdetail = NutanixUtils.getVmDetail(cloudVo, vm_uuid);
+		log.debug("name : "+vmdetail.getValue("name"));
+		log.debug("uuid : "+vmdetail.getValue("uuid"));
+		log.debug("host_uuid : "+vmdetail.getValue("host_uuid"));
+		log.debug("memory_mb : "+vmdetail.getValue("memory_mb"));
+		log.debug("num_vcpus : "+vmdetail.getValue("num_vcpus"));
+		log.debug("power_state : "+vmdetail.getValue("power_state"));
+		
+		List<NutanixObject> vmDiskList = vmdetail.getVDisks();
+		for (NutanixObject nutanixObject : vmDiskList) {
+			log.debug("vm_uuid : "+vmdetail.getValue("uuid"));
+			log.debug("vmdisk_uuid : " + nutanixObject.getObject("disk_address").getValue("vmdisk_uuid"));
+			log.debug("device_uuid : " + nutanixObject.getObject("disk_address").getValue("device_uuid"));
+			log.debug("storage_container_uuid : " + nutanixObject.getValue("storage_container_uuid"));
+			log.debug("size : " + nutanixObject.getValue("size"));
+		}
+		
+		List<NutanixObject> vmNicList = vmdetail.getVNics();
+		for (NutanixObject nutanixObject : vmNicList) {
+			log.debug("mac_address : "+nutanixObject.getValue("mac_address"));
+			log.debug("network_uuid : "+nutanixObject.getValue("network_uuid"));
+			log.debug("vlan_mode : "+nutanixObject.getValue("vlan_mode"));
+		}
+	}
+
+	private static void getVmList(CustomOssCloudVO cloudVo) throws Exception {
+		NutanixObject nObj = NutanixUtils.getVmList(cloudVo);
+		
+		for (NutanixObject nutanixObject : nObj.getVMs()) {
+			log.debug("name : "+nutanixObject.getValue("name"));
+			log.debug("uuid : "+nutanixObject.getValue("uuid"));
+			log.debug("num_vcpus : "+nutanixObject.getValue("num_vcpus"));
+			log.debug("uefi_boot : "+nutanixObject.getObject("boot").getValue("uefi_boot"));
+			log.debug("VGA_CONSOLE : "+nutanixObject.getObject("vm_features").getValue("VGA_CONSOLE"));
+		}
+	}
+	
+	private static void getProjectList(CustomOssCloudVO cloudVo) throws Exception {
+		NutanixObject nObj = NutanixUtils.getProjectList(cloudVo);
+		
+		for (NutanixObject nutanixObject : nObj.getProjects()) {
+			log.debug("project name : "+nutanixObject.getObject("spec").getValue("name"));
+			log.debug("project uuid : "+nutanixObject.getObject("metadata").getValue("uuid"));
+			for (NutanixObject account : nutanixObject.getAccountReferences()) {
+				log.debug("kind : "+account.getValue("kind"));
+				log.debug("account uuid : "+account.getValue("uuid"));
+			}
+			
+			NutanixObject defaultSubnet = nutanixObject.getDefaultSubnetReference();
+			log.debug("default subnet kind : "+defaultSubnet.getValue("kind"));
+			log.debug("default subnet uuid : "+defaultSubnet.getValue("uuid"));
+			
+			for (NutanixObject subnet : nutanixObject.getSubnetReferences()) {
+				log.debug("kind : "+subnet.getValue("kind"));
+				log.debug("name : "+subnet.getValue("name"));
+				log.debug("account uuid : "+subnet.getValue("uuid"));
+			}
+			
+		}
+	}
+	
+	private static void getProject(CustomOssCloudVO cloudVo, String project_uuid) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.getProject(cloudVo, project_uuid);
+		log.debug("project name : "+nutanixObject.getObject("spec").getValue("name"));
+		log.debug("project uuid : "+nutanixObject.getObject("metadata").getValue("uuid"));
+		for (NutanixObject account : nutanixObject.getAccountReferences()) {
+			log.debug("kind : "+account.getValue("kind"));
+			log.debug("account uuid : "+account.getValue("uuid"));
+		}
+		
+		NutanixObject defaultSubnet = nutanixObject.getDefaultSubnetReference();
+		log.debug("default subnet kind : "+defaultSubnet.getValue("kind"));
+		log.debug("default subnet uuid : "+defaultSubnet.getValue("uuid"));
+		
+		for (NutanixObject subnet : nutanixObject.getSubnetReferences()) {
+			log.debug("kind : "+subnet.getValue("kind"));
+			log.debug("name : "+subnet.getValue("name"));
+			log.debug("account uuid : "+subnet.getValue("uuid"));
+		}
+	
+	}
+
+	private static void createProject(CustomOssCloudVO cloudVo, String name, String description, int vCpu, int memory, int storage, String account_uuid, String default_subnet_uuid, String subnet_uuid ) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.createProject(cloudVo, name, description, vCpu, memory, storage, account_uuid, default_subnet_uuid, subnet_uuid);
+		
+		log.debug("state : "+nutanixObject.getObject("status").getValue("state"));
+		log.debug("uuid : "+nutanixObject.getObject("metadata").getValue("uuid"));
+		log.debug("--------------------------------");
+	}
+	
+	
+	private static void getEnvironmentList(CustomOssCloudVO cloudVo) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.getEnvironmentList(cloudVo);
+
+		
+	}
+	
+	
+	private static void getEnvironment(CustomOssCloudVO cloudVo, String env_uuid) throws Exception {
+		NutanixObject nutanixObject = NutanixUtils.getEnvironment(cloudVo, env_uuid);
+		
+	}
+	
+}

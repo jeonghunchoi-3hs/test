@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.operation.adminuser.AdminUserDAO">
+
+    <select id="list" parameterType="CustomAdminUserVO" resultType="CustomAdminUserVO">
+		SELECT * 
+		FROM (
+			SELECT
+				CU.user_id AS user_id
+				, CU.user_name AS user_name
+				, CC.customer_name AS customer_name
+				, CD.dept_name AS dept_name
+				, IF(SUBSTRING(CU.user_authority, 1, 1) ='1', 'Y', 'N') AS portalAdmin
+				, IF(SUBSTRING(CU.user_authority, 2, 1) ='1', 'Y', 'N') AS operation
+				, IF(SUBSTRING(CU.user_authority, 3, 1) ='1', 'Y', 'N') AS confirmAction
+				, IF(SUBSTRING(CU.user_authority, 6, 1) ='1', 'Y', 'N') AS login
+				, MAX(IF(AMM.step_id = #{WF1000A0}, 'Y', 'N')) AS WF1000A0
+				, MAX(IF(AMM.step_id = #{WF1000B0}, 'Y', 'N')) AS WF1000B0
+				, MAX(IF(AMM.step_id = #{WF1000C0}, 'Y', 'N')) AS WF1000C0
+				, MAX(IF(AMM.step_id = #{WF1000D0}, 'Y', 'N')) AS WF1000D0
+				, MAX(IF(AMM.step_id = #{WF1000E0}, 'Y', 'N')) AS WF1000E0
+				, MAX(IF(AMM.step_id = #{WF2000A0}, 'Y', 'N')) AS WF2000A0
+				, MAX(IF(AMM.step_id = #{WF2000B0}, 'Y', 'N')) AS WF2000B0
+				, MAX(IF(AMM.step_id = #{WF2000C0}, 'Y', 'N')) AS WF2000C0
+				, MAX(IF(AMM.step_id = #{WF2000D0}, 'Y', 'N')) AS WF2000D0
+				, MAX(IF(AMM.step_id = #{WF2000E0}, 'Y', 'N')) AS WF2000E0	
+				, MAX(IF(AMM.step_id = #{WF4000A0}, 'Y', 'N')) AS WF4000A0		 
+				, IFNULL(CU.apprv_pass,'N') AS apprv_pass
+				FROM      cmm_user CU
+				LEFT JOIN approval_model_member AMM
+					   ON CU.user_id = AMM.user_id
+				LEFT JOIN cmm_customer CC
+				       ON CU.customer_id = CC.customer_id
+				LEFT JOIN cmm_department CD
+				       ON CU.dept_code = CD.dept_code
+				WHERE     CU.del_flag = 'N'
+				      AND CU.user_status = 'USER_USING'
+				      AND ( SUBSTRING(CU.user_authority, 2, 1) = '1'
+						 OR SUBSTRING(CU.user_authority, 3, 1) = '1'
+						 OR SUBSTRING(CU.user_authority, 6, 1) = '1'
+					     OR CU.user_id IN (SELECT user_id FROM approval_model_member))	
+				GROUP BY CU.user_id 
+		) A
+		WHERE 1=1
+		<if test="searchKind == 'user_id' and keyword != ''">
+			AND
+				A.user_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'user_name' and keyword != ''">
+			AND
+				A.user_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+					A.user_id like CONCAT('%',#{keyword},'%')
+					OR
+					A.user_name like CONCAT('%',#{keyword},'%')
+			)
+		</if>	   
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+				ORDER BY A.user_id ASC
+			</if>
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>	
+	</select>
+	
+    <select id="addList" parameterType="CustomAdminUserVO" resultType="CustomAdminUserVO">
+		SELECT 
+			  a.user_id
+			, a.user_name
+			, b.dept_name
+		FROM cmm_user a
+		INNER JOIN cmm_department b
+		ON a.dept_code = b.dept_code
+		WHERE a.del_flag = 'N'
+		AND a.user_status = 'USER_USING'
+		AND SUBSTRING(a.user_authority, 2, 1) = '0'
+		AND SUBSTRING(a.user_authority, 3, 1) = '0'
+        AND SUBSTRING(a.user_authority, 6, 1) = '0'
+		AND a.user_id NOT IN (SELECT user_id FROM approval_model_member)
+		
+		<if test="searchKind == 'userId' and keyword != ''">
+		AND a.user_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'userName' and keyword != ''">
+		AND a.user_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'deptName' and keyword != ''">
+		AND b.dept_name like CONCAT('%',#{keyword},'%')
+		</if>		
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND
+			(
+			a.user_id like CONCAT('%',#{keyword},'%')
+			OR
+			a.user_name like CONCAT('%',#{keyword},'%')
+			OR
+			b.dept_name like CONCAT('%',#{keyword},'%')
+		    )
+		</if> 	
+			
+	</select>	
+	
+	<insert id="insertAdmin" parameterType="CustomAdminUserVO">
+   		INSERT INTO approval_model_member (
+			step_id
+			, user_id
+			, apprv_auth_flag
+			, mail_recv_flag
+			, sms_recv_flag   		
+			, push_recv_flag   		
+		) values (
+			#{stepId}
+			, #{userId}
+			, 'Y'
+			, 'Y'
+			, 'Y'
+			, 'Y'
+		)
+    </insert>
+    
+    <update id="updateAdmin" parameterType="CustomAdminUserVO">
+		UPDATE cmm_user 
+		SET
+			user_authority = CONCAT(SUBSTRING(user_authority, 1, 7), '1', SUBSTRING(user_authority, 9, 8))
+        WHERE 
+        	user_id=#{userId}
+    </update>
+    
+    <update id="updatePm" parameterType="CustomAdminUserVO">
+		UPDATE cmm_user 
+		SET
+			user_authority = CONCAT(SUBSTRING(user_authority, 1, 12), '1', SUBSTRING(user_authority, 14, 3))
+        WHERE 
+        	user_id=#{userId}
+    </update>
+
+    <select id="auth" parameterType="CustomAdminUserVO" resultType="CustomAdminUserVO">
+		SELECT
+			IF(SUBSTRING(CU.user_authority, 1, 1) ='1', 'Y', 'N') AS portalAdmin
+			, IF(SUBSTRING(CU.user_authority, 2, 1) ='1', 'Y', 'N') AS operation
+			, IF(SUBSTRING(CU.user_authority, 3, 1) ='1', 'Y', 'N') AS confirmAction
+			, IF(SUBSTRING(CU.user_authority, 6, 1) ='1', 'Y', 'N') AS login
+			, MAX(IF(AMM.step_id = #{WF1000A0}, 'Y', 'N')) AS WF1000A0
+			, MAX(IF(AMM.step_id = #{WF1000B0}, 'Y', 'N')) AS WF1000B0
+			, MAX(IF(AMM.step_id = #{WF1000C0}, 'Y', 'N')) AS WF1000C0
+			, MAX(IF(AMM.step_id = #{WF1000D0}, 'Y', 'N')) AS WF1000D0
+			, MAX(IF(AMM.step_id = #{WF1000E0}, 'Y', 'N')) AS WF1000E0
+			, MAX(IF(AMM.step_id = #{WF2000A0}, 'Y', 'N')) AS WF2000A0
+			, MAX(IF(AMM.step_id = #{WF2000B0}, 'Y', 'N')) AS WF2000B0
+			, MAX(IF(AMM.step_id = #{WF2000C0}, 'Y', 'N')) AS WF2000C0
+			, MAX(IF(AMM.step_id = #{WF2000D0}, 'Y', 'N')) AS WF2000D0
+			, MAX(IF(AMM.step_id = #{WF2000E0}, 'Y', 'N')) AS WF2000E0
+			, MAX(IF(AMM.step_id = #{WF4000A0}, 'Y', 'N')) AS WF4000A0
+			, CU.apprv_pass
+		FROM 
+			cmm_user CU
+		LEFT JOIN 
+			approval_model_member AMM
+		ON CU.user_id = AMM.user_id
+		
+		WHERE 
+			CU.user_id = #{userId}
+		GROUP BY 
+			OPERATION, confirmAction
+	</select>
+	
+    <select id="LoginAuth" resultType="Integer">
+     	SELECT 
+     		COUNT(*) 
+     	FROM 
+     		cmm_user 
+     	WHERE 
+     		SUBSTRING(user_authority, 6, 1) ='1'
+    </select>
+    
+    <update id="updateAuth" parameterType="CustomAdminUserVO">
+		UPDATE cmm_user 
+		SET
+			user_authority = CONCAT(
+									#{portaladmin}
+									, #{operation}
+									, SUBSTRING(user_authority, 3, 3)
+									, #{login}
+									, SUBSTRING(user_authority, 7, 2)
+									, #{customAdmin}
+									, SUBSTRING(user_authority, 10, 9)
+							),
+			apprv_pass = #{apprvPass}
+        WHERE 
+        	user_id = #{userId}
+    </update>
+    
+    <update id="updateCloudAuth" parameterType="CustomAdminUserVO">
+        UPDATE cmm_user SET 
+					user_cloud_authority= (
+				SELECT  
+					 CONCAT(    IF(#{rownum} = 1,'', SUBSTR(user_cloud_authority,1, #{rownum} -1))    
+					,#{cloudAuth}
+					, IF(#{cloudListSize} = (SELECT MAX(rownum) FROM oss_cloud LIMIT 0,1),'', SUBSTR(user_cloud_authority, #{rownum}+1 , #{cloudListSize} -#{rownum})) 
+					)                 
+					 FROM cmm_user 
+				   WHERE user_id = #{userId}
+			                                         )
+          WHERE user_id =#{userId}
+                                
+		
+    </update>
+
+    <delete id="deleteApproval" parameterType="CustomCmmFileVO">
+    	DELETE FROM 
+    		approval_model_member
+    	WHERE 
+    		user_id = #{userId}
+		<if test="!length.equals(0)">
+			AND step_id <![CDATA[<>]]> '*'
+		</if>	
+    </delete>
+	
+	<!-- 	
+    <select id="view" parameterType="CustomAdminUserVO" resultType="CustomAdminUserVO">
+		SELECT 
+			user_id
+			, user_name
+			, user_phone
+			, user_authority
+		FROM 
+			cmm_user
+		WHERE
+			user_id = #{userId}
+	</select>
+	
+    <select id="userList" parameterType="CustomAdminUserVO" resultType="CustomAdminUserVO">
+		SELECT 
+			user_id
+			, user_name
+			, user_phone
+			, user_authority
+		FROM 
+			cmm_user
+		WHERE
+			LEFT(user_authority, 8) = 0
+		<if test="keyword != ''">
+		AND (
+			user_id like CONCAT('%',#{keyword},'%')
+			OR 
+			user_name like CONCAT('%',#{keyword},'%')
+			)
+		</if>		
+		ORDER BY 
+			user_name
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>	
+	</select>
+	
+   	<update id="updateRole" parameterType="CustomAdminUserVO">
+    	UPDATE cmm_user SET
+			user_authority = #{userAuthority}
+        WHERE user_id=#{userId}
+    </update>
+ 	-->
+</mapper>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans 	xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation=
+			"http://www.springframework.org/schema/beans 
+			 http://www.springframework.org/schema/beans/spring-beans.xsd" >
+
+	<!-- excel download -->
+	<bean id="beanNameViewResolver" class="org.springframework.web.servlet.view.BeanNameViewResolver">
+		<property name="order" value="1" />
+	</bean>
+	<!-- 
+	<bean id="chargeDetailExcel" 			class="com.brandom.web.admin.charge.excel.ChargeDetailExcel" />
+	<bean id="chargeDetailByDayExcel" 		class="com.brandom.web.admin.charge.excel.ChargeDetailByDayExcel" />
+	<bean id="chargePayDetailExcel" 		class="com.brandom.web.admin.charge.excel.ChargePayDetailExcel" />
+	<bean id="chargePayDetailByDayExcel" 	class="com.brandom.web.admin.charge.excel.ChargePayDetailByDayExcel" />
+	<bean id="customerInstallExcel" 		class="com.brandom.web.admin.customer.excel.CustomerInstallExcel" />
+	 -->
+	 
+	 <bean id="excelView" 					class="com.ivucenter.cloud.portal.excel.ExcelView" />
+	 <bean id="salesExcelView" 				class="com.ivucenter.cloud.portal.excel.SalesExcelView" />
+	 <bean id="custExcelView" 				class="com.ivucenter.cloud.portal.excel.CustExcelView" />
+	 <bean id="productUsageStatusExcelView" class="com.ivucenter.cloud.portal.excel.ProductUsageStatusExcelView" />
+	 <bean id="productExcelView" 			class="com.ivucenter.cloud.portal.excel.ProductExcelView" />
+	 <bean id="ossProjectExcelView" 		class="com.ivucenter.cloud.portal.excel.OssProjectExcelView" />
+	 <bean id="operationExcelView" 			class="com.ivucenter.cloud.portal.excel.OperationExcelView" />
+	 <bean id="cmmCustomerExcelView"		class="com.ivucenter.cloud.portal.excel.CmmCustomerExcelView" />
+	 <bean id="bssAdjustmentExcelView"		class="com.ivucenter.cloud.portal.excel.BssAdjustmentExcelView" />
+	 <bean id="billInvoiceCustomerExcelView"	class="com.ivucenter.cloud.portal.excel.BillInvoiceCustomerExcelView" />
+	 <bean id="alarmsExcelView"		class="com.ivucenter.cloud.portal.excel.AlarmsExcelView" />
+	 <bean id="bBsMenuExcelView"		class="com.ivucenter.cloud.portal.excel.BBsMenuExcelView" />
+	 <bean id="bssCatalogExcelView"		class="com.ivucenter.cloud.portal.excel.BssCatalogExcelView" />
+	 <bean id="userHistoryExcelView"		class="com.ivucenter.cloud.portal.excel.userHistoryExcelView" />
+	 <bean id="billInvoiceCustomerDetailExcelView"		class="com.ivucenter.cloud.portal.excel.BillInvoiceCustomerDetailExcelView" />
+	 
+</beans>

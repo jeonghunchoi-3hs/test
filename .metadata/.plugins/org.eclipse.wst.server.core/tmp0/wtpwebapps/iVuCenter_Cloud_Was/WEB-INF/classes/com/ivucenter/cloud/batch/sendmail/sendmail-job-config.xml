@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+     xmlns="http://www.springframework.org/schema/beans"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:aop="http://www.springframework.org/schema/aop"
+     xmlns:tx="http://www.springframework.org/schema/tx"
+     xmlns:batch="http://www.springframework.org/schema/batch"
+     xmlns:context="http://www.springframework.org/schema/context"
+     xmlns:util="http://www.springframework.org/schema/util"
+    
+     xsi:schemaLocation="
+         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+         http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+         http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch-2.2.xsd
+         http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd
+     http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+    ">
+    
+    
+     <!-- *********************************************************** -->
+     <!-- ********** Job 선언 ********** -->
+     <!-- *********************************************************** -->
+     <batch:job id="sendMailJob">
+     
+     	<!-- jobContextStep -->
+    	<batch:step id="jobContextStep" next="mailStep">
+			<batch:tasklet ref="jobContextTasklet" />
+		</batch:step>
+     
+     	<!-- mailStep -->
+    	<batch:step id="mailStep">
+			<batch:tasklet ref="sendMailTaklet" />
+		</batch:step>
+		
+		
+     	<!-- mailStep -->
+<!--      	
+    	<batch:step id="mailStep">
+			<batch:tasklet>
+				<batch:chunk reader="mailReader" writer="mailWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+-->
+ 
+     	<!-- deleteMailQueueStep -->
+<!--      	
+    	<batch:step id="deleteMailQueueStep">
+			<batch:tasklet ref="deleteMailQueueTasklet" />
+		</batch:step>
+ -->
+
+     </batch:job>
+  
+   
+	
+	<!-- *********************************************************** -->
+	<!-- ********** 변수 선언 ********** -->
+	<!-- *********************************************************** -->
+
+	<!-- 입력변수 -->
+	<util:map id="jobParams" key-type="java.lang.String" scope="step" >
+		<entry key="runtime" value="#{jobParameters['runtime']}" />
+	</util:map>
+	
+	<!-- 스텝간 동적 변수 -->
+	<util:map id="stepParams" key-type="java.lang.String" scope="step">
+		<entry key="mailFrom" value="#{jobExecutionContext['mailFrom']}" />
+		<entry key="mailSmtpHost" value="#{jobExecutionContext['mailSmtpHost']}" />
+	</util:map>
+	
+     <!-- *********************************************************** -->
+     <!-- ********** Bean 선언 ********** -->
+     <!-- *********************************************************** -->
+
+	<!-- jobContextStep -->
+    <bean id="jobContextTasklet" class="com.ivucenter.cloud.batch.sendmail.JobContextTasklet">
+	    <property name="parameterValues" ref="jobParams"/>
+    </bean> 
+   
+	<!-- mailStep -->
+    <bean id="sendMailTaklet" class="com.ivucenter.cloud.batch.sendmail.SendMailTaklet">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="stepParams"/>
+    </bean> 
+   
+   
+	<!-- mailStep -->
+	<bean id="mailReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="queryId" value="com.ivucenter.cloud.portal.mail.queue.MailQueueDAO.batchSelectList"/>
+	</bean>
+      
+	<bean id="mailWriter" class="com.ivucenter.cloud.batch.sendmail.SendMailWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="stepParams"/>
+	</bean>
+
+	<!-- deleteMailQueueStep -->
+    <bean id="deleteMailQueueTasklet" class="com.ivucenter.cloud.batch.sendmail.DeleteMailQueueTasklet">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+    </bean> 
+</beans>

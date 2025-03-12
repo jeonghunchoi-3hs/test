@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.bss.batch.BssBatchDAO">
+	
+	<!-- batch list -->
+	<select id="bssBatchList" parameterType="CustomBssBatchVO" resultType="CustomBssBatchVO">
+		SELECT 
+			job_id
+			, job_name
+			, job_class_path
+			, job_state
+			, cron
+			, reg_user_id
+			, reg_datetime
+			, mod_user_id
+			, mod_datetime
+		FROM 
+			job_scheduler
+	</select>
+
+	<!-- batch detail -->
+	<select id="bssBatchDetail" parameterType="CustomBssBatchVO" resultType="CustomBssBatchVO">
+		SELECT 
+			job_id
+			, job_name
+			, job_class_path
+			, cron
+			, reg_user_id
+			, reg_datetime
+			, mod_user_id
+			, mod_datetime
+		FROM 
+			job_scheduler
+		WHERE
+			job_id = #{jobId}	
+	</select>
+	
+	<!-- batch insert -->
+	<insert id="bssBatchInsert" parameterType="CustomBssBatchVO">
+		INSERT INTO job_scheduler
+			(
+			job_id
+			, job_name
+			, job_class_path
+			, cron
+			, reg_user_id
+			, reg_datetime
+		)
+		VALUES
+		(
+			#{jobId}
+			, #{jobName}
+			, #{jobClassPath}
+			, #{cron}
+			, #{userId}
+			, NOW()
+			)
+	</insert>
+	
+	<!-- batch update -->
+	<update id="bssBatchUpdate" parameterType="CustomBssBatchVO">
+		UPDATE job_scheduler 
+		SET
+			job_name = #{jobName}
+			, job_class_path = #{jobClassPath}
+			, cron = #{cron}
+			, mod_user_id = #{userId}
+			, mod_datetime = NOW()
+		WHERE
+			job_id = #{jobId}	
+	</update>
+	
+	<!-- batch delete -->
+	<delete id="bssBatchDelete" parameterType="CustomBssBatchVO">
+		DELETE FROM 
+			job_scheduler
+		WHERE 
+			job_id = #{jobId}
+	</delete>
+	
+	     
+</mapper>

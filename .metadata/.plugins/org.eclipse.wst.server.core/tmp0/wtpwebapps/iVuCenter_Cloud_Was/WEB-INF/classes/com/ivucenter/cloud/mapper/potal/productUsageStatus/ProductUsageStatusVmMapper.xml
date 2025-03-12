@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.productUsageStatus.vm.ProductUsageStatusVmDAO">
+
+    <select id="list" parameterType="CustomProductUsageStatusVmVO" resultType="CustomProductUsageStatusVmVO">
+    	SELECT
+    		*
+    	FROM(
+			SELECT
+				  CC.customer_name AS customer_name
+				, CC.customer_id AS customer_id
+				, OP.cloud_id
+				, OC.cloud_name
+				, OC.cloud_type
+				, OP.project_id
+				, OP.project_name
+				, OP.project_alias
+				, OV.hostname_alias
+				, OV.hostname
+				, OV.vcpus
+				, OV.mem_gb
+				, OV.disk_gb
+				, OV.hourly_flag
+				, OV.reg_datetime
+				, OSP.fixed_ips
+				, BPO.vm_image_name
+			FROM (
+				SELECT
+					  A.project_id
+					, A.vm_uuid
+					, A.hostname_alias
+					, A.hostname
+					, A.vcpus
+					, A.mem_gb
+					, A.disk_gb
+					, A.az_name
+					, IF(A.hourly_flag ='N', '월', '시간') AS hourly_flag
+					, DATE_FORMAT(A.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+					, A.os_product_seq
+				FROM (SELECT *
+				             FROM oss_vm
+		        		<if test="instanceType != null and instanceType != ''">
+				           WHERE instance_type = #{instanceType}
+				        </if>
+				         ) A
+				WHERE A.del_flag = 'N'
+				AND IFNULL(A.expire_datetime, '9999-12-31') >= NOW()
+			) OV
+			LEFT JOIN oss_project OP
+			ON OP.project_id = OV.project_id
+
+			LEFT JOIN oss_cloud OC
+			ON OP.cloud_id = OC.cloud_id
+
+			LEFT JOIN cmm_customer CC
+			ON OP.customer_id=CC.customer_id
+
+			LEFT JOIN oss_port OSP
+			ON OV.vm_uuid = OSP.device_id
+
+			LEFT JOIN oss_zone_network OZN
+			ON OSP.network_id = OZN.network_id
+			AND OV.az_name = OZN.zone_name
+
+			LEFT JOIN bss_product_os BPO
+			ON OV.os_product_seq = BPO.product_seq
+
+			WHERE 1=1
+			AND OP.project_id is not null
+			AND OP.delete_flag = 'N'
+			AND (OZN.is_backup = 'N' OR OZN.is_backup IS NULL)
+
+    	) A
+		WHERE
+			1=1
+	    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND
+    		(
+    			A.customer_name like CONCAT('%',#{keyword},'%')
+    			OR A.project_alias like CONCAT('%',#{keyword},'%')
+    			OR A.hostname_alias like CONCAT('%',#{keyword},'%')
+    			OR A.hostname like CONCAT('%',#{keyword},'%')
+    			OR A.fixed_ips like CONCAT('%',#{keyword},'%')
+    		)
+	    	</if>
+		<if test="searchKind == 'customer_name' and keyword != ''">
+			AND
+				A.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				A.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'hostname_alias' and keyword != ''">
+			AND
+				A.hostname_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'hostname' and keyword != ''">
+			AND
+				A.hostname like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'ip' and keyword != ''">
+			AND
+				A.fixed_ips like CONCAT('%',#{keyword},'%')	
+		</if>		
+	    	<if test="!length.equals(0)">
+				LIMIT #{start}, #{length}
+			</if>
+	</select>
+
+    <select id="total" parameterType="CustomProductUsageStatusVmVO" resultType="CustomProductUsageStatusVmVO">
+    	SELECT
+			COUNT(*) AS length
+			, IFNULL(FORMAT(SUM(vcpus), 0), 0) AS vcpus
+			, IFNULL(FORMAT(SUM(mem_gb), 0), 0) AS mem_gb
+			, IFNULL(FORMAT(SUM(disk_gb), 0), 0) AS disk_gb
+    	FROM
+    	(
+			SELECT
+				*
+			FROM
+			(
+				SELECT
+					 CC.customer_name AS customer_name
+					, CC.customer_id AS customer_id
+					, OP.cloud_id
+					, OP.project_id
+					, OP.project_name
+					, OP.project_alias
+					, OV.hostname_alias
+					, OV.hostname
+					, OV.vcpus
+					, OV.mem_gb
+					, OV.disk_gb
+					, OV.hourly_flag
+					, OV.reg_datetime
+				FROM
+				(
+					SELECT
+						project_id
+						, hostname_alias
+						, hostname
+						, vcpus
+						, mem_gb
+						, disk_gb
+						, IF(hourly_flag ='N', '월', '시간') AS hourly_flag
+						, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+					FROM
+						oss_vm
+					WHERE
+						del_flag = 'N'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				) OV
+				LEFT JOIN oss_project OP
+				ON OP.project_id = OV.project_id
+
+				LEFT JOIN cmm_customer CC
+				ON OP.customer_id=CC.customer_id
+
+				WHERE
+					1=1
+					AND OP.project_id is not null
+					AND OP.delete_flag = 'N'
+			) A
+			WHERE
+				1=1
+	    		<if test="searchKind == 'searchAll' and keyword != '' ">
+	    		AND
+	    		(
+	    			A.customer_name like CONCAT('%',#{keyword},'%')
+	    			OR A.project_alias like CONCAT('%',#{keyword},'%')
+	    			OR A.hostname_alias like CONCAT('%',#{keyword},'%')
+	    			OR A.hostname like CONCAT('%',#{keyword},'%')
+	    		)
+	    		</if>
+				<if test="searchKind == 'customer_name' and keyword != ''">
+					AND
+						A.customer_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'project_alias' and keyword != ''">
+					AND
+						A.project_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'hostname_alias' and keyword != ''">
+					AND
+						A.hostname_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'hostname' and keyword != ''">
+					AND
+						A.hostname like CONCAT('%',#{keyword},'%')
+				</if>
+
+				<if test="cloudId != null ">
+			    AND A.cloud_id like CONCAT('%',#{cloudId},'%')
+		        </if>
+
+		) X
+		WHERE
+			1=1
+	</select>
+
+    <select id="total_old" parameterType="CustomProductUsageStatusVmVO" resultType="CustomProductUsageStatusVmVO">
+    	SELECT
+			COUNT(*) AS length
+			, IFNULL(FORMAT(SUM(vcpus), 0), 0) AS vcpus
+			, IFNULL(FORMAT(SUM(mem_gb), 0), 0) AS mem_gb
+			, IFNULL(FORMAT(SUM(disk_gb), 0), 0) AS disk_gb
+    	FROM(
+			SELECT
+				OP.project_name
+				, OV.vcpus
+				, OV.mem_gb
+				, OV.disk_gb
+			FROM (
+				SELECT
+					project_id
+					, vcpus
+					, mem_gb
+					, disk_gb
+				FROM oss_vm
+				WHERE del_flag = 'N'
+				AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				<if test="searchKey3 != '' ">
+					AND hourly_flag = #{searchKey3}
+				</if>
+			) OV
+			LEFT JOIN oss_project OP
+			ON OP.project_id = OV.project_id
+
+			LEFT JOIN cmm_customer CC
+			ON OP.customer_id=CC.customer_id
+
+			LEFT JOIN cmm_company CC2
+			ON CC.ref_company_id = CC2.company_id
+
+			LEFT JOIN cmm_company CC3
+			ON CC2.up_company_id = CC3.company_id
+
+			WHERE 1=1
+			AND OP.project_id is not null
+			AND OP.delete_flag = 'N'
+			<if test="searchKey0 != '' ">
+				AND CC3.company_name = #{searchKey0}
+			</if>
+			<if test="searchKey1 != '' ">
+				AND CC.customer_name = #{searchKey1}
+			</if>
+			<if test="searchKey2 != '' ">
+				AND OP.project_alias = #{searchKey2}
+			</if>
+		) A
+		WHERE 1=1
+		<if test="searchKind == 'searchAll' and keyword != '' ">
+    	 		AND (
+    	 		CC3.company_name like CONCAT('%',#{keyword},'%')
+    	 		OR CC.customer_name like CONCAT('%',#{keyword},'%')
+    	 		OR OP.project_alias like CONCAT('%',#{keyword},'%')
+    	 		)
+		</if>
+	</select>
+
+</mapper>

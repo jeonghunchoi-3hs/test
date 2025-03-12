@@ -1,0 +1,1223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.charge.bill.ChargeBillDAO">
+
+	<!-- 청구서 목록 조회 -->
+	<select id="list" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			*
+		FROM
+		(
+			SELECT
+				bm.bill_yyyymm
+				, bm.cloud_id
+				, bm.bill_proc_stat
+				, bm.confirn_flag
+				, bc.customer_id
+				, bc.customer_name
+				, bc.vat_rate
+				<!-- , bc.bill_start_datetime -->
+				<!-- , bc.bill_end_datetime -->
+				, DATE_FORMAT(bc.bill_start_datetime, '%Y.%m.%d') AS bill_start_datetime
+				, DATE_FORMAT(bc.bill_end_datetime, '%Y.%m.%d') AS bill_end_datetime
+				<!-- , bp.project_id -->
+				<!-- , bp.project_name -->
+				<!-- , bp.project_alias -->
+				, (SELECT bd.amount
+					FROM bill_invoice_customer_detail bd
+					WHERE bc.customer_id = bd.customer_id
+					AND bc.bill_yyyymm = bd.bill_yyyymm
+					AND bd.invoice_item = '0000') tot_amount
+				, (SELECT bd.amount
+					FROM bill_invoice_customer_detail bd
+					WHERE bc.customer_id = bd.customer_id
+					AND bc.bill_yyyymm = bd.bill_yyyymm
+					AND bd.invoice_item = 'A000') A000_Amount
+				, (SELECT bd.amount
+					FROM bill_invoice_customer_detail bd
+					WHERE bc.customer_id = bd.customer_id
+					AND bc.bill_yyyymm = bd.bill_yyyymm
+					AND bd.invoice_item = 'E000') dc_amount
+				, (SELECT bd.amount
+					FROM bill_invoice_customer_detail bd
+					WHERE bc.customer_id = bd.customer_id
+					AND bc.bill_yyyymm = bd.bill_yyyymm
+					AND bd.invoice_item = 'L000') vat_amount
+			FROM
+				bill_master bm
+				, bill_invoice_customer bc
+			WHERE
+				bm.bill_yyyymm = bc.bill_yyyymm
+				AND bm.cloud_id = bc.cloud_id
+				AND bm.bill_yyyymm <![CDATA[<=]]> DATE_FORMAT(NOW(), '%Y%m')
+				AND	bc.customer_id = #{customerId}
+				AND	bm.cloud_id = #{cloudId}
+			<if test="billYyyymm != '' and billYyyymm != null">
+			AND
+				bc.bill_yyyymm LIKE CONCAT('%',#{billYyyymm},'%')
+			</if>
+			<if test="startDt != '' and startDt != null">
+			AND
+				bm.bill_yyyymm <![CDATA[>=]]> #{startDt}
+			</if>
+			<if test="endDt != '' and startDt != null">
+			AND
+				bm.bill_yyyymm <![CDATA[<=]]> #{endDt}
+			</if>
+		)A
+		ORDER BY A.bill_yyyymm DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+
+	</select>
+
+
+	<!-- 청구서 목록 조회 -->
+	<select id="listMng" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT	*
+		FROM	(
+					SELECT
+						bm.bill_yyyymm		AS bill_yyyymm
+						, ucp.company_name	AS company_name
+						, bc.customer_id	AS customer_id
+						, bc.customer_name	AS customer_name
+						, SUM(CASE WHEN bd.invoice_item = '0000' THEN bd.amount ELSE 0 END)	AS tot_amount
+						, SUM(CASE WHEN bd.invoice_item = 'A000' THEN bd.amount ELSE 0 END)	AS A000_amount
+						, SUM(CASE WHEN bd.invoice_item = 'AA00' THEN bd.amount ELSE 0 END)	AS AA00_amount
+						, SUM(CASE WHEN bd.invoice_item = 'AE00' THEN bd.amount ELSE 0 END)	AS AE00_amount
+						, SUM(CASE WHEN bd.invoice_item = 'AI00' THEN bd.amount ELSE 0 END)	AS AI00_amount
+						, SUM(CASE WHEN bd.invoice_item = 'E000' THEN bd.amount ELSE 0 END)	AS E000_amount
+						, SUM(CASE WHEN bd.invoice_item = 'I000' THEN bd.amount ELSE 0 END)	AS I000_amount
+						, SUM(CASE WHEN bd.invoice_item = 'L000' THEN bd.amount ELSE 0 END)	AS L000_amount
+					FROM
+						bill_master bm
+
+						INNER JOIN bill_invoice_customer bc
+							ON bm.bill_yyyymm = bc.bill_yyyymm
+
+						INNER JOIN bill_invoice_customer_detail bd
+							ON bc.bill_yyyymm = bd.bill_yyyymm
+							AND bc.customer_id = bd.customer_id
+
+						INNER JOIN cmm_customer cc
+							ON bc.customer_id = cc.customer_id
+
+						INNER JOIN cmm_company cp
+							ON cc.ref_company_id = cp.company_id
+
+						INNER JOIN cmm_company ucp
+							ON cp.up_company_id = ucp.company_id
+					WHERE	1 = 1
+					AND	bm.bill_yyyymm = bc.bill_yyyymm
+					<if test="startDt != '' and startDt != null">
+					AND
+						bm.bill_yyyymm <![CDATA[>=]]> #{startDt}
+					</if>
+					<if test="endDt != '' and startDt != null">
+					AND
+						bm.bill_yyyymm <![CDATA[<=]]> #{endDt}
+					</if>
+					<if test="searchKey0 != '' ">
+						AND ucp.company_name = #{searchKey0}
+					</if>
+					<if test="searchKey1 != '' ">
+						AND cc.customer_name = #{searchKey1}
+					</if>
+					GROUP BY bm.bill_yyyymm, ucp.company_name, bc.customer_id, bc.customer_name
+				) Z
+		WHERE	1 = 1
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+   			AND		(
+	    				Z.company_name like CONCAT('%',#{keyword},'%')
+	    				OR
+	    				Z.customer_name like CONCAT('%',#{keyword},'%')
+    				)
+    	</if>
+		<if test="searchKind == 'company_name' and keyword != ''">
+			AND
+				Z.company_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'customer_name' and keyword != ''">
+			AND
+				Z.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		ORDER BY Z.bill_yyyymm desc, Z.company_name, Z.customer_name
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="listMngProject" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT	*
+		FROM	(
+					SELECT
+						  BM.bill_yyyymm	 AS bill_yyyymm
+						, OP.cloud_id AS cloud_id
+						, BP.customer_id	AS customer_id
+						, CC.customer_name	AS customer_name
+						, BP.project_id		AS project_id
+						, BP.project_name	AS project_name
+						, BP.project_alias	AS project_alias
+						, CD.dept_name AS dept_name
+						, PM.manager_id AS  manager_id
+						, CU.user_name AS manager_name
+						, SUM(CASE WHEN BD.invoice_item = '0000' THEN BD.amount ELSE 0 END)	AS tot_amount
+						, SUM(CASE WHEN BD.invoice_item = 'A000' THEN BD.amount ELSE 0 END)	AS A000_amount
+						, SUM(CASE WHEN BD.invoice_item = 'AA00' THEN BD.amount ELSE 0 END)	AS AA00_amount
+						, SUM(CASE WHEN BD.invoice_item = 'AE00' THEN BD.amount ELSE 0 END)	AS AE00_amount
+						, SUM(CASE WHEN BD.invoice_item = 'AI00' THEN BD.amount ELSE 0 END)	AS AI00_amount
+						, SUM(CASE WHEN BD.invoice_item = 'E000' THEN BD.amount ELSE 0 END)	AS E000_amount
+						, SUM(CASE WHEN BD.invoice_item = 'I000' THEN BD.amount ELSE 0 END)	AS I000_amount
+						, SUM(CASE WHEN BD.invoice_item = 'L000' THEN BD.amount ELSE 0 END)	AS L000_amount
+					FROM
+						bill_master BM
+						INNER JOIN bill_invoice_project BP
+								ON BM.bill_yyyymm = BP.bill_yyyymm
+						INNER JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') OP
+						        ON BP.project_id = OP.project_id
+						LEFT JOIN 	cmm_department CD
+						        ON OP.dept_code = CD.dept_code
+						INNER JOIN bill_invoice_project_detail BD
+								ON BP.bill_yyyymm = BD.bill_yyyymm
+							   AND BP.project_id = BD.project_id
+						LEFT JOIN cmm_customer CC
+								ON BP.customer_id = CC.customer_id
+						INNER JOIN (SELECT * FROM oss_project_manager WHERE manager_type = '01') PM
+						        ON BP.project_id = PM.project_id
+						INNER JOIN cmm_user CU
+						        ON PM.manager_id = CU.user_id
+
+					<if test="startDt != null and startDt != ''">
+					AND
+						BM.bill_yyyymm <![CDATA[>=]]> #{startDt}
+					</if>
+					<if test="endDt != null and endDt != ''">
+					AND
+						BM.bill_yyyymm <![CDATA[<=]]> #{endDt}
+					</if>
+					<if test="searchKey1 != '' ">
+						AND CC.customer_name = #{searchKey1}
+					</if>
+					<if test="searchKey2 != '' ">
+						AND BP.project_alias = #{searchKey2}
+					</if>
+					GROUP BY BP.project_id
+				) Z
+		WHERE	1 = 1
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+   			AND		(
+	    				Z.customer_name like CONCAT('%',#{keyword},'%')
+	    				OR
+	    				Z.project_alias like CONCAT('%',#{keyword},'%')
+    				)
+    	</if>
+		<if test="searchKind == 'customer_name' and keyword != ''">
+			AND
+				Z.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				Z.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+
+		ORDER BY Z.bill_yyyymm desc, Z.project_alias
+
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="getBillDate" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			DATE_FORMAT(bill_start_datetime, '%Y.%m.%d') AS bill_start_datetime
+			, DATE_FORMAT(bill_end_datetime, '%Y.%m.%d') AS bill_end_datetime
+			, customer_name
+		FROM
+			bill_invoice_customer
+		WHERE
+			bill_yyyymm = #{billYyyymm}
+			AND cloud_id = #{cloudId}
+			AND customer_id = #{customerId}
+	</select>
+
+	<select id="getUserCustomerId" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			customer_id
+		FROM
+			cmm_user
+		WHERE user_id=#{userId};
+	</select>
+
+
+	<!-- 청구서 목록 TOTAL COUNT -->
+	<select id="listTot" parameterType="CustomChargeBillVO" resultType="Integer">
+		SELECT
+			COUNT(*)
+		FROM
+			bill_master bm
+			, bill_invoice_customer bc
+<!-- 			, bill_invoice_project bp -->
+		WHERE
+			bm.bill_yyyymm = bc.bill_yyyymm
+		AND
+<!-- 			bc.customer_id = bp.customer_id	 -->
+<!-- 		AND	 -->
+			bc.customer_id = #{customerId}
+		<if test="billYyyymm != '' ">
+		AND
+			bc.bill_yyyymm LIKE CONCAT('%',#{billYyyymm},'%')
+		</if>
+<!-- 		<if test="searchKind == 'searchCustomer' and keyword != '' "> -->
+<!-- 		AND  -->
+<!-- 			bc.customer_name LIKE CONCAT('%',#{keyword},'%')	 -->
+<!-- 		</if> -->
+<!-- 		<if test="searchKind == 'searchProject' and keyword != '' "> -->
+<!-- 		AND  -->
+<!-- 			bp.project_alias LIKE CONCAT('%',#{keyword},'%')	 -->
+<!-- 		</if> -->
+<!-- 		<if test="searchKind == 'searchAll' and keyword != '' "> -->
+<!-- 		AND ( -->
+<!-- 			bc.customer_name like CONCAT('%',#{keyword},'%') -->
+<!-- 		OR  -->
+<!-- 			bp.project_alias like CONCAT('%',#{keyword},'%') -->
+<!-- 			)	 -->
+<!-- 		</if> -->
+		ORDER BY bm.bill_yyyymm
+		DESC
+	</select>
+
+
+	<!-- 청구서 상세 조회 -->
+	<select id="view" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			cd.bill_yyyymm
+			, cd.cloud_id
+			, cd.customer_id
+			, cd.invoice_item
+			, cd.invoice_item_sub
+			, cd.invoice_item_name
+			, cd.invoice_item_depth
+			, cd.amount
+			, (SELECT customer_name FROM cmm_customer WHERE customer_id = #{customerId}) AS customerName
+			, DATE_FORMAT((SELECT bill_start_datetime FROM bill_invoice_customer WHERE customer_id = #{customerId} AND bill_yyyymm = #{billYyyymm} AND cloud_id = #{cloudId}), '%Y-%m-%d') AS billStartDatetime
+			, DATE_FORMAT((SELECT bill_end_datetime FROM bill_invoice_customer WHERE customer_id = #{customerId} AND bill_yyyymm = #{billYyyymm} AND cloud_id = #{cloudId}), '%Y-%m-%d') AS billEndDatetime
+		FROM
+			bill_invoice_customer_detail cd
+		WHERE
+			cd.bill_yyyymm = #{billYyyymm}
+			AND cd.customer_id=#{customerId}
+			AND cd.cloud_id = #{cloudId}
+	</select>
+
+	<!-- 프로젝트 청구요금 목록 -->
+	<select id="getProjectBillList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			*
+		FROM
+		(
+			SELECT
+				bp.bill_yyyymm
+				,bp.customer_id
+				,cc.customer_name
+				,bp.project_id
+				,bp.project_name
+				,bp.project_alias
+				,(SELECT amount FROM bill_invoice_project_detail WHERE invoice_item = '0000' AND bill_yyyymm = bp.bill_yyyymm AND project_id = bp.project_id ) tot_amount
+				,(SELECT amount FROM bill_invoice_project_detail WHERE invoice_item = 'E000' AND bill_yyyymm = bp.bill_yyyymm AND project_id = bp.project_id) dc_amount
+				,(SELECT amount FROM bill_invoice_project_detail WHERE invoice_item = 'I000' AND bill_yyyymm = bp.bill_yyyymm AND project_id = bp.project_id) vat_amount
+				,(SELECT bd.amount FROM bill_invoice_customer_detail bd WHERE bc.customer_id = bd.customer_id AND bc.bill_yyyymm = bd.bill_yyyymm AND bd.invoice_item = 'AAA0') disk_amount // 블록디스크
+				,(SELECT bd.amount FROM bill_invoice_customer_detail bd WHERE bc.customer_id = bd.customer_id AND bc.bill_yyyymm = bd.bill_yyyymm AND bd.invoice_item = 'SVS0') service_amount //service 상품
+				,(SELECT bd.amount FROM bill_invoice_customer_detail bd WHERE bc.customer_id = bd.customer_id AND bc.bill_yyyymm = bd.bill_yyyymm AND bd.invoice_item = 'AE00') product_amount  //부가상품
+			FROM
+				bill_invoice_project bp
+				, cmm_customer cc
+			WHERE
+				bp.customer_id = cc.customer_id
+			AND
+				bp.project_id= #{projectId}
+			AND
+				bp.bill_yyyymm <![CDATA[<=]]> DATE_FORMAT(NOW(), '%Y%m')
+			<if test="billYyyymm != '' ">
+			AND
+				bp.bill_yyyymm LIKE CONCAT('%',#{billYyyymm},'%')
+			</if>
+		)A
+		ORDER BY A.bill_yyyymm DESC
+	</select>
+
+	<!-- 프로젝트 청구요금 목록 TOTAL COUNT -->
+	<select id="projectBillListTot" parameterType="CustomChargeBillVO" resultType="Integer">
+		SELECT
+			COUNT(*)
+		FROM
+			bill_invoice_project bp
+			, cmm_customer cc
+		WHERE
+			bp.customer_id = cc.customer_id
+		AND
+			bp.project_id= #{projectId}
+		<if test="billYyyymm != '' ">
+		AND
+			bp.bill_yyyymm = #{billYyyymm}
+		</if>
+	</select>
+
+	<!-- 프로젝트 청구요금 상세 조회 -->
+	<select id="projectBillView" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			bill_yyyymm
+			, customer_id
+			, project_id
+			, invoice_item
+			, invoice_item_sub
+			, invoice_item_name
+			, invoice_item_depth
+			, amount
+		FROM
+			bill_invoice_project_detail
+		WHERE
+			bill_yyyymm = #{billYyyymm}
+		AND
+			project_id=#{projectId}
+	</select>
+
+	<!-- customerId 조회 -->
+	<select id="getCustomerId" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			customer_id
+		FROM
+			cmm_user
+		where
+			user_id = #{userId}
+	</select>
+
+	<!-- projectId 조회 -->
+	<select id="projectList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			project_id
+			,project_name
+			,project_alias
+			,bill_yyyymm
+		FROM
+			bill_invoice_project
+		WHERE
+			customer_id = #{customerId}
+		AND
+			bill_yyyymm = #{billYyyymm}
+	</select>
+
+	<!-- projectId 조회 -->
+	<select id="invoiceProjectList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			A.project_id
+			,A.cloud_id
+			,A.project_name
+			,A.project_alias
+			,A.bill_yyyymm
+			,B.invoice_item
+			,SUM(B.amount) AS amount
+		FROM
+			bill_invoice_project A, bill_invoice_project_detail B
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.customer_id = B.customer_id
+			AND A.project_id = B.project_id
+			AND A.customer_id = #{customerId}
+			AND B.invoice_item = '0000'
+			AND a.bill_yyyymm BETWEEN #{startDt} AND #{endDt}
+			<if test="projectId != ''">
+			AND A.project_id = #{projectId}
+			</if>
+			GROUP BY A.project_id ,A.cloud_id ,A.project_name ,A.project_alias ,B.invoice_item
+		<!--
+		SELECT
+			A.project_id
+			,A.project_name
+			,A.project_alias
+			,C.customer_name
+			,E.company_name
+			,A.bill_yyyymm
+			,B.invoice_item
+			,SUM(IFNULL(B.amount,0)) as amount
+		FROM
+			bill_invoice_project A
+		INNER JOIN
+			bill_invoice_project_detail B
+			ON
+			(
+				A.bill_yyyymm = B.bill_yyyymm
+				AND A.customer_id = B.customer_id
+				AND A.project_id = B.project_id
+			)
+
+		INNER JOIN
+			(SELECT * FROM oss_project WHERE delete_flag = 'N') F
+			ON A.project_id  = F.project_id
+
+		INNER JOIN
+			cmm_customer C
+			ON F.customer_id = C.customer_id
+
+		INNER JOIN
+			cmm_company D
+			ON C.ref_company_id = D.company_id
+
+		INNER JOIN
+			cmm_company E
+		ON D.up_company_id = E.company_id
+
+		WHERE
+			A.customer_id = #{customerId}
+			AND B.invoice_item = '0000'
+			AND	A.bill_yyyymm <![CDATA[>=]]> #{startDt}
+			AND	A.bill_yyyymm  <![CDATA[<=]]> #{endDt}
+
+			<if test="projectId != ''">
+			AND A.project_id = #{projectId}
+		GROUP BY
+			A.project_id
+		</if>
+		-->
+	</select>
+
+
+	<!-- 회원사 소속 프로젝트별 상세내역 조회 -->
+	<select id="billDetailList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			bill_yyyymm
+			, customer_id
+			, project_id
+			, vm_uuid
+			, hostname
+			, hostname_alias
+			, charge_resource_status
+			, hourly_flag
+			, create_datetime
+			, expire_datetime
+			, DATE_FORMAT(MIN(charge_start_datetime), '%Y-%m-%d %H:%i') charge_start_datetime
+			, DATE_FORMAT(DATE_ADD(MAX(charge_end_datetime), INTERVAL -1 SECOND), '%Y-%m-%d %H:%i') charge_end_datetime
+			, SUM(amount) AS amount
+			, (SELECT project_alias FROM oss_project WHERE project_id=#{projectId}) project_alias
+		FROM
+			bill_charge_vm bv
+			WHERE project_id = #{projectId}
+
+			AND bill_yyyymm BETWEEN #{startDt} AND #{endDt}
+
+			<!--
+			AND	bill_yyyymm <![CDATA[>=]]> #{startDt}
+			AND bill_yyyymm  <![CDATA[<=]]> #{endDt}
+			-->
+		GROUP BY
+			vm_uuid, project_id
+		ORDER BY
+			hostname_alias, create_datetime
+	</select>
+
+
+	<!-- 매출현황조회 -->
+	<!-- <select id="salesList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT * FROM
+		(
+		SELECT
+			A.bill_yyyymm
+			, B.customer_id
+			, B.customer_name
+			, SUM(C.amount) AS amount
+			, SUM(CASE WHEN C.invoice_item = 'AA00' THEN C.amount ELSE 0 END) AS AA00_amount
+			, SUM(CASE WHEN C.invoice_item = 'AE00' THEN C.amount ELSE 0 END) AS AE00_amount
+			, SUM(CASE WHEN C.invoice_item = 'AI00' THEN C.amount ELSE 0 END) AS AI00_amount
+		FROM
+			bill_master A
+			, bill_invoice_customer B
+			, bill_invoice_customer_detail C
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+		AND
+			B.bill_yyyymm = C.bill_yyyymm
+		AND
+			B.customer_id = C.customer_id
+		AND
+			A.confirn_flag = 'Y'
+		AND
+			C.invoice_item IN ('AA00', 'AE00', 'AI00')
+		GROUP BY
+			A.bill_yyyymm, B.customer_id, B.customer_name
+		) Z
+		WHERE
+		 	CAST(Z.bill_yyyymm AS UNSIGNED) >= #{startDt}
+		AND
+			CAST(Z.bill_yyyymm AS UNSIGNED) <![CDATA[<=]]> #{endDt}
+
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select> -->
+
+	<select id="salesList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT	 z.bill_yyyymm,
+             z.customer_id,
+             z.customer_name,
+			 z.project_id,
+			 z.project_alias,
+			 z.project_name,
+			 z.manager_name,
+			 z.dept_name,
+			 z.AA00_amount,
+			 z.AE00_amount,
+			 z.AI00_amount,
+			 z.E000_amount,
+			 z.I000_amount,
+			 z.amount,
+			 z.cloud_name
+
+		FROM	(
+				 SELECT   A.bill_yyyymm
+							, A.customer_id
+							, C.customer_name
+							, B.project_id
+							, F.project_alias
+							, F.project_name
+							, G.dept_name
+						    , I.user_name AS manager_name
+						    , SUM(CASE WHEN B.invoice_item = 'AA00' THEN B.amount ELSE 0 END) AS AA00_amount
+							, SUM(CASE WHEN B.invoice_item = 'AE00' THEN B.amount ELSE 0 END) AS AE00_amount
+							, SUM(CASE WHEN B.invoice_item = 'AI00' THEN B.amount ELSE 0 END) AS AI00_amount
+							, SUM(CASE WHEN B.invoice_item = 'E000' THEN B.amount ELSE 0 END) AS E000_amount
+							, SUM(CASE WHEN B.invoice_item = 'I000' THEN B.amount ELSE 0 END) AS I000_amount
+							, SUM(B.amount)	AS amount
+							, OC.cloud_name
+					FROM  	bill_invoice_customer A
+
+							INNER JOIN bill_invoice_project_detail B
+								ON A.bill_yyyymm = B.bill_yyyymm
+								AND A.customer_id = B.customer_id
+							INNER JOIN cmm_customer C
+								ON A.customer_id = C.customer_id
+							INNER JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') F
+								ON B.project_id  = F.project_id
+							INNER JOIN oss_cloud OC
+							    ON F.cloud_id = OC.cloud_id	
+							LEFT OUTER JOIN cmm_department G
+								ON F.dept_code = G.dept_code
+							INNER JOIN (SELECT * FROM oss_project_manager WHERE manager_type = '01') H
+							    ON F.project_id = H.project_id
+							INNER JOIN cmm_user I
+							    ON H.manager_id = I.user_id
+
+					WHERE	1 = 1
+					AND		B.invoice_item IN ('AA00', 'AE00', 'AI00', 'E000', 'I000')
+					AND		A.bill_yyyymm <![CDATA[>=]]> #{startDt}
+					AND		A.bill_yyyymm <![CDATA[<=]]> #{endDt}
+				   <if test="cloudId != null and startDt != ''">
+					    AND  F.cloud_id like CONCAT('%',#{cloudId},'%')
+				   </if>
+					<if test="searchKey2 != '' ">
+						AND F.project_alias = #{searchKey2}
+					</if>
+					GROUP BY A.bill_yyyymm, A.customer_id, B.project_id
+				) Z
+		WHERE	1 = 1
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND 	(
+	    				Z.manager_name like CONCAT('%',#{keyword},'%')
+	    				OR
+	    				Z.project_alias like CONCAT('%',#{keyword},'%')
+    				)
+    	</if>
+		<if test="searchKind == 'manager_name' and keyword != ''">
+			AND
+				Z.manager_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				Z.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		ORDER BY Z.bill_yyyymm desc, Z.project_alias
+ 		<if test="!length.equals(0)">
+ 			LIMIT #{start}, #{length}
+ 		</if>
+ 	</select>
+
+
+	<select id="salesView" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+
+			SELECT
+				 z.cloud_name
+				,z.bill_yyyymm
+			    ,z.customer_id
+			    ,z.customer_name AS customer_name
+			    ,z.dept_name AS manager_dept_name
+			    ,z.user_name AS manager_name
+			    ,z.user_tel AS manager_tel
+			    ,Z.project_id
+			    ,Z.project_alias
+			    ,IFNULL(Z.AA00_amount,0) AS AA00_amount
+			    ,IFNULL(Z.AE00_amount,0) AS AE00_amount
+			    ,IFNULL(Z.AI00_amount,0) AS AI00_amount
+			    ,IFNULL(Z.E000_amount,0) AS E000_amount
+			    ,IFNULL(Z.I000_amount,0) AS I000_amount
+			    ,IFNULL(Z.AEA0_amount,0) AS AEA0_amount
+			    ,IFNULL(A.service_account_amount,0) AS service_account_amount
+			    ,IFNULL(A.service_security_amount,0) AS service_security_amount
+			    ,IFNULL(A.service_backup_amount,0) AS service_backup_amount
+			    ,IFNULL(A.service_sw_amount,0) AS service_sw_amount
+			    ,IFNULL(A.service_disk_amount,0) AS service_disk_amount
+			FROM
+						(
+				SELECT 	A.bill_yyyymm
+					, A.customer_id
+					, C.customer_name AS customer_name
+					, B.project_id
+					, F.project_alias
+					, G.dept_name AS dept_name
+					 ,H.manager_id
+					 ,I.user_name
+					 ,I.user_tel
+					 ,K.cloud_name
+					, SUM(CASE WHEN B.invoice_item = 'AA00' THEN B.amount ELSE 0 END) AS AA00_amount
+					, SUM(CASE WHEN B.invoice_item = 'AE00' THEN B.amount ELSE 0 END) AS AE00_amount
+					, SUM(CASE WHEN B.invoice_item = 'AI00' THEN B.amount ELSE 0 END) AS AI00_amount
+					, SUM(CASE WHEN B.invoice_item = 'E000' THEN B.amount ELSE 0 END) AS E000_amount
+					, SUM(CASE WHEN B.invoice_item = 'I000' THEN B.amount ELSE 0 END) AS I000_amount
+					, SUM(CASE WHEN B.invoice_item = 'AEA0' THEN B.amount ElSE 0 END) AS AEA0_amount
+
+				     FROM  bill_invoice_customer A
+					INNER JOIN bill_invoice_project_detail B
+						ON A.bill_yyyymm = B.bill_yyyymm
+						AND A.customer_id = B.customer_id
+					INNER JOIN cmm_customer C
+						ON A.customer_id = C.customer_id
+					INNER JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') F
+						ON B.project_id  = F.project_id
+					LEFT OUTER JOIN cmm_department G
+					    ON F.dept_code = G.dept_code
+					INNER JOIN (SELECT * FROM oss_project_manager WHERE manager_type = '01') H
+					    ON F.project_id = H.project_id
+					INNER JOIN cmm_user I
+						ON H.manager_id = I.user_id
+				    INNER JOIN oss_project J
+				        ON B.project_id = J.project_id
+				    INNER JOIN oss_cloud K
+				        ON J.cloud_id = K.cloud_id
+
+
+				GROUP BY A.bill_yyyymm, A.customer_id, B.project_id, F.project_alias, C.customer_name, G.dept_name ,I.user_name ,I.user_tel
+			) Z
+
+			LEFT OUTER JOIN (
+										SELECT
+												project_id,
+												SUM(CASE WHEN service_type = '01' THEN amount ELSE 0 END) AS service_account_amount,
+												SUM(CASE WHEN service_type = '02' THEN amount ELSE 0 END) AS service_security_amount,
+												SUM(CASE WHEN service_type = '03' THEN amount ELSE 0 END) AS service_backup_amount,
+												SUM(CASE WHEN service_type = '04' THEN amount ELSE 0 END) AS service_sw_amount,
+												SUM(CASE WHEN service_type = '05' THEN amount ELSE 0 END) AS service_disk_amount
+
+
+										  FROM
+												bill_charge_service_resource_detail
+												WHERE project_id = #{projectId}
+												AND bill_yyyymm = #{billYyyymm}
+												GROUP BY project_id
+									     ) A
+		                                   ON Z.project_id = A.project_id
+			WHERE
+			 	Z.bill_yyyymm =  #{billYyyymm}
+			AND
+				Z.project_id =  #{projectId}
+
+	</select>
+
+
+
+	<!-- 매출현황조회 엑셀용 -->
+	<select id="salesExcelList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT * FROM
+		(
+		SELECT
+			A.bill_yyyymm
+			, B.customer_id
+			, B.customer_name
+			, SUM(C.amount) AS amount
+			, SUM(CASE WHEN C.invoice_item = 'AA00' THEN C.amount ELSE 0 END) AS AA00_amount
+			, SUM(CASE WHEN C.invoice_item = 'AE00' THEN C.amount ELSE 0 END) AS AE00_amount
+			, SUM(CASE WHEN C.invoice_item = 'AI00' THEN C.amount ELSE 0 END) AS AI00_amount
+		FROM
+			(SELECT * FROM
+					bill_master
+				WHERE bill_yyyymm  >= #{startDt}
+				AND bill_yyyymm  <![CDATA[<=]]> #{endDt}) A
+			, bill_invoice_customer B
+			, bill_invoice_customer_detail C
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+		AND
+			B.bill_yyyymm = C.bill_yyyymm
+		AND
+			B.customer_id = C.customer_id
+		AND
+			A.confirn_flag = 'Y'
+		AND
+			C.invoice_item IN ('AA00', 'AE00', 'AI00', 'E000', 'I000')
+		GROUP BY
+			A.bill_yyyymm, B.customer_id, B.customer_name
+
+		UNION
+
+		SELECT
+			' ' AS bill_yyyymm
+			, ' ' AS customer_id
+			, ' ' AS customer_name
+			, ' ' AS amount
+			, ' ' AS AA00_amount
+			, 'Sales Total' AS AE00_amount
+			, SUM(C.amount) AS AI00_amount
+		FROM
+			(SELECT * FROM
+					bill_master
+				WHERE bill_yyyymm  >= #{startDt}
+				AND bill_yyyymm  <![CDATA[<=]]> #{endDt}) A
+			, bill_invoice_customer B
+			, bill_invoice_customer_detail C
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+		AND
+			B.bill_yyyymm = C.bill_yyyymm
+		AND
+			B.customer_id = C.customer_id
+		AND
+			A.confirn_flag = 'Y'
+		AND
+			C.invoice_item IN ('AA00', 'AE00', 'AI00')
+		) Z
+		ORDER BY customer_id DESC
+	</select>
+
+	<!-- 매출합계조회 -->
+	<select id="salesTotalAmount" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+
+		SELECT
+				SUM(Z.amount) AS amount
+		FROM	(
+					 SELECT   A.bill_yyyymm
+							, A.customer_id
+							, C.customer_name
+							, B.project_id
+							, F.project_alias
+							, F.project_name
+							, G.dept_name
+						    , I.user_name AS manager_name
+						    , SUM(CASE WHEN B.invoice_item = 'AA00' THEN B.amount ELSE 0 END) AS AA00_amount
+							, SUM(CASE WHEN B.invoice_item = 'AE00' THEN B.amount ELSE 0 END) AS AE00_amount
+							, SUM(CASE WHEN B.invoice_item = 'AI00' THEN B.amount ELSE 0 END) AS AI00_amount
+							, SUM(CASE WHEN B.invoice_item = 'E000' THEN B.amount ELSE 0 END) AS E000_amount
+							, SUM(CASE WHEN B.invoice_item = 'I000' THEN B.amount ELSE 0 END) AS I000_amount
+							, SUM(B.amount)	AS amount
+					FROM  	bill_invoice_customer A
+
+							INNER JOIN bill_invoice_project_detail B
+								ON A.bill_yyyymm = B.bill_yyyymm
+								AND A.customer_id = B.customer_id
+							INNER JOIN cmm_customer C
+								ON A.customer_id = C.customer_id
+							INNER JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') F
+								ON B.project_id  = F.project_id
+							LEFT OUTER JOIN cmm_department G
+								ON F.dept_code = G.dept_code
+							INNER JOIN (SELECT * FROM oss_project_manager WHERE manager_type = '01') H
+							    ON F.project_id = H.project_id
+							INNER JOIN cmm_user I
+							    ON H.manager_id = I.user_id
+
+					WHERE	1 = 1
+					AND		B.invoice_item IN ('AA00', 'AE00', 'AI00', 'E000', 'I000')
+					AND		A.bill_yyyymm <![CDATA[>=]]> #{startDt}
+					AND		A.bill_yyyymm <![CDATA[<=]]> #{endDt}
+
+					<if test="searchKey2 != '' ">
+						AND F.project_alias = #{searchKey2}
+					</if>
+					GROUP BY A.bill_yyyymm, A.customer_id, B.project_id
+				) Z
+		WHERE	1 = 1
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND 	(
+	    				Z.manager_name like CONCAT('%',#{keyword},'%')
+	    				OR
+	    				Z.project_alias like CONCAT('%',#{keyword},'%')
+    				)
+    	</if>
+		<if test="searchKind == 'manager_name' and keyword != ''">
+			AND
+				Z.manager_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				Z.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+	</select>
+
+
+	<!-- 매출현황조회 -->
+	<select id="salesListTot" parameterType="CustomChargeBillVO" resultType="Integer">
+		SELECT
+			COUNT(*)
+		FROM
+			bill_master A
+			, bill_invoice_customer B
+			, bill_invoice_customer_detail C
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+		AND
+			B.bill_yyyymm = C.bill_yyyymm
+		AND
+			B.customer_id = C.customer_id
+		AND
+			A.confirn_flag = 'Y'
+		<if test="keyword != '' ">
+		AND
+			B.customer_name LIKE CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="billYyyymm != '' ">
+		AND
+			A.bill_yyyymm LIKE CONCAT('%',#{billYyyymm},'%')
+		</if>
+		AND
+			C.invoice_item IN ('AA00', 'AE00', 'AE00')
+		GROUP BY
+			A.bill_yyyymm, B.customer_id, B.customer_name
+
+	</select>
+
+	<!-- 정산 -->
+	<select id="calculateList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			A.bill_yyyymm
+			, A.confirn_flag
+			, CASE WHEN (A.proc_user_name = 'BATCH_SYSTEM') THEN '자동정산' ELSE A.proc_user_name END proc_user_name
+			, A.proc_datetime
+			, A.comfirm_user_name
+			, A.confirm_datetime
+			, A.apprv_stat
+			,(
+				SELECT COUNT(*) FROM
+					bss_adjustment B
+				WHERE A.bill_yyyymm = B.bill_yyyymm AND B.bill_flag='N'
+			) AS bill_flag
+			,(
+				SELECT SUM(amount) AS amount
+				FROM bill_invoice_customer_detail C
+				WHERE C.bill_yyyymm = A.bill_yyyymm
+				AND C.invoice_item = '0000'
+			) AS amount
+		FROM
+			bill_master A
+		WHERE
+			A.bill_proc_stat <![CDATA[<>]]> 'BILLPROCSTAT_NA'
+			AND A.bill_yyyymm <![CDATA[<=]]> DATE_FORMAT(NOW(), '%Y%m')
+		<if test="billYyyymm != '' ">
+		AND
+			A.bill_yyyymm LIKE CONCAT('%',#{billYyyymm},'%')
+		</if>
+		ORDER BY A.bill_yyyymm DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<!-- 정산 건수 조회 -->
+	<select id="calculateListTot" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			COUNT(*)
+		FROM
+			bill_master A
+		WHERE
+			A.bill_proc_stat <![CDATA[<>]]> 'BILLPROCSTAT_NA'
+		<if test="billYyyymm != '' ">
+		AND
+			A.bill_yyyymm LIKE CONCAT('%',#{billYyyymm},'%')
+		</if>
+		ORDER BY A.bill_yyyymm DESC
+	</select>
+
+
+	<!-- 정산 상세보기(해당월의 기확정 및 미확정 매출현황 -->
+	<select id="calculateDetailList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		<!-- SELECT * FROM
+		(
+		SELECT
+			A.bill_yyyymm
+			, A.confirn_flag
+			, A.bill_proc_stat
+			, B.customer_id
+			, B.customer_name
+			, SUM(C.amount) AS amount
+			, SUM(CASE WHEN C.invoice_item = 'AA00' THEN C.amount ELSE 0 END) AS AA00_amount
+			, SUM(CASE WHEN C.invoice_item = 'AE00' THEN C.amount ELSE 0 END) AS AE00_amount
+			, SUM(CASE WHEN C.invoice_item = 'AI00' THEN C.amount ELSE 0 END) AS AI00_amount
+		FROM
+			(SELECT * FROM
+					bill_master
+				WHERE CAST(bill_yyyymm AS UNSIGNED) = #{billYyyymm}
+				) A
+			, bill_invoice_customer B
+			, bill_invoice_customer_detail C
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+		AND
+			B.bill_yyyymm = C.bill_yyyymm
+		AND
+			B.customer_id = C.customer_id
+		AND
+			C.invoice_item IN ('AA00', 'AE00', 'AI00')
+		GROUP BY
+			A.bill_yyyymm, B.customer_id, B.customer_name
+
+		UNION
+
+		SELECT
+			' ' AS 'bill_yyyymm'
+			, ' ' AS 'confirn_flag'
+			, ' ' AS 'bill_proc_stat'
+			, ' ' AS 'customer_id'
+			, ' ' AS 'customer_name'
+			, ' ' AS amount
+			, ' ' AS AA00_amount
+			, 'Sales Total' AS AE00_amount
+			, SUM(C.amount) AS AI00_amount
+		FROM
+			(SELECT * FROM
+					bill_master
+				WHERE CAST(bill_yyyymm AS UNSIGNED) = #{billYyyymm}
+				) A
+			, bill_invoice_customer B
+			, bill_invoice_customer_detail C
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+		AND
+			B.bill_yyyymm = C.bill_yyyymm
+		AND
+			B.customer_id = C.customer_id
+		AND
+			C.invoice_item IN ('AA00', 'AE00', 'AI00')
+		) Z
+		ORDER BY customer_id DESC -->
+
+		SELECT
+			Z.bill_yyyymm
+			, Z.confirn_flag
+			, Z.bill_proc_stat
+			, Z.comfirm_user_name
+			, Z.proc_user_name
+			, DATE_FORMAT(Z.confirm_datetime, '%Y-%m-%d %H:%i') AS confirm_datetime
+			, DATE_FORMAT(Z.proc_datetime, '%Y-%m-%d %H:%i') AS proc_datetime
+			, Z.customer_id
+			, Z.customer_name
+			, Z.company_name
+			, Z.A000_amount
+			, Z.E000_amount
+			, Z.I000_amount
+			, Z.A000_amount + Z.E000_amount + Z.I000_amount AS used_amount
+			, Z.L000_amount
+			, Z.amount
+		 FROM
+			(
+			SELECT
+				A.bill_yyyymm
+				, A.confirn_flag
+				, A.bill_proc_stat
+				, A.comfirm_user_name
+				, A.confirm_datetime
+				, A.proc_user_name
+				, A.proc_datetime
+				, B.customer_id
+				, B.customer_name
+				, CP2.company_name
+				, SUM(C.amount) AS amount
+				, SUM(CASE WHEN C.invoice_item = 'A000' THEN C.amount ELSE 0 END) AS A000_amount
+				, SUM(CASE WHEN C.invoice_item = 'E000' THEN C.amount ELSE 0 END) AS E000_amount
+				, SUM(CASE WHEN C.invoice_item = 'I000' THEN C.amount ELSE 0 END) AS I000_amount
+				, SUM(CASE WHEN C.invoice_item = 'L000' THEN C.amount ELSE 0 END) AS L000_amount
+
+			FROM
+				(SELECT * FROM
+						bill_master
+					WHERE bill_yyyymm = #{billYyyymm}
+					) A
+				, bill_invoice_customer B
+
+				LEFT JOIN bill_invoice_customer_detail C
+					ON B.customer_id = C.customer_id
+					AND B.bill_yyyymm = C.bill_yyyymm
+				LEFT JOIN cmm_customer CC
+					ON C.customer_id = CC.customer_id
+
+				LEFT JOIN cmm_company CP
+					ON CC.ref_company_id = CP.company_id
+
+				LEFT JOIN cmm_company CP2
+					ON CP.up_company_id = CP2.company_id
+
+			WHERE
+				A.bill_yyyymm = B.bill_yyyymm
+			AND
+				C.invoice_item IN ('A000', 'E000', 'I000', 'L000')
+			GROUP BY
+				A.bill_yyyymm, B.customer_id, B.customer_name
+			) Z
+		ORDER BY customer_id DESC
+
+	</select>
+
+	<!-- 정산확정 -->
+	<update id="updateConfirmFlag" parameterType="CustomChargeBillVO">
+		UPDATE
+			bill_master
+		SET
+			confirn_flag = 'Y'
+			, comfirm_user_name = #{userName}
+			, confirm_datetime = NOW()
+		WHERE
+			bill_yyyymm = #{billYyyymm}
+	</update>
+
+	<!-- 자원상세내역 start -->
+
+	<!-- 가상서버 자원 상세 -->
+	<select id="vmResource" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			bill_yyyymm
+			, customer_id
+			, cloud_id
+			, project_id
+			, resource_id
+			, resource_item
+			, DATE_FORMAT(MIN(charge_start_datetime), '%Y-%m-%d %H:%i') charge_start_datetime
+			, DATE_FORMAT(DATE_ADD(MAX(charge_end_datetime), INTERVAL -1 SECOND), '%Y-%m-%d %H:%i') charge_end_datetime
+			, hourly_flag
+			, duration
+			, SUM(measure_value)	AS measure_value
+			, price
+			, SUM(amount) AS amount
+		FROM
+			bill_charge_vm_resource_detail
+			WHERE project_id = #{projectId}
+			AND bill_yyyymm BETWEEN #{startDt} AND #{endDt}
+			<!--
+			AND	bill_yyyymm <![CDATA[>=]]> #{startDt}
+			AND bill_yyyymm <![CDATA[<=]]> #{endDt}
+			-->
+		GROUP BY
+			resource_id, resource_item
+		ORDER BY
+			CASE
+				WHEN resource_item = 'CPU' THEN 1
+				WHEN resource_item = 'MEMORY' THEN 2
+				WHEN resource_item = 'DISK' THEN 3
+			END
+			, charge_start_datetime
+
+	</select>
+
+	<!-- 자원 상세 -->
+	<select id="resourceDetail" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			A.hourly_flag
+			, A.project_id
+			, A.resource_id
+		    , SUM(A.amount) AS amount
+			, SUM(A.measure_value) AS measure_value
+			, A.resource_item
+			, DATE_FORMAT(MIN(A.charge_start_datetime), '%Y-%m-%d %H:%i') charge_start_datetime
+			, DATE_FORMAT(DATE_ADD(MAX(A.charge_end_datetime), INTERVAL -1 SECOND), '%Y-%m-%d %H:%i') charge_end_datetime
+			<choose>
+			<when test="resourceDbTable == 'bill_charge_disk_resource_detail' ">
+			, B.disk_alias
+			</when>
+			<when test="resourceDbTable == 'bill_charge_nas_resource_detail' ">
+			, B.nas_name
+			</when>
+			<when test="resourceDbTable == 'bill_charge_loadbalancer_resource_detail' ">
+			, B.loadbalancer_name
+			</when>
+			<when test="resourceDbTable == 'bill_charge_service_resource_detail' ">
+			, B.service_name
+			, B.service_type
+			, C.code_name AS service_type_name
+			</when>
+			<otherwise>
+			, '0'
+			</otherwise>
+			</choose>
+		FROM
+			#{resourceDbTable} A
+			<if test="resourceDbTable == 'bill_charge_disk_resource_detail' ">
+			LEFT OUTER JOIN oss_disk B
+			ON A.resource_id = B.disk_id
+			</if>
+			<if test="resourceDbTable == 'bill_charge_nas_resource_detail' ">
+			LEFT OUTER JOIN oss_nas B
+			ON A.resource_id = B.nas_id
+			</if>
+			<if test="resourceDbTable == 'bill_charge_loadbalancer_resource_detail' ">
+			LEFT OUTER JOIN oss_loadbalancer B
+			ON A.resource_id = B.loadbalancer_id
+			</if>
+			<if test="resourceDbTable == 'bill_charge_service_resource_detail' ">
+			LEFT OUTER JOIN oss_service B
+			ON A.resource_id = B.service_id
+			LEFT OUTER JOIN (SELECT * FROM cmm_code WHERE parent_code_id = 'SERVICE_TYPE') C
+			ON B.service_type = C.code_id
+		</if>
+
+			WHERE A.project_id = #{projectId}
+			    AND bill_yyyymm BETWEEN #{startDt} AND #{endDt}
+
+		GROUP BY
+			a.resource_id, a.project_id
+
+		ORDER BY
+			A.charge_start_datetime
+	</select>
+
+	<!-- 할인률 & 보정 상세-->
+	<select id="dcAdDetail" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			    cloud_id,
+				customer_id,
+				project_id,
+				invoice_item,
+				invoice_item_sub,
+				invoice_item_name,
+				invoice_item_depth,
+			    SUM(amount) as amount,
+				service_type
+		FROM
+			bill_invoice_project_detail
+		WHERE
+			bill_yyyymm BETWEEN #{startDt} AND #{endDt}
+		AND
+			project_id = #{projectId}
+
+		GROUP BY cloud_id, customer_id,	project_id,	invoice_item,	invoice_item_sub, invoice_item_name, invoice_item_depth, service_type
+
+	</select>
+
+
+	<!-- 정산요청 권한조회 -->
+	<select id="getStepAuth" parameterType="CustomChargeBillVO" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM
+			approval_model_member
+		WHERE
+			step_id = #{stepId}
+		AND
+			user_id = #{userId};
+
+	</select>
+
+</mapper>

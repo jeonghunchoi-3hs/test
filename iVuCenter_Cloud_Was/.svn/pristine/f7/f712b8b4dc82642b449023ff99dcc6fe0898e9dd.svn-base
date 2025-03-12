@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:mvc="http://www.springframework.org/schema/mvc"
+		xmlns:aop="http://www.springframework.org/schema/aop"
+		xmlns:tx="http://www.springframework.org/schema/tx"
+		xmlns:context="http://www.springframework.org/schema/context"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+		  http://www.springframework.org/schema/beans/spring-beans.xsd	  
+		  http://www.springframework.org/schema/mvc 
+		  http://www.springframework.org/schema/mvc/spring-mvc.xsd 
+		  http://www.springframework.org/schema/aop    
+		  http://www.springframework.org/schema/aop/spring-aop.xsd
+		  http://www.springframework.org/schema/tx    
+		  http://www.springframework.org/schema/tx/spring-tx.xsd
+		  http://www.springframework.org/schema/context    
+		  http://www.springframework.org/schema/context/spring-context.xsd">
+	
+	<!-- Enables the Spring MVC @Controller programming model -->
+	<mvc:annotation-driven />
+	
+	<!-- Enables the Spring myBatis Transaction annotation -->
+	<tx:annotation-driven transaction-manager="com.ivucenter.cloud.transactionManager" />
+	<context:annotation-config />
+
+	<context:component-scan base-package="com.ivucenter.cloud">
+		<context:include-filter type="annotation" expression="org.springframework.stereotype.Repository" />
+		<context:include-filter type="annotation" expression="org.springframework.stereotype.Service" />
+		<context:include-filter type="annotation" expression="org.springframework.stereotype.Component" />
+	</context:component-scan>
+	
+	<context:component-scan base-package="com.ivucenter.cloud" />
+	<context:property-placeholder location="classpath*:*.properties" />
+	<aop:aspectj-autoproxy>
+	
+	</aop:aspectj-autoproxy>
+
+	<!-- ##### DB session ##### -->
+	<!-- [JNDI 방식] -->
+	<!-- 
+	<bean id="com.ivucenter.cloud.writableDataSource" class="org.springframework.jndi.JndiObjectFactoryBean"> 
+		<property name="jndiName" value="java:comp/env/jdbc/cloud" /> <property name="resourceRef" value="true" /> 
+	</bean> 
+	-->
+	
+	<!-- Colud DB -->
+	<bean id="com.ivucenter.cloud.writableDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" 	value="${db.driverClassName}" />
+		<property name="url" 				value="${db.url}" />
+		<property name="username" 			value="${db.username}" />
+		<property name="password" 			value="${db.password}" />
+		<!-- <property name="validationQuery" 	value="${db.validationQuery}" /> -->
+		<property name="initialSize" 		value="${db.initialSize}" />
+		<property name="minIdle" 			value="${db.minIdle}" />
+		<property name="maxActive" 			value="${db.maxActive}" />
+		<property name="testWhileIdle" 		value="${db.testWhileIdle}" />
+		<property name="testOnBorrow" 		value="${db.testOnBorrow}" />
+		<property name="timeBetweenEvictionRunsMillis" value="${db.timeBetweenEvictionRunsMillis}" />
+		<property name="minEvictableIdleTimeMillis" value="${db.minEvictableIdleTimeMillis}" />
+	</bean>
+
+	<!-- itrm DB 실시간 성능 및 이벤트 관련 itrm 정보 -->
+	<bean id="hq.itrm.readableDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" 				value="${itrm.db.driverClassName}" />
+		<property name="url" 							value="${itrm.db.url}" />
+		<property name="username" 						value="${itrm.db.username}" />
+		<property name="password" 						value="${itrm.db.password}" />
+		<!-- <property name="validationQuery" 				value="${itrm.db.validationQuery}" /> -->
+		<property name="initialSize" 					value="${itrm.db.initialSize}" />
+		<property name="minIdle" 						value="${itrm.db.minIdle}" />
+		<property name="maxActive" 						value="${itrm.db.maxActive}" />
+		<property name="testWhileIdle" 					value="${itrm.db.testWhileIdle}" />
+		<property name="testOnBorrow" 					value="${itrm.db.testOnBorrow}" />
+		<property name="timeBetweenEvictionRunsMillis" 	value="${itrm.db.timeBetweenEvictionRunsMillis}" />
+		<property name="minEvictableIdleTimeMillis" 	value="${itrm.db.minEvictableIdleTimeMillis}" />
+	</bean>
+
+	<!-- BATCH INSA DB 사용자 정보 및 부서 정보 업데이트 -->
+	<bean id="batch.insa.readableDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" 				value="${insa.db.driverClassName}" />
+		<property name="url" 							value="${insa.db.url}" />
+		<property name="username" 						value="${insa.db.username}" />
+		<property name="password" 						value="${insa.db.password}" />
+		<!-- <property name="validationQuery" 				value="${itrm.db.validationQuery}" /> -->
+		<property name="initialSize" 					value="${insa.db.initialSize}" />
+		<property name="minIdle" 						value="${insa.db.minIdle}" />
+		<property name="maxActive" 						value="${insa.db.maxActive}" />
+		<property name="testWhileIdle" 					value="${insa.db.testWhileIdle}" />
+		<property name="testOnBorrow" 					value="${insa.db.testOnBorrow}" />
+		<property name="timeBetweenEvictionRunsMillis" 	value="${insa.db.timeBetweenEvictionRunsMillis}" />
+		<property name="minEvictableIdleTimeMillis" 	value="${insa.db.minEvictableIdleTimeMillis}" />
+	</bean>
+	<!-- ( 2 ) sqlSessionFactory (dataSource, configLocation "optional") -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="com.ivucenter.cloud.writableDataSource" />
+		<property name="configLocation" value="classpath:mybatis-context.xml" />
+		<property name="mapperLocations" value="classpath:com/ivucenter/cloud/mapper/**/*.xml" />
+	</bean>
+	
+	<!--  BATCH ITRM sqlSessionFactory -->
+	<bean id="sqlSessionFactory2" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="hq.itrm.readableDataSource" />
+		<property name="configLocation" value="classpath:mybatis-context.xml" />
+		<property name="mapperLocations" value="classpath:com/ivucenter/cloud/mapper/kepco/**/*.xml" />
+	</bean>
+	
+	<!--  INSA sqlSessionFactory -->
+	<bean id="sqlSessionFactory3" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="batch.insa.readableDataSource" />
+		<property name="configLocation" value="classpath:mybatis-context.xml" />
+		<property name="mapperLocations" value="classpath:com/ivucenter/cloud/mapper/**/*.xml" />
+	</bean>
+	
+	<!--  배치 테스트 -->
+	<bean id="sqlSessionFactory4" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="com.ivucenter.cloud.writableDataSource" />
+		<property name="configLocation" value="classpath:mybatis-context.xml" />
+		<property name="mapperLocations" value="classpath:com/ivucenter/cloud/mapper/**/*.xml" />
+	</bean>
+	
+	<!-- CLOUD sqlSession -->
+	<bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg index="0" ref="sqlSessionFactory" />
+	</bean>
+
+	<!-- ITRM sqlSession -->
+	<bean id="sqlSession2" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg index="0" ref="sqlSessionFactory2" />
+	</bean>
+	
+	<!-- BATCH INSA sqlSession -->
+	<bean id="sqlSession3" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg index="0" ref="sqlSessionFactory3" />
+	</bean>
+	
+	<!-- BATCH sqlSession -->
+	<bean id="sqlSession4" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg index="0" ref="sqlSessionFactory4" />
+		<constructor-arg index="1" value="BATCH" />
+	</bean>
+
+	<!--  Batch sqlSession -->
+	<!-- 
+	<bean id="batchSqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg index="0" ref="sqlSessionFactory" />
+		<constructor-arg index="1" value="BATCH" />
+	</bean>
+	-->
+	<!-- ##### End of DB session ##### -->
+
+
+	<!-- ##### Transaction ##### -->
+	<!-- Cloud Transaction -->
+	<bean id="com.ivucenter.cloud.transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="com.ivucenter.cloud.writableDataSource" />
+	</bean>
+	
+	<bean id="com.ivucenter.cloud.transactionTemplate" class="org.springframework.transaction.support.TransactionTemplate">
+		<property name="transactionManager" ref="com.ivucenter.cloud.transactionManager" />
+	</bean>
+	
+	<!-- ITRM Transaction -->
+	<bean id="hq.itrm.transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="hq.itrm.readableDataSource" />
+	</bean>
+	
+	<bean id="hq.itrm.transactionTemplate" class="org.springframework.transaction.support.TransactionTemplate">
+		<property name="transactionManager" ref="hq.itrm.transactionManager" />
+	</bean>	
+	<!-- ##### End of Transaction ##### -->
+	
+	<!-- BATCH INSA Transaction -->
+	<bean id="batch.insa.transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="batch.insa.readableDataSource" />
+	</bean>
+	
+	<bean id="batch.insa.transactionTemplate" class="org.springframework.transaction.support.TransactionTemplate">
+		<property name="transactionManager" ref="batch.insa.transactionManager" />
+	</bean>	
+	<!-- ##### End of Transaction ##### -->
+	<!-- ##### Quartz Scheduler ##### -->
+	<!-- quartz-context.xml에 설정됨 -->
+
+</beans>

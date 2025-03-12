@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.sms.queue.SmsQueueDAO">
+
+    <select id="list" resultType="CustomSmsQueueVO" parameterType="CustomSmsQueueVO">
+    	SELECT 
+			*
+    	FROM sms_queue
+    	ORDER BY reg_datetime    	
+    </select>
+
+	<select id="detail" resultType="CustomSmsQueueVO" parameterType="CustomSmsQueueVO">
+    	SELECT 
+			*
+    	FROM sms_queue
+    	WHERE sms_seq = #{smsSeq}    	
+    </select>
+    
+    <insert id="insert" parameterType="CustomSmsQueueVO">
+   		INSERT INTO sms_queue (
+   			sms_seq
+   			, sms_short_seq
+			, template_id
+			, sender_name
+			, sender_number
+			, receiver_flg
+			, receiver_id
+			, receiver_name
+			, receiver_number
+			, message
+			, retry_count
+			, reg_datetime
+			, reg_user_id
+		) values (
+			#{smsSeq}
+			, #{smsShortSeq}
+			, #{templateId}
+			, #{senderName}
+			, #{senderNumber}
+			, #{receiverFlg}
+			, #{receiverId}
+			, #{receiverName}
+			, #{receiverNumber}
+			, #{message}
+			, 0
+			, now()
+			, #{regUserId}
+		)
+    </insert>
+    
+    
+    <insert id="insertSendSms" parameterType="CustomSmsQueueVO">
+    	INSERT INTO EMMADB.em_smt_tran (
+    		date_client_req, 
+    		content, 
+    		callback, 
+    		service_type, 
+    		broadcast_yn, 
+    		msg_status, 
+    		recipient_num
+    		) VALUES (
+    		SYSDATE(), 
+    		#{message}, 
+    		#{receiverNumber}, 
+    		'0', 
+    		'N', 
+    		'1', 
+    		#{senderNumber});
+    </insert>
+    
+    <update id="updateRetryCount" parameterType="CustomSmsQueueVO">
+        UPDATE sms_queue SET
+			retry_count = retry_count + 1
+        WHERE sms_seq = #{smsSeq}
+    </update>
+    
+    <delete id="delete" parameterType="CustomSmsQueueVO">
+    	DELETE FROM sms_queue 
+    	WHERE sms_seq = #{smsSeq}
+    </delete>
+    
+</mapper>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bbs.download.BbsDownloadDAO">
+ 	
+ 	<!-- 자료실 리스트 -->
+    <select id="list" parameterType="CustomBbsDownloadVO" resultType="CustomBbsDownloadVO">
+    	SELECT
+    		*
+    	FROM(
+	    	SELECT 
+				a.*
+				, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+				,(SELECT code_name FROM cmm_code WHERE code_id=a.download_type AND parent_code_id=#{codeKeyId} ) AS code_name
+				, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+	    	FROM bbs_download a
+	    	where a.del_flag <![CDATA[<>]]> 'Y'
+	    ) A 
+		where 1=1
+			<if test="searchKind == 'title' and keyword != ''">
+			and 
+				A.title like CONCAT('%',#{keyword},'%')	
+			</if>
+			<if test="searchKind == 'content' and keyword != ''">
+			and 
+				A.content like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			and (
+				A.title like CONCAT('%',#{keyword},'%')
+			or 
+				A.content like CONCAT('%',#{keyword},'%')
+				)	
+			</if>
+		 
+		<if test="category != null and category != ''">
+			and A.code_name = #{category}
+		</if>
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+				ORDER BY A.download_no DESC
+			</if>
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 			
+	</select>
+	
+	<!-- 자료실 상세조회 -->
+    <select id="detail" parameterType="CustomBbsDownloadVO" resultType="CustomBbsDownloadVO">
+    	SELECT 
+			a.*
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+			,(SELECT code_name FROM cmm_code WHERE code_id=a.download_type AND parent_code_id=#{codeKeyId} ) AS codeName
+    	FROM bbs_download a
+    	where download_no = #{downloadNo}
+	</select>
+
+  	<!-- 자료실 등록 -->
+  	<insert id="insert" parameterType="CustomBbsDownloadVO" >
+  		insert into bbs_download(
+			download_type
+			, title
+			, content
+			, files_cnt
+			, reg_datetime
+			, reg_user_id
+			, del_flag
+  		)values(
+			#{downloadType}
+			, #{title}
+			, #{content}
+			, #{filesCnt}
+			, now()
+			, #{regUserId}
+			, #{delFlag}    
+  		)
+  	</insert>
+  	
+  	<!-- 자료실 수정 -->
+  	<update id="update" parameterType="CustomBbsDownloadVO" >
+  		update 
+  			bbs_download 
+  		set
+			download_type = #{downloadType}
+			, title = #{title}
+			, content = #{content}
+			, files_cnt = #{filesCnt}
+			, mod_datetime = NOW()
+			, mod_user_id = #{modUserId}  
+			, del_flag = #{delFlag}    
+  		where
+  			download_no = #{downloadNo}
+  	</update>
+
+  	<!-- 자료실 수정 -->
+  	<update id="updateFilesCnt" parameterType="CustomBbsDownloadVO" >
+  		update 
+  			bbs_download 
+  		set
+			files_cnt = #{filesCnt}
+  		where
+  			download_no = #{downloadNo}
+  	</update>
+  	
+  	<update id="delete" parameterType="CustomBbsDownloadVO">
+		UPDATE bbs_download 
+		SET			
+			del_flag = 'Y' 
+		WHERE
+		download_no = #{downloadNo}	
+  	</update>
+
+    <select id="findLastIndex" resultType="String">
+    	SELECT  		
+				download_no
+		FROM bbs_download
+		ORDER BY reg_datetime DESC
+		LIMIT 0, 1
+	</select>
+
+
+</mapper>

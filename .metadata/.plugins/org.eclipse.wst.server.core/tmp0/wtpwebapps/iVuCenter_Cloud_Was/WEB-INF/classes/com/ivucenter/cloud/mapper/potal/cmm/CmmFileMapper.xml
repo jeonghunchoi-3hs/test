@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.cmm.file.CmmFileDAO">
+
+    <select id="list" resultType="CustomCmmFileVO" parameterType="CustomCmmFileVO">
+    	SELECT 
+			*
+			<![CDATA[
+			, IF(file_size < 1024, CONCAT (file_size,' Byte'), IF(file_size < 1024*1024, CONCAT (ROUND(file_size/1024,0),' KB'), IF(file_size < 1024*1024*1024, CONCAT (ROUND(file_size/1024/1024,0),' MB'), CONCAT (ROUND(file_size/1024/1024/1024,0),' GB'))))  file_tran_size
+			]]>
+    	FROM cmm_file
+		WHERE 1=1
+		AND program_name = #{programName}
+		AND program_seq = #{programSeq} 
+    </select>
+     
+    <select id="detail" resultType="CustomCmmFileVO" parameterType="java.lang.String">
+    	SELECT 
+			*
+    	FROM cmm_file
+		WHERE file_id = #{0} 
+    </select>
+    
+    <insert id="insert" parameterType="CustomCmmFileVO">
+   		INSERT INTO cmm_file (
+			file_id
+			, file_name
+			, file_path
+			, file_size
+			, program_name
+			, program_seq
+		) values (
+			#{fileId}
+			, #{fileName}
+			, #{filePath}
+			, #{fileSize}
+			, #{programName}
+			, #{programSeq}		
+		)
+    </insert>
+    
+    <delete id="delete" parameterType="CustomCmmFileVO">
+    	delete from cmm_file
+    	WHERE 1=1
+		AND program_name = #{programName}
+		AND program_seq = #{programSeq} 
+		AND file_id = #{fileId} 
+    </delete>
+    
+    <select id="findById" resultType="CustomCmmFileVO" parameterType="CustomCmmFileVO">
+    	SELECT 
+			*
+    	FROM cmm_file
+		WHERE 1=1
+		AND program_name = #{programName}
+		AND program_seq = #{programSeq} 
+    </select>
+</mapper>

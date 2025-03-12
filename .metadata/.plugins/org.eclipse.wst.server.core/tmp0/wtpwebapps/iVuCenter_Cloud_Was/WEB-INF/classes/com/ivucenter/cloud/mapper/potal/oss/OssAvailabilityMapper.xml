@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.oss.availability.OssAvailabilityDAO">
+
+    <select id="batchSelectOssAvailability" resultType="OssAvailabilityVO" parameterType="OssAvailabilityVO">
+    	SELECT
+			*
+    	FROM 	oss_availability
+    	WHERE 	1 = 1
+		<if test='projectId !="" or projectId !=null'>
+			AND		project_id = #{projectId}
+		</if>
+    </select>
+
+	<insert id="batchInsertOssAvailability" parameterType="OssAvailabilityVO">
+
+		MERGE INTO oss_availability A
+        USING (
+        SELECT
+		              #{projectId}	 AS project_id
+					, #{cloudId} AS cloud_id
+					, #{vmTotal} AS vm_total
+					, #{vmUsed} AS vm_used
+					, #{vmAvail} AS vm_avail
+					, #{vCpuTotal} AS vcpu_total
+					, #{vCpuUsed} AS vcpu_used
+					, #{vCpuAvail} AS vcpu_avail
+					, #{memTotal} AS mem_total
+					, #{memUsed} AS mem_used
+					, #{memAvail} AS mem_avail
+					, #{diskTotal}	 AS disk_total
+					, #{diskUsed}	 AS disk_used
+					, #{diskAvail}	 AS disk_avail
+					, #{nasTotal}	 AS nas_total
+					, #{nasUsed}	 AS nas_used
+					, #{nasAvail}	 AS nas_avail
+					, #{collDatetime} AS coll_datetime
+
+				FROM db_root
+              ) B
+              ON (    A.project_id = B.project_id
+                   AND A.cloud_id = B.cloud_id
+              ) WHEN MATCHED THEN
+                     UPDATE
+                        SET
+
+					A.vm_total	= B.vm_total,
+					A.vm_used	= B.vm_used,
+					A.vm_avail	= B.vm_avail,
+					A.vcpu_total = B.vcpu_total,
+					A.vcpu_used = B.vcpu_used,
+					A.vcpu_avail = B.vcpu_avail,
+					A.mem_total = B.mem_total,
+					A.mem_used = B.mem_used,
+					A.mem_avail = B.mem_avail,
+					A.disk_total = B.disk_total,
+					A.disk_used = B.disk_used,
+					A.disk_avail = B.disk_avail,
+					A.coll_datetime = B.coll_datetime
+
+                WHEN NOT MATCHED THEN
+                INSERT
+                (
+					A.project_id,
+					A.cloud_id,
+					A.vm_total,
+					A.vm_used,
+					A.vm_avail,
+					A.vcpu_total,
+					A.vcpu_used,
+					A.vcpu_avail,
+					A.mem_total,
+					A.mem_used,
+					A.mem_avail,
+					A.disk_total,
+					A.disk_used,
+					A.disk_avail,
+					A.coll_datetime
+                ) VALUES
+                (
+			        B.project_id,
+					B.cloud_id,
+					B.vm_total,
+					B.vm_used,
+					B.vm_avail,
+					B.vcpu_total,
+					B.vcpu_used,
+					B.vcpu_avail,
+					B.mem_total,
+					B.mem_used,
+					B.mem_avail,
+					B.disk_total,
+					B.disk_used,
+					B.disk_avail,
+					B.coll_datetime
+                )
+
+	</insert>
+
+	<insert id="batchInsertOssAvailabilityHistory" parameterType="OssAvailabilityVO">
+		INSERT INTO oss_availability_history (
+			project_id
+			, cloud_id
+			, vm_total
+			, vm_used
+			, vm_avail
+			, vcpu_total
+			, vcpu_used
+			, vcpu_avail
+			, mem_total
+			, mem_used
+			, mem_avail
+			, disk_total
+			, disk_used
+			, disk_avail
+			, nas_total
+			, nas_used
+			, nas_avail
+			, coll_datetime
+		) VALUES (
+			#{projectId}
+			, #{cloudId}
+			, #{vmTotal}
+			, #{vmUsed}
+			, #{vmAvail}
+			, #{vCpuTotal}
+			, #{vCpuUsed}
+			, #{vCpuAvail}
+			, #{memTotal}
+			, #{memUsed}
+			, #{memAvail}
+			, #{diskTotal}
+			, #{diskUsed}
+			, #{diskAvail}
+			, #{nasTotal}
+			, #{nasUsed}
+			, #{nasAvail}
+			, #{collDatetime}
+		)
+	</insert>
+
+    <update id="batchUpdateOssAvailability" parameterType="OssAvailabilityVO">
+        UPDATE oss_availability
+        SET	vm_total = #{vmTotal}
+			, vm_used = #{vmUsed}
+			, vm_avail = #{vmAvail}
+			, vcpu_total = #{vCpuTotal}
+			, vcpu_used = #{vCpuUsed}
+			, vcpu_avail = #{vCpuAvail}
+			, mem_total = #{memTotal}
+			, mem_used = #{memUsed}
+			, mem_avail = #{memAvail}
+			, disk_total = #{diskTotal}
+			, disk_used = #{diskUsed}
+			, disk_avail = #{diskAvail}
+			, nas_total = #{nasTotal}
+			, nas_used = #{nasUsed}
+			, nas_avail = #{nasAvail}
+			, coll_datetime = #{collDatetime}
+        WHERE	project_id = #{projectId}
+    </update>
+
+	<delete id="batchDeleteOssAvailability" parameterType="CustomQuotaVO">
+		DELETE FROM oss_availability
+    	WHERE cloud_id = #{cloudId}
+	</delete>
+
+	<select id="selectProjectBycloudId" resultType="CustomOssProjectVO" parameterType="CustomOssProjectVO">
+	    SELECT cloud_id
+	    FROM oss_project
+	    WHERE project_id = #{projectId}
+   </select>
+
+   <delete id="batchDeleteOssAvailabilityHistory" parameterType="OssAvailabilityVO">
+		DELETE FROM oss_availability_history
+    	WHERE 	1 = 1
+    	AND coll_datetime BETWEEN ADDDATE(CURDATE(), - WEEKDAY(CURDATE()) + 0 ) AND ADDDATE(CURDATE(), - WEEKDAY(CURDATE()) + 6)
+    	AND cloud_id = #{cloudId}
+   </delete>
+   <delete id="deleteStorageUsage" parameterType="OssAvailabilityVO">
+   		DELETE FROM oss_storage_availability
+   		WHERE cloud_id = #{cloudId}
+   </delete>
+
+   <insert id="insertStorageUsage" parameterType="CustomStorageVO">
+   		INSERT INTO
+   			oss_storage_availability (
+   				storage_id
+   				,storage_type
+   				,cloud_id
+   				,total_space
+   				,used_space
+   			)
+   			VALUES
+   			(
+   				#{storageId}
+   				,#{storageType}
+   				,#{cloudId}
+   				,#{totalSpace}
+   				,#{usedSpace}
+   			)
+   </insert>
+
+   <select id="openshftOssNutanixAvailability" resultType="OpenStackUsage"  parameterType="CustomQuotaVO">
+
+								SELECT
+									oc.cloud_name,
+									oc.cloud_type,
+									oc.cloud_id,
+									op.project_id,
+									10 AS vm_total,
+									COUNT(ov.vm_uuid) AS vm_used,
+									COUNT(ov.vm_uuid) AS vm_avail,
+									SUM (rpc.cpu_req) AS vcpu_total ,
+									SUM (ov.vcpus) AS vcpu_used,
+									SUM (rpc.cpu_req - ov.vcpus) AS vcpu_avail,
+									SUM (CAST(rpc.mem_req AS int) * 1024) AS mem_total,
+									SUM (ov.mem_gb * 1024) AS mem_used,
+									SUM ((CAST(rpc.mem_req AS int) * 1024) - (ov.mem_gb * 1024)) AS mem_avail,
+									SUM (rpc.storage_req) AS disk_total,
+									SUM (ov.disk_gb) AS disk_used,
+									SUM (rpc.storage_req - ov.disk_gb) AS disk_avail
+
+								FROM (SELECT * FROM oss_cloud WHERE del_flag = 'N') oc
+					    INNER JOIN (SELECT * FROM oss_project WHERE del_flag = 'N') op
+								    ON oc.cloud_id = op.cloud_id
+						LEFT JOIN (SELECT * FROM oss_vm WHERE del_flag = 'N') ov
+								    ON op.project_id = ov.project_id
+						LEFT JOIN req_project_cloud rpc
+								    ON oc.cloud_id = rpc.cloud_id
+								  AND op.program_seq = rpc.req_project_seq
+						      WHERE op.cloud_id = #{cloudId}
+
+					      GROUP BY oc.cloud_name, oc.cloud_type, oc.cloud_id,	op.project_id
+
+								UNION ALL
+
+								SELECT
+									oc.cloud_name,
+									oc.cloud_type,
+									oc.cloud_id,
+									'ALL',
+									COUNT(op.project_id) * 10 AS vm_total,
+									COUNT(ov.vm_uuid) AS vm_used,
+									COUNT(ov.vm_uuid) AS vm_avail,
+									SUM (rpc.cpu_req) AS vcpu_total ,
+									SUM (ov.vcpus) AS vcpu_used,
+									SUM (rpc.cpu_req - ov.vcpus) AS vcpu_avail,
+									SUM (CAST(rpc.mem_req AS int) * 1024) AS mem_total,
+									SUM (ov.mem_gb * 1024) AS mem_used,
+									SUM ((CAST(rpc.mem_req AS int) * 1024) - (ov.mem_gb * 1024)) AS mem_avail,
+									SUM (rpc.storage_req) AS disk_total,
+									SUM (ov.disk_gb) AS disk_used,
+									SUM (rpc.storage_req - ov.disk_gb) AS disk_avail
+
+								FROM (SELECT * FROM oss_cloud WHERE del_flag = 'N') oc
+					    INNER JOIN (SELECT * FROM oss_project WHERE del_flag = 'N') op
+								    ON oc.cloud_id = op.cloud_id
+						LEFT JOIN (SELECT * FROM oss_vm WHERE del_flag = 'N') ov
+								    ON op.project_id = ov.project_id
+						LEFT JOIN req_project_cloud rpc
+								    ON oc.cloud_id = rpc.cloud_id
+								  AND op.program_seq = rpc.req_project_seq
+					          WHERE op.cloud_id = #{cloudId}
+					     GROUP BY oc.cloud_name, oc.cloud_type, oc.cloud_id
+
+    </select>
+
+
+    <select id="openshftOssOpenshiftAvailability" resultType="OpenStackUsage"  parameterType="CustomQuotaVO">
+
+							SELECT
+									oc.cloud_name,
+									oc.cloud_type,
+									oc.cloud_id,
+									op.project_id,
+									COUNT(oc.cloud_name) AS vm_total,
+									COUNT(oc.cloud_name) AS vm_used,
+									COUNT(oc.cloud_name) AS vm_avail,
+									SUM (oa.pod) AS vcpu_total ,
+									SUM (oa.pod) AS vcpu_used,
+									SUM (oa.pod) AS vcpu_avail,
+									SUM (oat.autoscaler) AS mem_total,
+									SUM (oat.autoscaler) AS mem_used,
+									SUM (oat.autoscaler) AS mem_avail,
+									SUM (oa.volume) AS disk_total,
+									SUM (oa.volume) AS disk_used,
+									SUM (oa.volume) AS disk_avail
+
+								FROM (SELECT * FROM oss_cloud WHERE del_flag = 'N') oc
+					    INNER JOIN (SELECT * FROM oss_project WHERE del_flag = 'N') op
+								    ON oc.cloud_id = op.cloud_id
+						INNER JOIN (SELECT * FROM oss_app WHERE del_flag = 'N') oa
+								    ON oa.project_id = op.project_id
+					      LEFT JOIN (SELECT COUNT(autoscaler_uuid) AS autoscaler, project_id FROM oss_autoscaler GROUP BY project_id) oat
+                                    ON oat.project_id = op.project_id
+						      WHERE op.cloud_id = #{cloudId}
+					      GROUP BY oc.cloud_name, oc.cloud_type, oc.cloud_id,	op.project_id
+
+								UNION ALL
+
+							SELECT
+									oc.cloud_name,
+									oc.cloud_type,
+									oc.cloud_id,
+									'ALL',
+									COUNT(oc.cloud_name) AS vm_total,
+									COUNT(oc.cloud_name) AS vm_used,
+									COUNT(oc.cloud_name) AS vm_avail,
+									SUM (oa.pod) AS vcpu_total ,
+									SUM (oa.pod) AS vcpu_used,
+									SUM (oa.pod) AS vcpu_avail,
+									SUM (oat.autoscaler) AS mem_total,
+									SUM (oat.autoscaler) AS mem_used,
+									SUM (oat.autoscaler) AS mem_avail,
+									SUM (oa.volume) AS disk_total,
+									SUM (oa.volume) AS disk_used,
+									SUM (oa.volume) AS disk_avail
+
+
+								FROM (SELECT * FROM oss_cloud WHERE del_flag = 'N') oc
+					    INNER JOIN (SELECT * FROM oss_project WHERE del_flag = 'N') op
+								    ON oc.cloud_id = op.cloud_id
+						INNER JOIN (SELECT * FROM oss_app WHERE del_flag = 'N') oa
+								    ON oa.project_id = op.project_id
+					     LEFT JOIN (SELECT COUNT(autoscaler_uuid) AS autoscaler, project_id FROM oss_autoscaler GROUP BY project_id) oat
+                                   ON oat.project_id = op.project_id
+					          WHERE op.cloud_id = #{cloudId}
+						 GROUP BY oc.cloud_name, oc.cloud_type, oc.cloud_id
+	</select>
+
+
+</mapper>

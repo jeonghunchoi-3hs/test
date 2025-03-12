@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+     xmlns="http://www.springframework.org/schema/beans"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:aop="http://www.springframework.org/schema/aop"
+     xmlns:tx="http://www.springframework.org/schema/tx"
+     xmlns:batch="http://www.springframework.org/schema/batch"
+     xmlns:context="http://www.springframework.org/schema/context"
+     xmlns:util="http://www.springframework.org/schema/util"
+    
+     xsi:schemaLocation="
+         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+         http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+         http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch-2.2.xsd
+         http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd
+     http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+    ">
+    
+    
+     <!-- *********************************************************** -->
+     <!-- ********** Job 선언 ********** -->
+     <!-- *********************************************************** -->
+     <batch:job id="meteringRealtimeJob">
+     
+     	<!-- jobContextStep -->
+    	<batch:step id="meteringJobContextStep" next="syncOpenStackAvailStep">
+			<batch:tasklet ref="meteringJobContextTasklet" />
+		</batch:step>
+		
+		<!-- 오픈스택 가용량 동기화 -->
+		<batch:step id="syncOpenStackAvailStep">
+			<batch:tasklet>
+				<batch:chunk reader="syncOpenStackAvailReader" 
+							writer="syncOpenStackAvailWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		
+     </batch:job>
+  
+   
+	
+	<!-- *********************************************************** -->
+	<!-- ********** 변수 선언 ********** -->
+	<!-- *********************************************************** -->
+
+	<!-- 입력변수 -->
+	<util:map id="meteringJobParams" key-type="java.lang.String" scope="step" >
+		<entry key="runtime" value="#{jobParameters['runtime']}" />
+		<entry key="meteringDay" value="#{jobParameters['meteringDay']}" />
+	</util:map>
+	
+	<!-- 스텝간 동적 변수 -->
+	<util:map id="meteringStepParams" key-type="java.lang.String" scope="step">
+		<entry key="meteringStartDatetime" value="#{jobExecutionContext['meteringStartDatetime']}" />
+		<entry key="meteringEndDatetime" value="#{jobExecutionContext['meteringEndDatetime']}" />
+	</util:map>
+	
+	
+     <!-- *********************************************************** -->
+     <!-- ********** Bean 선언 ********** -->
+     <!-- *********************************************************** -->
+
+    <bean id="meteringJobContextTasklet" class="com.ivucenter.cloud.batch.metering.realtime.JobContextTasklet">
+	    <property name="parameterValues" ref="meteringJobParams"/>
+    </bean> 
+
+	<!-- 오픈스택 가용량 동기화 -->
+    <bean id="syncOpenStackAvailReader" class="com.ivucenter.cloud.batch.metering.realtime.SyncOpenStackAvailReader">	  	
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />	
+    </bean> 
+    
+    <bean id="syncOpenStackAvailWriter" class="com.ivucenter.cloud.batch.metering.realtime.SyncOpenStackAvailWriter">	  	
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />	
+    </bean> 
+
+    
+</beans>

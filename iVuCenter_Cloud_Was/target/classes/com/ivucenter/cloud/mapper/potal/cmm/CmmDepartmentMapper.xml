@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.cmm.department.CmmDepartmentDAO">
+ 	
+ 	<select id="listAll" resultType="CustomCmmDepartmentVO">
+		SELECT dept_code
+			, IFNULL(up_code, '') AS up_code
+			, dept_name
+			, LEVEL AS tree_level
+			, CONNECT_BY_ISLEAF AS is_leaf
+			, false AS is_expended
+		FROM cmm_department
+		WHERE del_flag != 'Y'
+		START WITH up_code IS null
+		CONNECT BY PRIOR dept_code=up_code
+		ORDER SIBLINGS BY dept_code
+    </select>
+    
+    <select id="list" resultType="CustomCmmDepartmentVO" parameterType="CustomCmmDepartmentVO">
+		SELECT 
+			*
+		FROM cmm_department				
+    </select>
+    
+    <select id="detail" resultType="CustomCmmDepartmentVO" parameterType="CustomCmmDepartmentVO">
+		SELECT  
+			*
+		FROM cmm_department		
+		WHERE dept_code = #{deptCode}
+    </select>  	
+	
+    <insert id="insert" parameterType="CustomCmmDepartmentVO">
+   		INSERT INTO cmm_department (
+			dept_code
+			, dept_name
+			, up_code
+			, dept_order
+			, manager
+			, del_flag			   		
+		) values (			
+			#{deptCode}
+			, #{deptName}
+			, #{deptOrder}
+			, #{manager}
+			, NULL			
+		)
+    </insert> 
+    
+    <select id="TreeAll" resultType="CustomCmmDepartmentVO" parameterType="CustomCmmDepartmentVO">
+		SELECT 
+			dept_code
+			, IFNULL(up_code, '') AS up_code
+			, false AS is_expended
+			<choose>
+				<when test="searchKind == 'dept_name' and keyword != '' ">
+				, SYS_CONNECT_BY_PATH(TRIM(dept_name), '<![CDATA[>]]>') AS dept_name
+				, 1 AS tree_level
+				, LEVEL AS real_tree_level
+				, true AS is_leaf
+				</when>
+				<otherwise>
+				, TRIM(dept_name) AS dept_name
+				, LEVEL AS tree_level
+				, LEVEL AS real_tree_level
+				, CONNECT_BY_ISLEAF AS is_leaf
+				</otherwise>
+			</choose>		
+		FROM  
+			cmm_department
+		<choose>
+		<when test="searchKind == 'dept_name' and keyword != '' ">
+		WHERE 
+			dept_name like CONCAT('%', #{keyword},'%') AND del_flag != 'Y'
+		</when>
+		<otherwise>
+		WHERE 
+			del_flag != 'Y'
+		</otherwise>
+		</choose>
+		START WITH up_code IS null
+		CONNECT BY PRIOR dept_code=up_code
+		ORDER SIBLINGS BY dept_code
+    </select>  
+    
+    <select id="getDeptName" resultType="CustomCmmDepartmentVO" parameterType="CustomCmmDepartmentVO">
+		SELECT dept_name
+		FROM cmm_department
+		START WITH dept_code = #{deptCode}
+		CONNECT BY dept_code = PRIOR up_code
+		ORDER SIBLINGS BY dept_code
+    </select>
+      	
+</mapper>

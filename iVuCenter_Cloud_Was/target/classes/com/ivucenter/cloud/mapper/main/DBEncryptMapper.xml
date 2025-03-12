@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.main.DBEncryptDao">
+ 	
+    <select id="cmmCustomerList" resultType="CustomCmmCustomerVO" parameterType="CustomCmmCustomerVO">
+		SELECT 
+			*	
+		FROM cmm_customer
+    </select>
+	
+   	<update id="cmmCustomerUpdate" parameterType="CustomCmmCustomerVO">
+    	UPDATE cmm_customer SET
+			company_rep = #{companyRepEnc}
+        WHERE customer_id = #{customerId}
+    </update>
+     
+    <select id="cmmUserList" resultType="CustomCmmUserVO" parameterType="CustomCmmUserVO">
+		SELECT 
+			*	
+		FROM cmm_user
+    </select>
+	
+   	<update id="cmmUserUpdate" parameterType="CustomCmmUserVO">
+    	UPDATE cmm_user SET
+			user_phone = #{userPhoneEnc}
+			, user_tel = #{userTelEnc}
+			, user_mail = #{userMailEnc}
+        WHERE user_id = #{userId}
+    </update>
+    
+    <select id="hrsystemTemporaryList" resultType="HrsystemTemporaryVO" parameterType="HrsystemTemporaryVO">
+		SELECT 
+			*	
+		FROM hrsystem_temporary
+    </select>
+	
+   	<update id="hrsystemTemporaryUpdate" parameterType="HrsystemTemporaryVO">
+    	UPDATE hrsystem_temporary SET
+			user_phone = #{userPhoneEnc}
+			, user_tel = #{userTelEnc}
+			, user_mail = #{userMailEnc}
+        WHERE user_id = #{userId}
+    </update>
+    
+    <select id="MailQueueVOList" resultType="CustomMailQueueVO" parameterType="CustomMailQueueVO">
+		SELECT 
+			*	
+		FROM mail_queue
+    </select>
+	
+   	<update id="MailQueueVOUpdate" parameterType="CustomMailQueueVO">
+    	UPDATE mail_queue SET
+			sender_name = #{senderNameEnc}
+			, sender_mail = #{senderMailEnc}
+			, receiver_id = #{receiverIdEnc}
+			, receiver_name = #{receiverNameEnc}
+			, receiver_mail = #{receiverMailEnc}
+        WHERE mail_seq = #{mailSeq}
+    </update>
+    
+    <select id="MailQueueHistorList" resultType="CustomMailQueueHistoryVO" parameterType="CustomMailQueueHistoryVO">
+		SELECT 
+			*	
+		FROM mail_queue_history
+    </select>
+	
+   	<update id="MailQueueHistorUpdate" parameterType="CustomMailQueueHistoryVO">
+    	UPDATE mail_queue_history SET
+			sender_name = #{senderNameEnc}
+			, sender_mail = #{senderMailEnc}
+			, receiver_id = #{receiverIdEnc}
+			, receiver_name = #{receiverNameEnc}
+			, receiver_mail = #{receiverMailEnc}
+        WHERE mail_seq = #{mailSeq}
+    </update>   
+    
+    <select id="NhwithQueueHistoryList" resultType="CustomNhwithVO" parameterType="CustomNhwithVO">
+		SELECT 
+			*	
+		FROM nhwith_queue_history
+    </select>
+	
+   	<update id="NhwithQueueHistoryUpdate" parameterType="CustomNhwithVO"> 
+    	UPDATE nhwith_queue_history SET
+			sender_name = #{senderNameEnc}
+			, sender_id = #{senderIdEnc}
+			, receiver_id = #{receiverIdEnc}
+			, receiver_name = #{receiverNameEnc}
+        WHERE nhwith_seq = #{nhwithSeq}
+    </update>      
+
+    <select id="SmsQueueList" resultType="CustomSmsQueueVO" parameterType="CustomSmsQueueVO">
+		SELECT 
+			*	
+		FROM sms_queue
+    </select>
+	
+   	<update id="SmsQueueUpdate" parameterType="CustomSmsQueueVO">
+    	UPDATE sms_queue SET
+			sender_name = #{senderNameEnc}
+			, sender_number = #{senderNumberEnc}
+			, receiver_id = #{receiverIdEnc}
+			, receiver_name = #{receiverNameEnc}
+			, receiver_number = #{receiverNumberEnc}
+        WHERE sms_seq = #{smsSeq}
+    </update>
+
+
+    <select id="SmsQueueHistoryList" resultType="CustomSmsQueueHistoryVO" parameterType="CustomSmsQueueHistoryVO">
+		SELECT 
+			*	
+		FROM sms_queue_history
+    </select>
+	
+   	<update id="SmsQueueHistoryUpdate" parameterType="CustomSmsQueueHistoryVO">
+    	UPDATE sms_queue_history SET
+			sender_name = #{senderNameEnc}
+			, sender_number = #{senderNumberEnc}
+			, receiver_id = #{receiverIdEnc}
+			, receiver_name = #{receiverNameEnc}
+			, receiver_number = #{receiverNumberEnc}
+        WHERE sms_seq = #{smsSeq}
+    </update>
+    
+    
+    
+    
+	
+   	<update id="cmmCustomerUpdateDec" parameterType="CustomCmmCustomerVO">
+    	UPDATE cmm_customer SET
+			company_rep = #{companyRepDec}
+        WHERE customer_id = #{customerId}
+    </update>
+
+   	<update id="cmmUserUpdateDec" parameterType="CustomCmmUserVO">
+    	UPDATE cmm_user SET
+			user_phone = #{userPhoneDec}
+			, user_tel = #{userTelDec}
+			, user_mail = #{userMailDec}
+        WHERE user_id = #{userId}
+    </update>
+
+   	<update id="hrsystemTemporaryUpdateDec" parameterType="HrsystemTemporaryVO">
+    	UPDATE hrsystem_temporary SET
+			user_phone = #{userPhoneDec}
+			, user_tel = #{userTelDec}
+			, user_mail = #{userMailDec}
+        WHERE user_id = #{userId}
+    </update>
+	
+   	<update id="MailQueueVOUpdateDec" parameterType="CustomMailQueueVO">
+    	UPDATE mail_queue SET
+			sender_name = #{senderNameDec}
+			, sender_mail = #{senderMailDec}
+			, receiver_id = #{receiverIdDec}
+			, receiver_name = #{receiverNameDec}
+			, receiver_mail = #{receiverMailDec}
+        WHERE mail_seq = #{mailSeq}
+    </update>
+    
+   	<update id="MailQueueHistorUpdateDec" parameterType="CustomMailQueueHistoryVO">
+    	UPDATE mail_queue_history SET
+			sender_name = #{senderNameDec}
+			, sender_mail = #{senderMailDec}
+			, receiver_id = #{receiverIdDec}
+			, receiver_name = #{receiverNameDec}
+			, receiver_mail = #{receiverMailDec}
+        WHERE mail_seq = #{mailSeq}
+    </update>   
+	
+   	<update id="NhwithQueueHistoryUpdateDec" parameterType="CustomNhwithVO"> 
+    	UPDATE nhwith_queue_history SET
+			sender_name = #{senderNameDec}
+			, sender_id = #{senderIdDec}
+			, receiver_id = #{receiverIdDec}
+			, receiver_name = #{receiverNameDec}
+        WHERE nhwith_seq = #{nhwithSeq}
+    </update>      
+	
+   	<update id="SmsQueueUpdateDec" parameterType="CustomSmsQueueVO">
+    	UPDATE sms_queue SET
+			sender_name = #{senderNameDec}
+			, sender_number = #{senderNumberDec}
+			, receiver_id = #{receiverIdDec}
+			, receiver_name = #{receiverNameDec}
+			, receiver_number = #{receiverNumberDec}
+        WHERE sms_seq = #{smsSeq}
+    </update>
+	
+   	<update id="SmsQueueHistoryUpdateDec" parameterType="CustomSmsQueueHistoryVO">
+    	UPDATE sms_queue_history SET
+			sender_name = #{senderNameDec}
+			, sender_number = #{senderNumberDec}
+			, receiver_id = #{receiverIdDec}
+			, receiver_name = #{receiverNameDec}
+			, receiver_number = #{receiverNumberDec}
+        WHERE sms_seq = #{smsSeq}
+    </update>  
+         
+</mapper>

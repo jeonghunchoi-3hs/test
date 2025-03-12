@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.mng.approval.ApprovalDAO">
+
+	<!-- 정산목록조회(로그인계정 기준) -->
+    <select id="calculateList" resultType="CustomChargeBillVO" parameterType="CustomChargeBillVO">
+    	SELECT
+    	      A.cloud_id
+			, A.bill_yyyymm
+			, A.confirn_flag
+			, CASE WHEN (A.proc_user_name = 'BATCH_SYSTEM') THEN '자동정산' ELSE A.proc_user_name END proc_user_name
+			, A.proc_datetime
+			, A.comfirm_user_name
+			, A.confirm_datetime
+			, S.reject_cnt
+			, S2.step_cnt
+			,(
+				SELECT COUNT(*) FROM
+					bss_adjustment B
+				WHERE A.bill_yyyymm = B.bill_yyyymm AND B.bill_flag='N'
+			) AS bill_flag
+		FROM
+			bill_master A LEFT JOIN (SELECT request_seq,COUNT(*)reject_cnt FROM sr_approval_step WHERE apprv_state ='APPRV_REJECTED' GROUP BY request_seq ) S
+			ON A.bill_yyyymm = S.request_seq
+			LEFT JOIN (SELECT request_seq,COUNT(*)step_cnt FROM sr_approval_step GROUP BY request_seq ) S2
+			ON A.bill_yyyymm = S2.request_seq
+		WHERE
+			A.bill_proc_stat <![CDATA[<>]]> 'BILLPROCSTAT_NA'
+			AND bill_yyyymm <![CDATA[<=]]> DATE_FORMAT(NOW(), '%Y%m')
+		<if test="billYyyymm != '' ">
+		AND
+			A.bill_yyyymm LIKE CONCAT('%',#{billYyyymm},'%')
+		</if>
+		<if test="cloudId != null  and cloudId !='cloudAll' ">
+				AND A.cloud_id like CONCAT('%',#{cloudId},'%')
+		</if>
+		ORDER BY A.bill_yyyymm DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+
+    <!-- 정산 상세보기(해당월의 기확정 및 미확정 매출현황 -->
+	<!-- <select id="calculateDetailList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT * FROM
+		(
+		SELECT
+			A.bill_yyyymm
+			, A.confirn_flag
+			, A.bill_proc_stat
+			, B.customer_id
+			, B.customer_name
+			, SUM(C.amount) AS amount
+			, SUM(CASE WHEN C.invoice_item = 'AA00' THEN C.amount ELSE 0 END) AS AA00_amount
+			, SUM(CASE WHEN C.invoice_item = 'AE00' THEN C.amount ELSE 0 END) AS AE00_amount
+			, SUM(CASE WHEN C.invoice_item = 'AI00' THEN C.amount ELSE 0 END) AS AI00_amount
+		FROM
+			(SELECT * FROM
+					bill_master
+				WHERE CAST(bill_yyyymm AS UNSIGNED) = #{billYyyymm}
+				) A
+			, bill_invoice_customer B
+			, bill_invoice_customer_detail C
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+		AND
+			B.bill_yyyymm = C.bill_yyyymm
+		AND
+			B.customer_id = C.customer_id
+		AND
+			C.invoice_item IN ('AA00', 'AE00', 'AI00')
+		GROUP BY
+			A.bill_yyyymm, B.customer_id, B.customer_name
+
+		UNION
+
+		SELECT
+			' ' AS 'bill_yyyymm'
+			, ' ' AS 'confirn_flag'
+			, ' ' AS 'bill_proc_stat'
+			, ' ' AS 'customer_id'
+			, ' ' AS 'customer_name'
+			, ' ' AS amount
+			, ' ' AS AA00_amount
+			, 'Sales Total' AS AE00_amount
+			, SUM(C.amount) AS AI00_amount
+		FROM
+			(SELECT * FROM
+					bill_master
+				WHERE CAST(bill_yyyymm AS UNSIGNED) = #{billYyyymm}
+				) A
+			, bill_invoice_customer B
+			, bill_invoice_customer_detail C
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+		AND
+			B.bill_yyyymm = C.bill_yyyymm
+		AND
+			B.customer_id = C.customer_id
+		AND
+			C.invoice_item IN ('AA00', 'AE00', 'AI00')
+		) Z
+		ORDER BY customer_id DESC
+	</select> -->
+
+	<!-- 정산 상세보기(해당월의 기확정 및 미확정 매출현황 -->
+	<select id="calculateDetailList" parameterType="CustomChargeBillVO" resultType="CustomChargeBillVO">
+		SELECT
+			A.bill_yyyymm
+			, A.confirn_flag
+			, A.bill_proc_stat
+			, B.customer_id
+			, B.customer_name
+			, SUM(CASE WHEN C.invoice_item = '0000' THEN C.amount ELSE 0 END) AS amount
+			, SUM(CASE WHEN C.invoice_item = 'A000' THEN C.amount ELSE 0 END) AS A000_amount
+			, SUM(CASE WHEN C.invoice_item = 'E000' THEN C.amount ELSE 0 END) AS E000_amount
+			, SUM(CASE WHEN C.invoice_item = 'I000' THEN C.amount ELSE 0 END) AS I000_amount
+			, SUM(CASE WHEN C.invoice_item = 'LA00' THEN C.amount ELSE 0 END) AS LA00_amount
+		FROM
+			(SELECT * FROM
+					bill_master
+				WHERE bill_yyyymm = #{billYyyymm}
+				) A
+			, bill_invoice_customer B
+			, bill_invoice_customer_detail C
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+		AND
+			B.bill_yyyymm = C.bill_yyyymm
+		AND
+			B.customer_id = C.customer_id
+		GROUP BY A.bill_yyyymm, B.customer_id, B.customer_name
+		ORDER BY B.customer_id DESC
+	</select>
+
+
+	<!-- 보정재정산유무확인 -->
+	<select id="adjustYn" parameterType="CustomChargeBillVO" resultType="Integer">
+		SELECT COUNT(*)
+		FROM
+			bss_adjustment
+		WHERE
+			bill_yyyymm = #{billYyyymm}
+		AND
+			bill_flag='N';
+	</select>
+
+
+	<!-- 정산확정 -->
+	<update id="updateConfirmFlag" parameterType="CustomChargeBillVO">
+		UPDATE
+			bill_master
+		SET
+			confirn_flag = 'Y'
+			, comfirm_user_name = #{userName}
+			, confirm_datetime = NOW()
+		WHERE
+			bill_yyyymm = #{billYyyymm}
+	</update>
+
+    <!-- 정산승인 요청 -->
+	<update id="reqCalculateApproval" parameterType="CustomChargeBillVO">
+		UPDATE
+			bill_master
+		SET
+			apprv_stat = #{apprvStat}
+		WHERE
+			bill_yyyymm = #{billYyyymm}
+	</update>
+
+	<!-- 승인모델 관리자 단계  리스트 -->
+	<select id="getApprovalModelSteplist" resultType="CustomApprovalVO">
+		SELECT
+			step_id,
+			model_id,
+			step_name,
+			step_level,
+			left_step_id,
+			right_step_id
+		FROM
+			approval_model_step
+		where
+			model_id=(SELECT model_id FROM sr_approval_flow WHERE flow_id='AFW0030')
+  	</select>
+
+  	<!-- 승인모델 관리자 단계  리스트 -->
+	<select id="getCalculatetApprovalModelSteplist" resultType="CustomApprovalVO">
+		SELECT
+			step_id,
+			model_id,
+			step_name,
+			step_level,
+			left_step_id,
+			right_step_id
+		FROM
+			approval_model_step
+		where
+			model_id=(SELECT model_id FROM sr_approval_flow WHERE flow_id='AFW0060')
+  	</select>
+
+    <!-- sr_approval_step(서비스 요청 승인단계입력)-->
+    <insert id="setSrApprovalStepinsert" parameterType="CustomApprovalVO" >
+		INSERT INTO sr_approval_step
+				(
+					step_id,
+					request_seq,
+					flow_id,
+					<if test = "stepLevel == 1">
+					apprv_datetime,
+					</if>
+					step_name,
+					step_level,
+					left_step_id,
+					right_step_id,
+					apprv_state
+				)
+		VALUES
+				(
+					#{stepId},
+					#{requestSeq},
+					'AFW0030',   <!--(정산요청코드)-->
+					<if test = "stepLevel == 1">
+					NOW(),
+					</if>
+					#{stepName},
+					#{stepLevel},
+					#{leftStepId},
+					#{rightStepId},
+					#{apprvState}  <!--고정(승인처리중)-->
+				)
+  	</insert>
+
+  	<!-- sr_approval_member(서비스 요청 승인 구성원 입력)-->
+    <insert id="setSrApprovalMemberinsert" parameterType="CustomApprovalVO" >
+		INSERT INTO sr_approval_member
+			(
+				step_id,
+				request_seq,
+				flow_id,
+				user_id,
+				apprv_auth_flag,
+				mail_recv_flag,
+				sms_recv_flag,
+				push_recv_flag
+			)
+		VALUES
+			(
+				#{stepId},
+				#{requestSeq},
+				'AFW0030',		<!--(정산요청코드)-->
+				#{userId},
+				#{apprvAuthFlag},
+				#{mailRecvFlag},
+				#{smsRecvFlag},
+				#{pushRecvFlag}
+			)
+  	</insert>
+
+	<!--  유저 스텝아이디 조회 작업담당자 관련 -->
+    <select id="getStepId" resultType="String" parameterType="java.util.Map" >
+		SELECT
+			step_id
+		FROM
+			sr_approval_step
+		WHERE
+			request_seq=#{orderNo}
+		  AND (
+			apprv_state = 'APPRV_PROCESSING'
+			OR
+			(right_step_id= '*' AND apprv_state='APPRV_COMPLETED')
+		  )
+  	</select>
+
+	<!--  유저 승인단계 조회 체크박스 관련 -->
+    <select id="getUserApprvState" resultType="String" parameterType="java.util.Map" >
+		SELECT
+			apprv_state
+		FROM
+			sr_approval_step
+		WHERE
+			step_id = #{stepId}
+		AND
+			request_seq = #{orderNo}
+  	</select>
+
+	<!-- 상품 신청현황 상세 리스트 승인멤버 조회-->
+    <select id="approvalList" parameterType="CustomApprovalVO" resultType="CustomApprovalVO">
+		SELECT
+			s.step_id,
+			s.request_seq,
+			s.flow_id,
+			s.step_name,
+			s.step_level,
+			s.left_step_id,
+			s.right_step_id,
+			s.apprv_state,
+			s.apprv_user_id,
+			s.apprv_user_name,
+			DATE_FORMAT(s.apprv_datetime, '%Y-%m-%d %H:%i') AS apprvDatetime,
+			s.apprv_description,
+			IF(ISNULL(a.user_id),'N','Y') AS apprv_auth,
+			bm.apprv_stat as billMasterApprvStat
+
+		FROM
+			sr_approval_step s
+			LEFT JOIN (SELECT * FROM approval_model_member WHERE  user_id = #{userId}) a
+			ON s.step_id = a.step_id
+
+
+				LEFT OUTER JOIN bill_master bm
+			ON s.request_seq = bm.bill_yyyymm
+
+
+		WHERE  request_seq=#{orderNo}
+		ORDER BY step_level ASC
+
+		<!-- select
+			a.request_seq,
+			a.step_name,
+			a.step_level,
+			a.apprv_state,
+			a.step_id,
+			a.right_step_id,
+			a.apprv_description,
+			DATE_FORMAT(a.apprv_datetime, '%Y-%m-%d %H:%i') AS apprvDatetime,
+			a.apprv_user_name
+		FROM
+			sr_approval_step a
+	 	WHERE
+			a.request_seq = #{orderNo}
+		AND
+			flow_id = #{flowId} -->
+	</select>
+
+	<!-- 상품 신청현황 상세 리스트 승인멤버 유저 아이디 조회-->
+    <select id="approvalUserId" parameterType="CustomApprovalVO" resultType="CustomApprovalVO">
+			select
+				sa.user_id
+				,sa.step_id
+				,cu.user_name
+			from
+				sr_approval_member  sa, cmm_user cu
+	 		where
+				request_seq = #{orderNo}
+			AND
+				flow_id = #{flowId}
+			AND
+				sa.user_id = cu.user_id
+	</select>
+
+    <!-- 승인 스텝정보 수정-->
+	<update id="stepUpdate" parameterType="CustomApprovalVO" >
+	  		UPDATE
+	  			sr_approval_step
+	  		SET
+	  			apprv_description=#{apprvDescription}
+				, apprv_state = #{apprvState}
+				, apprv_datetime = NOW()
+				, apprv_user_id = #{apprvUserId}
+				, apprv_user_name = #{apprvUserName}
+	  		WHERE
+	  			request_seq = #{requestSeq}
+	  		AND
+	  			step_level = #{stepLevel}
+	</update>
+
+
+    <delete id="reReqDelete" parameterType="CustomApprovalVO" >
+	  		DELETE FROM
+	  			sr_approval_step
+	  		WHERE
+	  			request_seq = #{requestSeq}
+
+	</delete>
+    <delete id="reReqDeleteMember" parameterType="CustomApprovalVO" >
+	  		DELETE FROM
+	  			sr_approval_member
+	  		WHERE
+	  			request_seq = #{requestSeq}
+	</delete>
+
+
+    <!-- 승인 스텝정보 수정-->
+	<insert id="hisApprvUpdate" parameterType="CustomApprovalVO" >
+	  		INSERT INTO
+	  			sr_approval_step_his
+	  		(
+		  		request_seq,
+		  		apprv_description,
+		  		apprv_datetime,
+		  		apprv_user_id,
+		  		step_level,
+		  		step_name
+	  		)
+	  		VALUES
+	  		(
+		  		#{requestSeq},
+		  		#{apprvDescription},
+		  		NOW(),
+		  		#{apprvUserName},
+		  		 #{stepLevel},
+		  		 (SELECT step_name FROM sr_approval_step WHERE request_seq = #{requestSeq} AND step_level =  #{stepLevel} )
+	  		)
+
+	</insert>
+
+    <!--승인 메일 발송 승인모델 단계 관리자 구성원 리스트 -->
+    <select id="getApprovalModelMemberlist" parameterType="CustomApprovalVO" resultType="CustomApprovalVO">
+		SELECT
+			a.step_id,
+			a.user_id,
+			a.apprv_auth_flag,
+			a.mail_recv_flag,
+			a.sms_recv_flag,
+			a.push_recv_flag,
+			b.step_level,
+			c.user_name,
+			c.user_mail
+		FROM
+			approval_model_member 	a , approval_model_step b, cmm_user c
+		WHERE a.step_id=b.step_id
+		AND c.user_id=a.user_id
+		AND c.del_flag = 'N'
+		AND b.model_id=(
+				SELECT model_id
+				FROM sr_approval_flow
+				WHERE flow_id=#{flowId})
+		<if test="stepLevel != '' and stepLevel != null" >
+		AND b.step_level=#{stepLevel}
+		</if>
+  	</select>
+
+  	<select id="getApprovalModelMemberStepList" parameterType="String" resultType="CustomApprovalVO">
+  	   SELECT
+  	   		step_id
+  	   		, user_id
+		 FROM
+		 	approval_model_member
+		WHERE
+			step_id = #{stepId}
+  	</select>
+
+    <select id ="billYearList" parameterType="CustomChargeBillVO" resultType="java.util.HashMap">
+    SELECT
+    	DISTINCT SUBSTR(bill_yyyymm,1,4)  AS "YEAR"
+    FROM
+    	bill_master
+    WHERE
+    	bill_proc_stat != 'BILLPROCSTAT_NA'
+    AND
+    	bill_yyyymm <![CDATA[<=]]> DATE_FORMAT(NOW(), '%Y%m')
+    </select>
+
+   <!-- 승인권한체크 -->
+	<select id="checkApprovalAuth" parameterType="CustomApprovalVO" resultType="Integer">
+		SELECT COUNT(*)
+		FROM
+			approval_model_member
+		WHERE
+			step_id=#{stepId}
+		AND
+			user_id=#{userId}
+		AND
+			apprv_auth_flag = 'Y'
+	</select>
+
+
+    <select id="getSetpMember" parameterType="CustomApprovalVO" resultType="CustomApprovalVO">
+		SELECT
+			*
+		FROM
+			sr_approval_step
+		WHERE
+			step_id = #{stepId}
+		AND
+			request_seq = #{requestSeq}
+
+	</select>
+
+	<select id="getNextScheduleUserList" parameterType="CustomApprovalVO" resultType="CustomApprovalVO">
+		SELECT
+			a.apprv_schedule_user_id user_id,
+			c.mail_recv_flag,
+			c.sms_recv_flag,
+			c.user_name,
+			c.user_mail,
+			c.user_phone
+		FROM
+			sr_approval_step a, cmm_user c
+		WHERE
+			a.request_seq = #{requestSeq}
+			AND a.step_level = #{stepLevel}+1
+			AND a.apprv_schedule_user_id = c.user_id
+			AND c.del_flag = 'N'
+	</select>
+	
+	<select id="getApprovalQueueMemberList" parameterType="CustomApprovalVO" resultType="CustomApprovalVO">
+		SELECT * FROM (
+			SELECT
+				payer_id AS user_id
+			FROM
+				alarm_kepco_queue_history
+			WHERE
+				approval_no = #{requestSeq}
+				AND title in ('클라우드 자원 결재자 지정','클라우드 프로젝트 결재자 지정')
+		) 
+		UNION ALL
+		(
+			SELECT
+				payer_id AS user_id
+			FROM
+				alarm_kepco_queue
+			WHERE
+				approval_no = #{requestSeq}
+				AND title in ('클라우드 자원 결재자 지정','클라우드 프로젝트 결재자 지정')
+		)	
+	</select>
+	
+	<select id="getNextScheduleUser" parameterType="CustomApprovalVO" resultType="CustomApprovalVO">
+		SELECT 	
+			a.apprv_schedule_user_id apprvUserId,
+			c.mail_recv_flag, 
+			c.sms_recv_flag, 
+			c.user_name,
+			c.user_mail,
+			c.user_phone,
+			(select apprv_schedule_user_id from sr_approval_step where step_level = #{stepLevel} + 1 AND request_seq = a.request_seq) user_id	
+		FROM 
+			sr_approval_step a, cmm_user c
+		WHERE 
+			a.request_seq = #{requestSeq}
+			AND a.step_level = #{stepLevel}
+			AND a.apprv_schedule_user_id = c.user_id
+			AND c.del_flag = 'N' 
+	</select>
+
+	<select id="getComplatedMemberList" parameterType="CustomApprovalVO" resultType="CustomApprovalVO">
+		SELECT
+			SAS.step_id
+			, SAS.step_level
+			, AMM.apprv_auth_flag
+			, AMM.mail_recv_flag
+			, AMM.sms_recv_flag
+			, AMM.push_recv_flag
+			, (SELECT user_id FROM cmm_user WHERE user_id = SAS.apprv_user_id) user_id
+			, (SELECT user_name FROM cmm_user WHERE user_id = SAS.apprv_user_id) user_name
+			, (SELECT user_mail FROM cmm_user WHERE user_id = SAS.apprv_user_id) user_mail
+		FROM
+			sr_approval_step SAS
+			, approval_model_member AMM
+		WHERE
+			SAS.step_id = AMM.step_id
+		AND
+			SAS.request_seq = #{requestSeq}
+		AND
+			SAS.apprv_user_id IS NOT NULL
+		AND
+			SAS.apprv_user_name IS NOT NULL
+		GROUP BY AMM.step_id
+
+	</select>
+</mapper>

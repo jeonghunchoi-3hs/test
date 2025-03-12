@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.nas.OssNasDAO">
+
+<!--     <select id="getNasList" parameterType="CustomOssNasVO" resultType="CustomOssNasVO">
+		SELECT
+			*
+			, DATE_FORMAT(create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+	 		, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+		FROM
+			oss_nas
+		where project_id = #{projectId}
+		AND ( expire_datetime IS NULL OR expire_datetime  <![CDATA[>]]>  #{expireDatetime} )
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select> -->
+    <select id="getNasList" parameterType="CustomOssNasVO" resultType="CustomOssNasVO">
+		 SELECT A.nas_id,
+					A.project_id,
+					A.project_box_id,
+					A.nas_name,
+					A.nas_alias,
+					A.nas_gb,
+					A.nas_option,
+					A.nas_file_system_path,
+					A.description,
+					A.create_datetime,
+					A.expire_datetime,
+					A.delete_datetime,
+					A.reg_datetime,
+					A.reg_user_id,
+					A.mod_datetime,
+					A.mod_user_id,
+					A.del_flag,
+					A.hourly_flag,
+					A.nas_catalog_seq,
+					A.nas_product_seq,
+					A.vm_name,
+					A.nas_nfs_object_id,
+					A.order_product_seq,
+					B.cloud_id,
+					F.default_network_id,
+					F.default_network_name,
+					F.default_network_alias,
+					F.default_network_ip,			
+					F.az_name,								
+					GROUP_CONCAT(C.vm_uuid SEPARATOR ', ') AS vm_uuid_list,
+					GROUP_CONCAT(D.hostname_alias SEPARATOR ', ') AS vm_alias_list,
+			 		DATE_FORMAT(A.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2,
+	 		 		DATE_FORMAT(A.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+		FROM (SELECT * FROM oss_nas WHERE del_flag = 'N') A
+		LEFT JOIN oss_project B
+			ON A.project_id = B.project_id
+		LEFT JOIN (SELECT * FROM oss_nas_vm WHERE del_flag = 'N') C
+			ON A.nas_id = C.nas_id
+		LEFT JOIN oss_vm D
+			ON C.vm_uuid = D.vm_uuid
+		LEFT JOIN oss_cloud E
+			ON B.cloud_id = E.cloud_id
+		LEFT JOIN bss_order_product_nas F
+			ON A.order_product_seq = F.order_product_seq
+		LEFT JOIN bss_order_product_nas_vm G
+			ON F.order_product_seq = G.order_product_seq
+		WHERE A.project_box_id = #{projectBoxId}
+		AND A.nas_type = #{nasType}
+		AND ( A.expire_datetime IS NULL OR A.expire_datetime  <![CDATA[>]]>  #{expireDatetime} )
+    	<if test="keyword != '' ">
+			AND A.${searchKind} like CONCAT('%',#{keyword},'%')
+		</if>
+		GROUP BY A.nas_id
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+
+
+   <select id="getNasAllList" parameterType="CustomOssNasVO" resultType="CustomOssNasVO">
+		 SELECT A.nas_id,
+					A.project_id,
+					A.project_box_id,
+					A.nas_name,
+					A.nas_alias,
+					A.nas_gb,
+					A.nas_option,
+					A.nas_file_system_path,
+					A.description,
+					A.create_datetime,
+					A.expire_datetime,
+					A.delete_datetime,
+					A.reg_datetime,
+					A.reg_user_id,
+					A.mod_datetime,
+					A.mod_user_id,
+					A.del_flag,
+					A.hourly_flag,
+					A.nas_catalog_seq,
+					A.nas_product_seq,
+					A.vm_name,
+					A.nas_nfs_object_id,
+					A.order_product_seq,
+					B.cloud_id,
+					E.cloud_type,
+					F.default_network_id,
+					F.default_network_name,
+					F.default_network_alias,
+					F.default_network_ip,			
+					F.az_name,								
+					GROUP_CONCAT(C.vm_uuid SEPARATOR ', ') AS vm_uuid_list,
+					GROUP_CONCAT(D.hostname_alias SEPARATOR ', ') AS vm_alias_list,
+			 		DATE_FORMAT(A.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2,
+	 		 		DATE_FORMAT(A.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+		FROM (SELECT * FROM oss_nas WHERE del_flag = 'N') A
+		INNER JOIN oss_project B
+			ON A.project_id = B.project_id
+		LEFT JOIN (SELECT * FROM oss_nas_vm WHERE del_flag = 'N') C
+			ON A.nas_id = C.nas_id
+		LEFT JOIN oss_vm D
+			ON C.vm_uuid = D.vm_uuid
+		LEFT JOIN oss_cloud E
+			ON B.cloud_id = E.cloud_id
+		LEFT JOIN bss_order_product_nas F
+			ON A.order_product_seq = F.order_product_seq
+		LEFT JOIN bss_order_product_nas_vm G
+			ON F.order_product_seq = G.order_product_seq			
+		WHERE A.project_box_id = #{projectBoxId}
+		AND A.nas_type = #{nasType}
+		AND ( A.expire_datetime IS NULL OR A.expire_datetime  <![CDATA[>]]>  #{expireDatetime} )
+    	<if test="keyword != '' ">
+			AND A.${searchKind} like CONCAT('%',#{keyword},'%')
+		</if>
+		GROUP BY A.nas_id
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+	<!--oss_nas 수정-->
+<!--
+	<update id="setNasEditOk" parameterType="CustomOssNasVO">
+		UPDATE
+			oss_nas
+		SET
+			description = #{description},
+			vm_name = 	 #{vmName},
+			nas_name = 	 #{nasName}
+		WHERE
+			nas_id = #{nasId}
+  	</update>
+-->
+
+<!--
+  	<select id="nasDetail" parameterType="CustomOssNasVO" resultType="CustomOssNasVO">
+		SELECT
+			a.nas_id,
+			a.project_id,
+			(SELECT project_alias FROM oss_project PJ WHERE PJ.project_id =a.project_id) project_alias,
+			a.nas_name,
+			a.nas_gb,
+			a.description,
+			PROD.product_category,
+			DATE_FORMAT(a.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime,
+			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =a.nas_catalog_seq AND CF.program_seq = a.nas_product_seq  ) AS image_name,
+			a.expire_datetime,
+			a.delete_datetime,
+			a.reg_datetime,
+			a.reg_user_id,
+			a.mod_datetime,
+			a.mod_user_id,
+			a.del_flag,
+			a.hourly_flag,
+			a.nas_catalog_seq,
+			a.nas_product_seq
+		FROM
+			oss_nas a,
+			(
+				/* 상품 구성 */
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea
+ 					IFNULL(SCM.scm_ea,0) AS scm_ea,
+ 					IFNULL(BAK.backup_gb,0) AS backup_gb,
+ 					IFNULL(MCA.mca_ea,0) AS mca_ea,
+ 					IFNULL(SEC.security_ea,0) AS security_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		 블록 디스크
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_nas NAS		 NAS
+				 ON PROD.product_seq = NAS.product_seq
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq
+				 LEFT OUTER JOIN bss_product_publicip IP	 공인IP
+				 ON PROD.product_seq = IP.product_seq
+ 				 LEFT OUTER JOIN bss_product_backup BAK		 백업
+ 				 ON PROD.product_seq = BAK.product_seq
+ 				 LEFT OUTER JOIN bss_product_scm SCM		 형상관리
+ 				 ON PROD.product_seq = SCM.product_seq
+ 				 LEFT OUTER JOIN bss_product_mca MCA		 대외계
+ 				 ON PROD.product_seq = MCA.product_seq
+ 				 LEFT OUTER JOIN bss_product_security SEC	 보안관제
+ 				 ON PROD.product_seq = SEC.product_seq
+				 WHERE PROD.del_flag = 'N'
+
+			) PROD
+		WHERE a.nas_id = #{nasId} AND	a.nas_product_seq = PROD.product_seq
+    </select>
+-->
+<!--
+    <select id="nasEditDetail" parameterType="CustomOssNasVO" resultType="CustomOssNasVO">
+		SELECT
+			a.nas_id,
+			a.project_id,
+			(SELECT project_alias FROM oss_project PJ WHERE PJ.project_id =a.project_id) project_alias,
+			a.nas_name,
+			a.nas_gb,
+			a.description,
+			PROD.product_category,
+			DATE_FORMAT(a.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime,
+			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =a.nas_catalog_seq AND CF.program_seq = a.nas_product_seq  ) AS image_name,
+			a.expire_datetime,
+			a.delete_datetime,
+			a.reg_datetime,
+			a.reg_user_id,
+			a.mod_datetime,
+			a.mod_user_id,
+			a.del_flag,
+			a.hourly_flag,
+			a.nas_catalog_seq,
+			a.nas_product_seq,
+			a.vm_name
+		FROM
+			oss_nas a,
+			(
+				/* 상품 구성 */
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea,
+ 					IFNULL(SCM.scm_ea,0) AS scm_ea,
+ 					IFNULL(BAK.backup_gb,0) AS backup_gb,
+ 					IFNULL(MCA.mca_ea,0) AS mca_ea,
+ 					IFNULL(SEC.security_ea,0) AS security_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		-블록 디스크
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_nas NAS		 NAS
+				 ON PROD.product_seq = NAS.product_seq
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq
+				 LEFT OUTER JOIN bss_product_publicip IP	 공인IP
+				 ON PROD.product_seq = IP.product_seq
+ 				 LEFT OUTER JOIN bss_product_backup BAK		 백업
+ 				 ON PROD.product_seq = BAK.product_seq
+ 				 LEFT OUTER JOIN bss_product_scm SCM		 형상관리
+ 				 ON PROD.product_seq = SCM.product_seq
+ 				 LEFT OUTER JOIN bss_product_mca MCA		 대외계
+ 				 ON PROD.product_seq = MCA.product_seq
+ 				 LEFT OUTER JOIN bss_product_security SEC	 보안관제
+ 				 ON PROD.product_seq = SEC.product_seq
+				 WHERE PROD.del_flag = 'N'
+			) PROD
+		WHERE a.nas_id = #{nasId} AND	a.nas_product_seq = PROD.product_seq
+    </select>
+-->
+</mapper>

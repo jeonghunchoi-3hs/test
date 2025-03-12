@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.network.OssNetworkDAO">
+
+	<!-- 네트워크 정보 목록 -->
+    <select id="list" parameterType="CustomOssNetworkVO" resultType="CustomOssNetworkVO">
+		SELECT
+			z.*
+		FROM
+		(
+			SELECT
+			    A.cloud_id,
+				A.network_id,
+				A.network_name,
+				A.network_alias,
+				B.subnet_name,
+				B.subnet_cidr,
+				IFNULL(C.port_cnt,0)  AS port_cnt,
+				D.cloud_name
+			FROM  oss_network A
+			INNER JOIN oss_subnet B
+			ON A.network_id = B.network_id
+			LEFT JOIN (SELECT network_id, COUNT(port_id) AS port_cnt FROM oss_port WHERE delete_flag = 'N' and status='ACTIVE' GROUP BY network_id) C
+			ON A.network_id = C.network_id
+			LEFT JOIN oss_cloud D
+			ON A.cloud_id = D.cloud_id
+		)z
+		WHERE 1=1
+		<if test="searchKind == 'network_name' and keyword != ''">
+			AND
+				z.network_name like CONCAT('%',#{keyword},'%')
+		</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+				AND z.network_name like CONCAT('%',#{keyword},'%')
+		</if>
+		ORDER BY z.network_name ASC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+ 	</select>
+
+	<!-- 네트워크 서브넷 정보 상세조회 -->
+    <select id="detail" parameterType="CustomOssNetworkVO" resultType="CustomOssNetworkVO">
+	  	SELECT
+	  	    C.cloud_name,
+			A.network_name AS networkName,
+			A.network_alias AS networkAlias,
+			B.subnet_name AS subnetName,
+			B.subnet_cidr AS subnetCidr,
+			B.allocation_pools AS allocationPools,
+			B.subnet_cidr AS subnetCidr,
+			B.enable_dhcp AS enableDhcp,
+			B.gateway_ip AS gatewayIp,
+			B.dns_nameservers AS dnsNameservers
+		FROM oss_network A
+		INNER JOIN oss_subnet B
+		ON A.network_id = B.network_id
+		INNER JOIN oss_cloud C
+		ON A.cloud_id = C.cloud_id
+
+
+		WHERE A.network_id = #{networkId}
+	</select>
+
+    <select id="detailByNetworkName" parameterType="CustomOssNetworkVO" resultType="CustomOssNetworkVO">
+	  	SELECT
+				*
+	    FROM oss_network
+    	WHERE network_name = #{networkName}
+    	AND project_id = #{projectId}
+	</select>
+
+    <select id="getNetworkAlias" parameterType="String" resultType="String">
+	  	SELECT
+				network_alias
+	    FROM oss_network
+    	WHERE network_id = #{networkId}
+	</select>
+
+	<select id= "getNetworkInfo"  parameterType="CustomOssNetworkVO" resultType="CustomOssNetworkVO">
+			SELECT  net.network_id
+						,net.network_name
+						,net.network_alias
+						,net.project_id
+						,pro.customer_id
+						,pro.project_alias
+						,pro.project_name
+						,com.company_id
+						,cust.customer_name
+						,(SELECT company_name FROM cmm_company WHERE company_id = com.up_company_id)up_company_name
+	    		FROM oss_network net
+	    INNER JOIN oss_project pro
+	   				 ON net.project_id = pro.project_id
+	    INNER JOIN cmm_customer cust
+	   				 ON pro.customer_id = cust.customer_id
+	    INNER JOIN cmm_company com
+	   				 ON cust.ref_company_id = com.company_id
+	   		    WHERE network_id = #{networkId}
+	</select>
+	<insert id="insert" parameterType="CustomOssNetworkVO">
+	INSERT INTO oss_network (
+		network_id
+		, network_name
+		, network_alias
+		, project_id
+		, reg_datetime
+		, reg_user_id
+		, delete_flag
+	)value(
+		#{networkId}
+		, #{networkName}
+		, #{networkAlias}
+		, #{projectId}
+		, now()
+		, #{regUserId}
+		, 'N'
+	)
+	</insert>
+
+	<update id="update" parameterType="CustomOssNetworkVO">
+		UPDATE oss_network SET
+			mod_datetime = now()
+			, network_alias = #{networkAlias}
+			, mod_user_id = #{modUserId}
+		WHERE network_id = #{networkId}
+	</update>
+
+
+	<update id="networkAliasUpdate" parameterType="CustomOssNetworkVO">
+
+		UPDATE oss_network SET
+		network_alias = #{networkAlias}
+		WHERE network_id = #{networkId}
+
+	</update>
+
+
+	<delete id="delete" parameterType="CustomOssNetworkVO">
+		DELETE FROM oss_network
+		WHERE network_id = #{networkId}
+	</delete>
+
+	<select id ="getPortList" parameterType="CustomOssNetworkVO" resultType="CustomOssNetworkVO">
+		SELECT
+			A.fixed_ips as fixedIps,
+			A.mac_address as macAddress,
+			C.project_alias as projectAlias,
+			B.hostname as hostName,
+			B.hostname_alias as hostNameAlias,
+			A.device_owner as deviceOwner,
+			A.status as status
+		FROM oss_port A
+		LEFT JOIN oss_vm B
+		ON A.device_id = B.vm_uuid
+		LEFT JOIN oss_project C
+		ON A.project_id = C.project_id
+		WHERE A.network_id = #{networkId}
+	</select>
+
+
+	<!-- 네트워크 정보 목록 -->
+    <select id="portList" parameterType="CustomOssNetworkVO" resultType="CustomOssNetworkVO">
+        SELECT
+        	a.port_id AS port_id,
+			IFNULL(A.virtual_ips,'') AS virtual_ips,
+			A.fixed_ips as fixed_ips,
+			A.mac_address as mac_address,
+			C.project_alias as project_alias,
+			B.hostname as hostname,
+			B.hostname_alias as hostname_alias,
+			A.device_owner as device_owner,
+			A.status as status
+		FROM
+			oss_port A
+		LEFT JOIN oss_vm B
+			ON A.device_id = B.vm_uuid
+		LEFT JOIN oss_project C
+			ON A.project_id = C.project_id
+		WHERE
+			A.network_id = #{networkId}
+			AND A.status = 'ACTIVE'
+		ORDER BY
+			CAST(REPLACE(A.fixed_ips,'.','') AS BIGINT) asc
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+ 	</select>
+
+	<select id ="ruleNetList" parameterType="CustomOssNetworkVO" resultType="CustomOssSubnetVO">
+		SELECT
+			aa.*
+			,c.code_name
+	  	FROM
+		(
+			SELECT
+				a.*
+			FROM
+				(
+				SELECT
+					UPPER(CONCAT(CONCAT(#{projectName},'_'),CONCAT(CONCAT(SUBSTRING_INDEX(work_kind,'_',-1),'_'),CONCAT(SUBSTRING_INDEX(work_net_kind,'_',-1),'_NET'))))rule_network_name
+					,network_id AS rule_network_id
+					,work_kind
+					,work_net_kind
+					,a_class
+					,b_class
+					,c_class
+					,cidr
+				FROM
+					cmm_network
+				WHERE
+					company_id = #{companyId}) a
+					WHERE rule_network_name NOT IN (SELECT UPPER(network_name) FROM oss_network WHERE project_id = #{projectId})
+				) aa
+				INNER JOIN cmm_code c
+				ON (c.code_value = aa.work_kind AND c.code_value1 = aa.work_net_kind)
+		WHERE
+			c.code_key_id = 'NET_DFLT_KIND'
+	</select>
+
+	<update id="virtualIpsUpdate" parameterType="CustomOssNetworkVO">
+		UPDATE OSS_PORT
+		SET
+			virtual_ips = #{virtualIps}
+		WHERE
+			port_id = #{portId}
+	</update>
+
+</mapper>

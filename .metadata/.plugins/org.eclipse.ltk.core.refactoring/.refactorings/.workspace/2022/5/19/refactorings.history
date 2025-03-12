@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Delete resource &apos;iVuCenter_Cloud_Was/WebContent/WEB-INF/views/mbr/req/project/SDDC-UI-M015.jsp&apos;" deleteContents="false" description="Delete resource &apos;iVuCenter_Cloud_Was/WebContent/WEB-INF/views/mbr/req/project/SDDC-UI-M015.jsp&apos;" element1="/iVuCenter_Cloud_Was/WebContent/WEB-INF/views/mbr/req/project/SDDC-UI-M015.jsp" flags="7" id="org.eclipse.ltk.core.refactoring.delete.resources" resources="1" stamp="1651639776637"/>
+</session>

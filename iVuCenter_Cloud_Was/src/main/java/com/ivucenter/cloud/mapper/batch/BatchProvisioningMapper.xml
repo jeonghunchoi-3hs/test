@@ -1,0 +1,1212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.batch.provisioning.BatchProvisioningDAO">
+
+	<select id="batchSelectListProvisioningQueue" parameterType="java.util.Map" resultType="BatchProvisioningVO">
+		SELECT
+			A.provisioning_seq,
+			A.request_type,
+			A.order_product_seq,
+			A.product_category,
+			A.on_demand_flag,
+			A.apply_datetime,
+			A.provisioning_status,
+			A.provisioning_status_message,
+			A.order_user_id,
+			A.reg_user_id,
+			A.reg_datetime,
+			A.cloud_id,
+			A.cloud_type
+		FROM
+			provisioning_queue A
+
+		<!--
+		<if test="provisioningStatus == 'PROVISIONING_READY' ">
+			WHERE A.provisioning_status IN ('PROVISIONING_READY', 'PROVISIONING_FAIL')
+		</if>
+		-->
+
+		<if test="provisioningStatus == 'PROVISIONING_READY' ">
+		WHERE
+			A.provisioning_status IN ('PROVISIONING_READY')
+		</if>
+
+
+		<if test="provisioningStatus == 'PROVISIONING_ONGOING' ">
+		WHERE
+			A.provisioning_status  = 'PROVISIONING_ONGOING'
+<!-- 			AND provisioning_seq in (${provisioningSeq}) -->
+			AND provisiong_seq in
+				<foreach item="item" collection="provisiongSeq" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+		</if>
+			<!-- 신규는 apply_datetime에 대한 정의가 없어서 기존에 null로 들어갓지만 변경된느낌 demand_flag만 으로 충분하긴함 -->
+			<!-- AND (A.apply_datetime <![CDATA[<=]]> #{applyDatetime} OR (A.on_demand_flag ='Y' AND  ISNULL(A.apply_datetime) )) -->
+			AND (A.apply_datetime <![CDATA[<=]]> #{applyDatetime} OR A.on_demand_flag ='Y')
+		ORDER BY
+			FIELD(A.product_category, 'PRODCATE_VM', 'PRODCATE_DISK' ), provisioning_seq
+		LIMIT
+			#{_skiprows}, #{_pagesize}
+	</select>
+
+	<update id="updateProvisioning" parameterType="BatchProvisioningVO">
+		UPDATE	provisioning_queue
+		SET		provisioning_status = #{provisioningStatus},
+				provisioning_status_message = #{provisioningStatusMessage},
+				reg_user_id= #{regUserId},
+				reg_datetime = NOW()
+		WHERE	provisioning_seq =  #{provisioningSeq}
+	</update>
+
+	<select id="detailBssOrderProductVm" resultType="CustomReqProductVO">
+		SELECT
+			*
+		FROM
+			bss_order_product_vm a
+		LEFT JOIN
+			bss_product_os b
+			ON a.os_product_seq = b.product_seq
+		LEFT JOIN
+			oss_project c
+			ON a.project_id = c.project_id
+		LEFT JOIN
+			oss_subnet d
+			ON a.default_network_id = d.network_id
+		LEFT JOIN
+			oss_vm_network e
+			ON a.vm_uuid = e.vm_uuid
+		LEFT JOIN oss_vm f
+		    ON a.vm_uuid = f.vm_uuid
+		WHERE
+			a.order_product_seq = #{orderProductSeq}
+	</select>
+
+	<select id="detailBssOrderProductDisk" resultType="CustomReqProductVO">
+		SELECT
+			*
+		FROM
+			bss_order_product_disk a
+		LEFT JOIN
+			oss_project c
+		ON a.project_id=c.project_id
+		LEFT JOIN
+			oss_disk d
+		ON a.disk_id=d.disk_id
+		LEFT JOIN
+			oss_vm e
+	    ON d.vm_uuid=e.vm_uuid
+		WHERE
+			order_product_seq = #{orderProductSeq}
+	</select>
+
+	<select id="detailBssOrderProductNas" resultType="CustomReqProductVO">
+		SELECT
+			*
+		FROM
+			bss_order_product_nas a
+		LEFT JOIN
+			oss_project c
+		ON a.project_id=c.project_id
+		LEFT JOIN
+			oss_nas d
+		ON a.nas_id=d.nas_id
+		WHERE
+			a.order_product_seq = #{orderProductSeq}
+	</select>
+
+	<select id="detailBssOrderProductNasVm" resultType="CustomReqProductVO">
+		SELECT
+			*
+		FROM
+			bss_order_product_nas a
+		INNER JOIN bss_order_product_nas_vm b
+					ON a.order_product_seq = b.order_product_seq
+		INNER JOIN oss_vm c
+					ON b.vm_uuid = c.vm_uuid
+		INNER JOIN oss_vm_network d
+					ON c.vm_uuid = d.vm_uuid
+		INNER JOIN oss_port e
+					ON d.port_network_id = e.port_id
+		INNER JOIN oss_project f
+					ON a.project_id = f.project_id
+		INNER JOIN oss_cloud g
+					ON f.cloud_id = g.cloud_id
+		WHERE
+			a.order_product_seq = #{orderProductSeq}
+	</select>
+
+	<select id="detailBssOrderProductAPP" resultType="CustomReqProductVO">
+		SELECT
+			*
+		FROM
+			bss_order_product_app A
+		LEFT JOIN
+			oss_project B
+				ON A.project_id = B.project_id
+		LEFT JOIN
+			bss_product_app C
+				ON A.template_product_seq = C.product_seq
+		LEFT JOIN
+			bss_product_os D
+				ON A.os_product_seq= D.product_seq
+		WHERE
+			A.order_product_seq = #{orderProductSeq}
+	</select>
+
+	<select id="detailBssOrderProductService" resultType="CustomReqProductVO">
+		SELECT
+			*
+		FROM
+			bss_order_product_service a
+		LEFT JOIN oss_project c
+		ON a.project_id = c.project_id
+
+		LEFT JOIN bss_order_product tb_b
+		ON a.order_product_seq = tb_b.order_product_seq
+
+		WHERE a.order_product_seq = #{orderProductSeq}
+	</select>
+
+	<select id="cicdGourpProjectInfo" resultType="CustomReqProductVO">
+
+			SELECT
+				a.name AS cicd_project_name,
+				b.path AS cicd_group_path,
+				b.name AS cicd_group_name
+			FROM cicd_project a
+    INNER JOIN cicd_group b ON a.group_id = b.group_id
+	 	  WHERE cicd_project_id = #{cicdProjectId}
+
+
+	</select>
+
+	<select id="cicdProjectUserInfo" resultType="CustomReqProductVO">
+
+			SELECT *
+			  FROM (SELECT * FROM cicd_project_user WHERE access_level = '40') a
+	  INNER JOIN  cicd_user b
+			     ON a.cicd_user_id = b.user_id
+			WHERE cicd_project_id = #{cicdProjectId}
+
+	</select>
+
+
+<!-- 	<select id="detailOssSecurityGroup" resultType="CustomOssSecurityVO"> -->
+<!-- 					 SELECT security_id, -->
+<!-- 								vpc_no, -->
+<!-- 								security_name, -->
+<!-- 								cloud_id, -->
+<!-- 								project_id, -->
+<!-- 								vm_uuid, -->
+<!-- 								reg_datetime, -->
+<!-- 								reg_user_id, -->
+<!-- 								mod_datetime, -->
+<!-- 								mod_user_id, -->
+<!-- 								del_flag, -->
+<!-- 								description -->
+<!-- 				       FROM oss_security -->
+<!-- 				    WHERE vm_uuid = #{vmUuid} -->
+
+<!-- 	</select> -->
+
+    <insert id="insertOssService" parameterType="CustomReqProductVO">
+    	INSERT INTO oss_service
+			(
+				service_id,
+				project_id,
+				service_ea,
+				description,
+				create_datetime,
+				reg_datetime,
+				reg_user_id,
+				service_product_seq,
+				service_catalog_seq,
+				service_type,
+				service_name,
+				vm_uuid,
+				req_service_product_seq,
+				app_uuid,
+				hpa_division,
+				hpa_max,
+				hpa_continue,
+				hpa_min_pod,
+				hpa_max_pod,
+				hpa_incre_pod,
+				ansible_status,
+				ansible_status_message,
+				bastion_vm_user_id,
+				bastion_vm_user_password
+			)
+		VALUES
+			(
+				#{serviceId},
+				#{projectId},
+				#{serviceEa},
+				#{description},
+				now(),
+				now(),
+				#{regUserId},
+				#{serviceProductSeq},
+				#{serviceCatalogSeq},
+				#{serviceType},
+				#{serviceName},
+				#{vmUuid},
+				#{reqServiceProductSeq},
+				#{appUuid},
+				#{hpaDivision},
+				#{hpaMax},
+				#{hpaContinue},
+				#{hpaMinPod},
+				#{hpaMaxPod},
+				#{hpaIncrePod},
+				#{ansibleStatus},
+				#{ansibleStatusMessage},
+				#{bastionVmUserId},
+				#{bastionVmUserPassword}
+			)
+    </insert>
+
+	<!-- 상품 마지막 승인 신청 내용입력 -->
+    <insert id="insertOssVm" parameterType="CustomReqProductVO" >
+    	INSERT INTO oss_vm
+		(
+			vm_uuid,
+			application_uuid,
+			host_uuid,
+			power_state,
+
+			project_id,
+			hostname,
+			hostname_alias,
+			flavor_id,
+			vcpus,
+			mem_gb,
+			disk_gb,
+			image_id,
+			volume_type,
+			az_name,
+			vm_product_seq,
+			os_product_seq,
+			vm_catalog_seq,
+			reg_datetime,
+			reg_user_id,
+			del_flag,
+			create_datetime,
+			instance_type
+		)
+		VALUES
+		(
+			#{vmUuid},
+			#{applicationUuid},
+			#{hostUuid},
+			#{powerState},
+			#{projectId},
+			#{hostname},
+			#{hostnameAlias},
+			#{flavorId},
+			#{vcpus},
+			#{memGb},
+			#{diskGb},
+			#{imageId},
+			#{volumeType},
+			#{azName},
+			#{vmProductSeq},
+			#{osProductSeq},
+			#{vmCatalogSeq},
+			NOW(),
+			#{orderUserId},
+			'N',
+			#{createDatetime},
+			#{instanceType}
+		)
+  	</insert>
+
+  	<insert id="insertOssApp" parameterType="CustomReqProductVO" >
+    	INSERT INTO	oss_app (
+				app_uid,
+				project_id,
+				app_name,
+				app_name_space,
+				app_alias,
+				create_datetime,
+				reg_datetime,
+				reg_user_id,
+				del_flag,
+				kind,
+				api_version,
+				order_product_seq,
+				template_product_seq,
+				template_catalog_seq,
+				pod,
+				cpu_req,
+				cpu_limit,
+				mem_req,
+				mem_limit,
+				volume,
+				os_product_seq,
+				image_id,
+				description,
+				pvc_yn,
+				service_cnt,
+				routes_cnt,
+				builds_cnt,
+				deployment_config_cnt,
+				app_version
+			)
+		VALUES
+			(
+				#{appUid},
+				#{projectId},
+				#{appName},
+				#{appNameSpace},
+				#{appName},
+				#{createDatetime},
+				NOW(),
+				#{orderUserId},
+				'N',
+				#{kind},
+				#{apiVersion},
+				#{orderProductSeq},
+				#{templateProductSeq},
+				#{templateCatalogSeq},
+				#{pod},
+				#{cpuReq},
+				#{cpuLimit},
+				#{memReq},
+				#{memLimit},
+				#{volume},
+				#{osProductSeq},
+				#{imageId},
+				#{description},
+				#{pvcYn},
+				#{serviceCnt},
+				#{routesCnt},
+				#{buildsCnt},
+				#{deploymentConfigCnt},
+				#{appVersion}
+			);
+
+
+  	</insert>
+
+  	<update id="updateOssVm" parameterType="CustomReqProductVO" >
+		UPDATE oss_vm
+			SET
+				vcpus = #{vcpus}
+				, mem_gb = #{memGb}
+				, mod_datetime = NOW()
+				, mod_user_id = #{orderUserId}
+		WHERE vm_uuid = #{vmUuid}
+  	</update>
+
+  	<update id="deleteOssVm" parameterType="CustomReqProductVO" >
+		UPDATE
+			oss_vm
+		SET
+			del_flag = 'Y'
+			, mod_datetime = NOW()
+			, mod_user_id = #{orderUserId}
+		WHERE
+			vm_uuid = #{vmUuid}
+  	</update>
+
+    <update id="deleteOssApp" parameterType="CustomReqProductVO" >
+		UPDATE
+			oss_app
+		SET
+			del_flag = 'Y'
+			, mod_datetime = NOW()
+			, mod_user_id = #{orderUserId}
+		WHERE
+			app_uid = #{appUid}
+  	</update>
+
+  	<update id="deleteOssService" parameterType="CustomReqProductVO" >
+		UPDATE
+			oss_service
+		SET
+			del_flag = 'Y'
+			, mod_datetime = NOW()
+			, mod_user_id = #{orderUserId}
+		WHERE
+			vm_uuid = #{vmUuid}
+  	</update>
+
+	<insert id="insertOssVmNetwork" parameterType="CustomReqProductVO" >
+		INSERT INTO oss_vm_network
+		(
+			network_id
+			, vm_uuid
+			, port_network_id
+			, port_backup_network_id
+		)
+		value
+		(
+			#{networkId}
+			, #{vmUuid}
+			, #{portNetworkId}
+			, #{portBackupNetworkId}
+		)
+	</insert>
+
+	<insert id="insertOssPort" parameterType="BatchOssPortVO" >
+		INSERT INTO oss_port(
+			port_id,
+			port_name,
+			fixed_ips,
+			subnet_id,
+			mac_address,
+			project_id,
+			network_id,
+			device_owner,
+			device_id,
+			reg_datetime,
+			delete_flag
+		)
+		value
+		(
+			#{portId},
+			#{portName},
+			#{fixedIps},
+			#{subnetId},
+			#{macAddress},
+			#{projectId},
+			#{networkId},
+			#{deviceOwner},
+			#{deviceId},
+			NOW(),
+			'N'
+		)
+	</insert>
+
+	<update id="deleteOssPort" parameterType="CustomReqProductVO" >
+		UPDATE
+			oss_port
+		SET
+			delete_flag = 'Y'
+			, mod_datetime = NOW()
+			, mod_user_id = #{orderUserId}
+		WHERE
+			port_id = #{portNetworkId}
+			OR port_id = #{portBackupNetworkId}
+  	</update>
+
+
+
+  	<insert id="insertOssDisk" parameterType="CustomReqProductVO" >
+		INSERT INTO oss_disk
+		(
+			disk_id
+			, project_id
+			, vm_uuid
+			, device_uuid
+			, storage_container_uuid
+			, disk_alias
+			, size_gb
+			, create_datetime
+			, reg_datetime
+			, reg_user_id
+			, del_flag
+			, hourly_flag
+			, description
+			, disk_catalog_seq
+			, disk_product_seq
+			, volume_type
+			, vmdk_file
+		)
+		value
+		(
+			#{diskId}
+			, #{projectId}
+			, #{vmUuid}
+			, #{deviceUuid}
+			, #{storageContainerUuid}
+			, #{diskName}
+			, #{diskGb}
+			, #{createDatetime}
+			, NOW()
+			, #{orderUserId}
+			, 'N'
+			, #{hourlyFlag}
+			, #{description}
+			, #{diskCatalogSeq}
+			, #{diskProductSeq}
+			, #{volumeType}
+			, #{vmdkFile}
+		)
+	</insert>
+
+  	<update id="updateOssDisk" parameterType="CustomReqProductVO" >
+		UPDATE
+			oss_disk
+		SET
+			size_gb = #{diskGb}
+			, mod_datetime = NOW()
+			, mod_user_id = #{orderUserId}
+		WHERE
+			disk_id = #{diskId}
+  	</update>
+
+  	<update id="deleteOssDisk" parameterType="CustomReqProductVO" >
+		UPDATE
+			oss_disk
+		SET
+			del_flag = 'Y'
+			, mod_datetime = NOW()
+			, mod_user_id = #{orderUserId}
+		WHERE
+			disk_id = #{diskId}
+  	</update>
+
+	<update id="deleteOssDiskVmUuid" parameterType="CustomReqProductVO" >
+		UPDATE
+			oss_disk
+		SET
+			del_flag = 'Y'
+			, mod_datetime = NOW()
+			, mod_user_id = #{orderUserId}
+		WHERE
+			vm_uuid = #{vmUuid}
+	</update>
+	<select id="getBackupNetwork" resultType="CustomReqProductVO">
+		SELECT
+			A.network_id,
+			B.subnet_id
+		FROM
+			oss_zone_network A
+		LEFT JOIN
+			oss_subnet B
+		ON
+			A.network_id = B.network_id
+		WHERE
+			is_backup = 'Y'
+		AND cloud_id = #{cloudId}
+	</select>
+	<select id="getDataStore" resultType="CustomReqProductVO">
+		SELECT
+			datastore_id
+		FROM
+			oss_datastore
+		WHERE
+			cloud_id = #{cloudId}
+	</select>
+
+	<select id="getOssDiskAt" resultType="CustomReqProductVO">
+				SELECT	*
+	              FROM oss_disk
+	           WHERE disk_id = #{vmdisk_uuid}
+    </select>
+
+    <update id="updateOssApp" parameterType="CustomReqProductVO">
+
+		UPDATE oss_app SET
+	         pod = #{podCnt},
+	    volume = #{volume}
+	    WHERE app_uid = #{appUid}
+
+
+	</update>
+
+	<select id="getDataDiskIds" resultType="CustomReqProductVO">
+		SELECT
+			disk_id
+		FROM
+			oss_disk
+		WHERE
+			vm_uuid = #{vmUuid}
+	</select>
+
+
+  	<insert id="insertOssNas" parameterType="CustomReqProductVO" >
+
+		  	INSERT INTO oss_nas (
+				nas_id,
+				project_id,
+				project_box_id,
+				nas_name,
+				nas_alias,
+				nas_gb,
+				nas_option,
+				nas_file_system_path,
+				nas_type,
+				description,
+				create_datetime,
+				expire_datetime,
+				delete_datetime,
+				reg_datetime,
+				reg_user_id,
+				nas_catalog_seq,
+				nas_product_seq,
+				nas_nfs_object_id,
+				order_product_seq,
+				pvc_name,
+				pv_name,
+				connect_model,
+				connect_status
+			)
+		VALUES
+			(
+				#{nasId},
+				#{projectId},
+				#{projectBoxId},
+				#{nasName},
+				#{nasAlias},
+				#{nasGb},
+				#{nasOption},
+				#{nasFileSystemPath},
+				#{nasType},
+				#{description},
+				NOW(),
+				#{expireDatetime},
+				#{deleteDatetime},
+				NOW(),
+				#{regUserId},
+				#{nasCatalogSeq},
+				#{nasProductSeq},
+				#{nasNfsObjectId},
+				#{orderProductSeq},
+				#{pvcName},
+				#{pvName},
+				#{connectModel},
+				#{connectStatus}
+			)
+  	</insert>
+
+	<insert id="insertOssNasVm" parameterType="CustomReqProductVO">
+
+		INSERT INTO oss_nas_vm (
+			nas_id,
+			vm_uuid,
+			order_product_seq,
+			reg_datetime,
+			reg_user_id
+		)
+		VALUES(
+			#{nasId},
+			#{vmUuid},
+			#{orderProductSeq},
+			NOW(),
+			#{regUserId}
+		)
+
+	</insert>
+
+		<insert id="insertOssNasApp" parameterType="CustomReqProductVO">
+
+		INSERT INTO oss_nas_app (
+			nas_id,
+			app_uuid,
+			mount_path,
+			order_product_seq,
+			reg_datetime,
+			reg_user_id,
+			mod_datetime,
+			mod_user_id,
+			del_flag
+		)
+		VALUES(
+			#{nasId},
+			#{appUuid},
+			#{mountPath},
+			#{orderProductSeq},
+			NOW(),
+			#{regUserId},
+			#{modDatetime},
+			#{modUserId},
+			'N'
+		)
+
+	</insert>
+
+  	<update id="updateOssNas" parameterType="CustomReqProductVO" >
+
+		    UPDATE oss_nas SET
+		    		    nas_gb = #{nasGb},
+		    		    mod_datetime = NOW(),
+                        mod_user_id = #{modUserId}
+            WHERE nas_id = #{nasId}
+
+  	</update>
+
+  	<update id="deleteOssNas" parameterType="CustomReqProductVO" >
+
+		    UPDATE oss_nas SET
+		    		   del_flag = 'Y',
+		    		   mod_datetime = NOW(),
+		    		   expire_datetime = NOW(),
+		    		   delete_datetime = NOW(),
+		    		   mod_user_id = #{modUserId}
+            WHERE nas_id = #{nasId}
+
+  	</update>
+
+  	<update id="deleteOssNasVm" parameterType="CustomReqProductVO" >
+
+		    UPDATE oss_nas_vm SET
+		    		   del_flag = 'Y',
+		    		   mod_datetime = NOW(),
+		    		   mod_user_id = #{modUserId}
+            WHERE nas_id = #{nasId}
+
+  	</update>
+
+  	<select id="detailBssOrderProductEnv" resultType="CustomReqProductVO">
+		SELECT
+			a.*
+			,c.order_user_id AS reg_user_id
+		FROM
+			bss_order_product_env a
+		INNER JOIN bss_order_product b
+		    ON a.order_product_seq = b.order_product_seq
+		INNER JOIN bss_order c
+		    ON b.order_no = c.order_no
+		WHERE a.order_product_seq = #{orderProductSeq}
+     </select>
+
+   	<select id="detailBssOrderProductEnvUserList" resultType="CustomReqProductVO">
+		SELECT
+			*
+		FROM
+			bss_order_product_env_user a
+		WHERE
+			order_product_seq = #{orderProductSeq}
+     </select>
+
+  	<select id="detailConfigTemplate" resultType="CustomReqProductVO">
+		SELECT * FROM cicd_template WHERE template_id = #{templateId}
+    </select>
+
+  	<select id="getConfigTemplateList" resultType="CustomReqProductVO">
+		SELECT * FROM cicd_template
+			WHERE del_flag = 'N'
+    </select>
+
+
+<!-- //////////////////////////////////////////////////// -->
+<!-- //////////////////////////////////////////////////// -->
+<!-- //////////////////////////////////////////////////// -->
+<!-- //////////////////////////////////////////////////// -->
+<!-- //////////////////////////////////////////////////// -->
+
+    <!-- 그룹 정보 저장 -->
+    <insert id="insertCicdGroup" parameterType="CustomReqProductVO">
+        INSERT INTO cicd_group (
+            group_id,
+            name,
+            web_url,
+            path,
+            visibility,
+            reg_datetime,
+            reg_user_id,
+            mod_datetime,
+            mod_user_id,
+            del_flag
+        )
+        VALUES (
+            #{groupId},
+            #{name},
+            #{webUrl},
+            #{path},
+            #{visibility},
+            NOW(),
+            #{regUserId},
+            NOW(),
+            #{modUserId},
+            'N'
+        )
+    </insert>
+
+
+	<update id="updateCicdProjectEnvironmentStatus" parameterType="CustomReqProductVO">
+		UPDATE	cicd_project
+		SET		environment_status = #{environmentStatus},
+				mod_user_id= #{modUserId},
+				mod_datetime = NOW()
+		WHERE	cicd_project_id =  #{cicdProjectId}
+			and group_id = #{groupId}
+	</update>
+
+
+
+    <!-- 프로젝트 정보 저장 -->
+    <insert id="insertCicdProject" parameterType="CustomReqProductVO">
+        INSERT INTO cicd_project (
+            cicd_project_id,
+            group_id,
+            project_box_id,
+            name,
+            description,
+            url,
+            visibility,
+            order_product_seq,
+            reg_datetime,
+            reg_user_id,
+            mod_datetime,
+            mod_user_id,
+            del_flag
+        )
+        VALUES (
+            #{cicdProjectId},
+            #{groupId},
+            #{projectBoxId},
+            #{name},
+            #{description},
+            #{url},
+            #{visibility},
+            #{orderProductSeq},
+            NOW(),
+            #{regUserId},
+            NOW(),
+            #{modUserId},
+            'N'
+        )
+    </insert>
+
+    <!-- 브랜치 정보 저장 -->
+    <insert id="insertCicdBranch" parameterType="CustomReqProductVO">
+        INSERT INTO cicd_branch (
+            branch_id,
+            cicd_project_id,
+            name,
+            protected_yn,
+            template_id,
+            reg_datetime,
+            reg_user_id,
+            mod_datetime,
+            mod_user_id,
+            del_flag
+        )
+        VALUES (
+            #{branchId},
+            #{cicdProjectId},
+            #{name},
+            #{protectedYn},
+            #{templateId},
+            NOW(),
+            #{regUserId},
+            NOW(),
+            #{modUserId},
+            'N'
+        )
+    </insert>
+
+    <!-- 브랜치 태그 정보 저장 -->
+    <insert id="insertCicdBranchTag" parameterType="CustomReqProductVO">
+        INSERT INTO cicd_branch_tag (
+            branch_tag_id,
+            branch_name,
+            name,
+            cicd_project_id,
+            project_id,
+            app_name,
+            reg_datetime,
+            reg_user_id,
+            mod_datetime,
+            mod_user_id,
+            del_flag
+        )
+        VALUES (
+            #{branchTagId},
+            #{branchName},
+            #{name},
+            #{cicdProjectId},
+            #{ossProjectId},
+            #{appName},
+            NOW(),
+            #{regUserId},
+            NOW(),
+            #{modUserId},
+            'N'
+        )
+    </insert>
+
+    <delete id="deleteCicdBranchTag" parameterType="CustomReqProductVO">
+	    DELETE FROM cicd_branch_tag
+	    WHERE branch_tag_id = #{branchTagId}
+	    AND cicd_project_id = #{cicdProjectId}
+	</delete>
+
+
+
+    <!-- 커밋 정보 저장 -->
+    <insert id="insertCicdCommit" parameterType="CustomReqProductVO">
+        INSERT INTO cicd_commit (
+            commit_id,
+            branch_name,
+            cicd_project_id,
+            message,
+            author,
+            reg_datetime,
+            reg_user_id,
+            mod_datetime,
+            mod_user_id,
+            del_flag
+        )
+        VALUES (
+            #{commitId},
+            #{branchName},
+            #{cicdProjectId},
+            #{message},
+            #{author},
+            NOW(),
+            #{regUserId},
+            NOW(),
+            #{modUserId},
+            'N'
+        )
+    </insert>
+
+    <!-- 잡 정보 저장 -->
+    <insert id="insertCicdJob" parameterType="CustomReqProductVO">
+        INSERT INTO cicd_job (
+            job_id,
+            job_name,
+            pipeline_id,
+            [ref],
+            status,
+            duration,
+            reg_datetime,
+            reg_user_id,
+            mod_datetime,
+            mod_user_id,
+            del_flag
+        )
+        VALUES (
+            #{jobId},
+            #{jobName},
+            #{pipelineId},
+            #{ref},
+            #{status},
+            #{duration},
+            NOW(),
+            #{regUserId},
+            NOW(),
+            #{modUserId},
+            'N'
+        )
+    </insert>
+
+    <!-- 병합 요청 정보 저장 -->
+    <insert id="insertCicdMergeRequest" parameterType="CustomReqProductVO">
+        INSERT INTO cicd_merge_request (
+            merge_request_id,
+            cicd_project_id,
+            user_email,
+            user_id,
+            reg_datetime,
+            reg_user_id,
+            mod_datetime,
+            mod_user_id,
+            del_flag
+        )
+        VALUES (
+            #{mergeRequestId},
+            #{cicdProjectId},
+            #{userEmail},
+            #{userId},
+            NOW(),
+            #{regUserId},
+            NOW(),
+            #{modUserId},
+            'N'
+        )
+    </insert>
+
+    <!-- 파이프라인 정보 저장 -->
+    <insert id="insertCicdPipeline" parameterType="CustomReqProductVO">
+
+    	MERGE INTO cicd_pipeline A
+        USING (
+        SELECT
+            #{pipelineId} AS pipeline_id,
+            #{cicdProjectId} AS cicd_project_id,
+            #{projectId} AS project_id,
+            #{ref} AS [ref],
+            #{status} AS status,
+            #{appName} AS app_name,
+            #{cicdRequestType} AS cicd_request_type,
+            #{syncAppStatus} AS sync_app_status,
+            #{orderProductSeq} AS order_product_seq,
+            NOW() AS reg_datetime,
+            #{regUserId} AS reg_user_id,
+            'N' AS del_flag,
+            #{envApplicationVersion} AS env_application_version
+    	FROM db_root
+              ) B
+              ON (    A.pipeline_id = B.pipeline_id
+                   AND A.cicd_project_id = B.cicd_project_id
+              ) WHEN MATCHED THEN
+    UPDATE SET
+
+	         A.project_id = B.project_id,
+	         A.[ref] = B.[ref],
+	         A.status = B.status,
+	         A.app_name = B.app_name,
+	         A.cicd_request_type = B.cicd_request_type,
+	         A.sync_app_status = B.sync_app_status,
+	         A.order_product_seq = B.order_product_seq
+
+          WHEN NOT MATCHED THEN
+                INSERT (
+		            A.pipeline_id,
+		            A.cicd_project_id,
+		            A.project_id,
+		            A.[ref],
+		            A.status,
+		            A.app_name,
+		            A.cicd_request_type,
+		            A.sync_app_status,
+		            A.order_product_seq,
+		            A.reg_datetime,
+		            A.reg_user_id,
+		            A.del_flag,
+		            A.env_application_version
+		        )
+		        VALUES (
+		            B.pipeline_id,
+   		            B.cicd_project_id,
+   		            B.project_id,
+   		            B.[ref],
+   		            B.status,
+   		            B.app_name,
+   		            B.cicd_request_type,
+   		            B.sync_app_status,
+   		            B.order_product_seq,
+   		            B.reg_datetime,
+   		            B.reg_user_id,
+   		            B.del_flag,
+   		            B.env_application_version
+		        )
+    </insert>
+
+    <!-- 프로젝트 사용자 정보 저장 -->
+    <insert id="insertCicdProjectUser" parameterType="CustomReqProductVO">
+        INSERT INTO cicd_project_user (
+            cicd_project_id,
+            cicd_user_id,
+            user_email,
+            token,
+            access_level,
+            reg_datetime,
+            reg_user_id,
+            mod_datetime,
+            mod_user_id,
+            del_flag
+        )
+        VALUES (
+            #{cicdProjectId},
+            #{cicdUserId},
+            #{userEmail},
+            #{token},
+            #{accessLevel},
+            NOW(),
+            #{regUserId},
+            NOW(),
+            #{modUserId},
+            'N'
+        )
+    </insert>
+
+    <!-- 템플릿 정보 저장 -->
+    <insert id="insertCicdTemplate" parameterType="CustomReqProductVO">
+        INSERT INTO cicd_template (
+            template_id,
+            name,
+            title,
+            content,
+            reg_datetime,
+            reg_user_id,
+            mod_datetime,
+            mod_user_id,
+            del_flag
+        )
+        VALUES (
+            #{templateId},
+            #{name},
+            #{title},
+            #{content},
+            NOW(),
+            #{regUserId},
+            NOW(),
+            #{modUserId},
+            'N'
+        )
+    </insert>
+
+    <!-- 사용자 정보 저장 -->
+    <insert id="insertCicdUser" parameterType="CustomReqProductVO">
+
+	    MERGE INTO cicd_user A
+	        USING (
+	        SELECT
+	            #{userEmail} AS user_email,
+	            #{userId} AS user_id,
+	            #{name} AS name,
+	            #{alias} AS alias,
+	            #{password} AS password,
+	            NOW() AS reg_datetime,
+	            #{regUserId} AS reg_user_id,
+	            NOW() AS mod_datetime,
+	            #{modUserId} AS mod_user_id,
+	            'N' AS del_flag
+	    	FROM db_root
+	              ) B
+	              ON (     A.user_email = B.user_email
+	                      AND A.name = B.name
+	              ) WHEN MATCHED THEN
+	    UPDATE SET
+
+	            A.alias = B.alias,
+	            A.password = B.password,
+	            A.mod_user_id = B.mod_user_id,
+	            A.mod_datetime = B.mod_datetime
+
+	          WHEN NOT MATCHED THEN
+	                INSERT (
+			            A.user_email,
+			            A.user_id,
+			            A.name,
+			            A.alias,
+			            A.password,
+			            A.reg_datetime,
+			            A.reg_user_id,
+			            A.mod_datetime,
+			            A.mod_user_id,
+			            A.del_flag
+			        )
+			        VALUES (
+			            B.user_email,
+			            B.user_id,
+			            B.name,
+			            B.alias,
+			            B.password,
+			            B.reg_datetime,
+			            B.reg_user_id,
+			            B.mod_datetime,
+			            B.mod_user_id,
+			            B.del_flag
+			        )
+
+    </insert>
+
+    <select id="getBssOrderProductVmInfo" resultType="CustomReqProductVO">
+    	SELECT d.*, a.* FROM bss_order_product_vm a
+		INNER JOIN provisioning_queue b
+		ON a.order_product_seq = b.order_product_seq
+		INNER JOIN bss_order_product c
+		ON a.order_product_seq = c.order_product_seq
+		INNER JOIN oss_vm d
+		ON a.hostname = d.hostname
+		WHERE b.provisioning_status = 'PROVISIONING_SUCCESS'
+		AND c.order_no IN (SELECT order_no FROM bss_order_product WHERE order_product_seq = #{orderProductSeq})
+    </select>
+
+    <update id="updateOssServiceDelFlag" parameterType="CustomReqProductVO">
+    	UPDATE oss_service SET
+		del_flag = 'Y'
+		WHERE vm_uuid = #{vmUuid}
+		AND service_type = 'SERVICE99'
+    </update>
+
+</mapper>

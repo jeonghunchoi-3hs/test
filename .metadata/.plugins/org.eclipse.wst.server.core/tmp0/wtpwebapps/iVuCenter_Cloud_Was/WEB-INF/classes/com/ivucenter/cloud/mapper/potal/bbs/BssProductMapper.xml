@@ -1,0 +1,1453 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bss.product.MngBssProductDAO">
+
+  	<!--카탈로그 관리 리스트-->
+    <select id="list" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			BP.product_seq
+			,BP.product_name
+			,BP.product_category
+			,BP.reg_user_id
+			,(SELECT CU.user_name FROM cmm_user CU WHERE CU.user_id = BP.reg_user_id) AS user_name
+			,BP.mod_datetime
+			,BP.mod_user_id
+			,BP.del_flag
+			,(SELECT CC.code_name FROM cmm_code CC WHERE CC.code_id = BP.product_category)AS productCategoryName
+			,DATE_FORMAT(BP.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			,BP.reg_datetime
+		 FROM
+		 	bss_product BP
+		 WHERE
+		 	1=1
+
+			<if test="searchKind == 'sProductName' and keyword != ''">
+			AND
+				BP.product_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'sProductCategoryName' and keyword != ''">
+			AND
+				(SELECT code_name FROM cmm_code WHERE code_id =BP.product_category) like CONCAT('%',#{keyword},'%')
+			</if>
+
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			AND
+				(
+				BP.product_name like CONCAT('%',#{keyword},'%')
+				OR
+				(SELECT code_name FROM cmm_code WHERE code_id =BP.product_category) like CONCAT('%',#{keyword},'%')
+				)
+			</if>
+			<if test="productKind == 'categoryVm' and productKind != ''">
+			AND
+				BP.product_category = 'PRODCATE_VM'
+			</if>
+			<if test="productKind == 'categoryOs' and productKind != ''">
+			AND
+				BP.product_category = 'PRODCATE_OS'
+			</if>
+			<if test="productKind == 'categoryDisk' and productKind != ''">
+			AND
+				BP.product_category = 'PRODCATE_DISK'
+			</if>
+			<if test="productKind == 'categoryService' and productKind != ''">
+			AND
+				BP.product_category IN ('PRODCATE_BACKUP', 'PRODCATE_MCA', 'PRODCATE_SCM', 'PRODCATE_SECURITY','PRODCATE_SERVICE')
+			</if>
+			<if test="productKind == 'categoryAdditional' and productKind != ''">
+			AND
+				BP.product_category IN ('PRODCATE_DISK', 'PRODCATE_LOADBALANCER', 'PRODCATE_NAS', 'PRODCATE_PUBLICIP')
+			</if>
+			<if test="productKind == 'categoryApp'">
+			AND
+				BP.product_category IN ('PRODCATE_APP')
+			</if>
+
+		ORDER BY
+			BP.product_category DESC,	BP.product_name ASC
+		<if test="!length.equals(0)">
+		LIMIT #{start}, #{length}
+		</if>
+  	</select>
+
+  	<select id="pageCount" resultType="Int" parameterType="CustomBssProductVO">
+		SELECT
+			Z.start
+		FROM
+		(
+			SELECT
+				@rownum := @rownum+1 AS start
+				,product_seq
+			FROM bss_product BP, (SELECT @rownum:=-1) tmp
+			WHERE 1=1
+			ORDER BY BP.product_category DESC, BP.product_name ASC
+		)Z
+		WHERE Z.product_seq=#{productSeq}
+  	</select>
+
+
+  	  	<!--카탈로그 관리 리스트2-->
+    <select id="bssProductList" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+				product_seq
+				,product_name
+				,product_category
+				,reg_datetime
+				,reg_user_id
+				,mod_datetime
+				,mod_user_id
+				,del_flag
+				,(SELECT code_name FROM cmm_code WHERE code_id =product_category)AS productCategoryName
+				,DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+		 FROM
+		 	bss_product
+		 WHERE
+		 	1=1
+		ORDER BY
+			 product_category DESC,	product_name ASC
+		<if test="searchKind == 'sProductName' and keyword != ''">
+		AND
+			product_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'sProductCategoryName' and keyword != ''">
+		AND
+			(SELECT code_name FROM cmm_code WHERE code_id =product_category) like CONCAT('%',#{keyword},'%')
+		</if>
+
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND
+			(
+			product_name like CONCAT('%',#{keyword},'%')
+			OR
+			(SELECT code_name FROM cmm_code WHERE code_id =product_category) like CONCAT('%',#{keyword},'%')
+			)
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+
+  	</select>
+
+	<!-- 상품구성 상세 -> 상품정보 -->
+    <select id="view" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+				a.product_seq
+				,a.product_name
+				,a.product_category
+				,a.reg_user_id
+				,a.reg_datetime
+				,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				,(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName
+				,(SELECT CU.user_name FROM cmm_user CU WHERE CU.user_id = a.reg_user_id) AS user_name
+		 FROM
+		 	bss_product a
+		 WHERE
+		 	a.product_seq=#{productSeq}
+  	</select>
+
+  	<select id="listTot" resultType="Int" parameterType="CustomBssProductVO">
+    	SELECT
+			count(*)
+    	FROM
+			bss_product
+    </select>
+
+	<!--  카탈로그 상세 -->
+    <select id="detail" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+				*
+				,DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+		 FROM
+		 	bss_product
+		WHERE
+			product_seq=#{productSeq}
+  	</select>
+  	<!--  가상서버 상품 상세 -->
+    <select id="productView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+
+	     SELECT
+				*
+				,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				,b.image_type_name
+				,b.disk_type_name
+				,b.image_type
+				,b.disk_type
+				,(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName
+			FROM
+				bss_product a
+			INNER JOIN
+				(
+					SELECT
+							cc.code_name AS image_type_name,
+							dd.code_name AS disk_type_name,
+							dd.code_value1 AS disk_type,
+							vm.product_seq,
+							vm.vcpus,
+							vm.mem_gb,
+							vm.disk_gb,
+							vm.image_type
+						FROM
+						bss_product_vm vm
+						LEFT JOIN (SELECT * FROM cmm_code WHERE parent_code_id = 'ITEMCATE_VMIMAGE') cc ON vm.image_type = cc.code_id
+						LEFT JOIN (SELECT * FROM cmm_code WHERE parent_code_id = 'ITEMCATE_DISK') dd ON vm.disk_type = dd.code_id
+				 ) b
+			ON a.product_seq= b.product_seq
+			AND a.product_seq= #{productSeq}
+
+
+  	</select>
+
+   	<!--  os 상품 상세 -->
+    <select id="osView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			bi.item_name,
+			bi.unit,
+			bi.quantity,
+			bi.item_id
+			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			,os.vm_image_name
+			,os.vm_image_id
+			,c.cloud_name
+			,os.cloud_id
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_os)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+		JOIN
+		(SELECT
+		*
+		FROM
+		bill_product)AS bi
+		ON os.item_id=bi.item_id
+		LEFT JOIN oss_cloud c
+		ON os.cloud_id = c.cloud_id
+  	</select>
+
+   	<!--  os 상품 상세 -->
+    <select id="diskView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			os.code_value1 AS disk_type,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.disk_gb
+			,os.code_name
+			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_disk bd
+		LEFT JOIN cmm_code cc ON bd.disk_type = cc.code_id
+
+		)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+
+  	</select>
+
+   	<!--  os 상품 상세 -->
+    <select id="nasView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.nas_gb
+			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_nas)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+
+  	</select>
+
+   	<!--  os 상품 상세 -->
+    <select id="ipView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.publicip_ea
+			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			c.cloud_name
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_publicip)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+		LEFT JOIN oss_cloud c
+		ON a.cloud_id = c.cloud_id
+
+  	</select>
+
+   	<!--  os 상품 상세 -->
+    <select id="lbView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.loadbalancer_ea
+			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			,c.cloud_name
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_loadbalancer)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+		LEFT JOIN oss_cloud c
+		ON a.cloud_id = c.cloud_id
+
+  	</select>
+
+   	<!--  os 상품 상세 -->
+<!--
+    <select id="scmView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.scm_ea
+			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			,c.cloud_name
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_scm)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+		LEFT JOIN oss_cloud c
+		ON a.cloud_id = c.cloud_id
+  	</select>
+-->
+
+   	<!--  os 상품 상세 -->
+<!--
+    <select id="bkView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.backup_gb
+			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			c.cloud_name
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_backup)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+		LEFT JOIN oss_cloud c
+		ON a.cloud_id = c.cloud_id
+  	</select>
+-->
+
+
+
+  	   	<!--  서비스 상품 상세 -->
+    <select id="serviceView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.service_ea,
+			cmm.code_value AS service_type,
+			DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_service)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+		LEFT JOIN (SELECT * FROM cmm_code where parent_code_id = 'SERVICE_TYPE') cmm
+		ON os.service_type = cmm.code_id
+
+  	</select>
+
+  	<select id="appView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.*
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_template)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+
+  	</select>
+
+   	<!--  os 상품 상세 -->
+<!--
+    <select id="serView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.security_ea
+			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			,c.cloud_name
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_security)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+		LEFT JOIN oss_cloud c
+		ON a.cloud_id = c.cloud_id
+  	</select>
+-->
+
+   	<!--  os 상품 상세 -->
+<!--
+    <select id="mcaView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq,
+			a.product_name,
+			a.product_category,
+			a.del_flag,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			os.mca_ea
+			,DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			c.cloud_name
+		FROM
+			bss_product a
+		JOIN
+		(SELECT *
+		FROM
+		bss_product_mca)AS os
+		ON a.product_seq= os.product_seq
+		AND a.product_seq=#{productSeq}
+		LEFT JOIN oss_cloud c
+		ON a.cloud_id = c.cloud_id
+  	</select>
+-->
+   <!-- os 팝업 리스트  -->
+   <select id="osPopList" parameterType="CustomBssProductVO" resultType="CustomBssProductVO">
+	            SELECT	*
+
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE 	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN (SELECT item_id FROM bill_product)
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+				AND ITEM.item_category='ITEMCATE_OS'
+
+				AND
+				(
+					ITEM.item_name like CONCAT('%',#{searchValue},'%')
+				)
+
+  	</select>
+
+    <select id="osPopListold" parameterType="CustomBssProductVO" resultType="CustomBssProductVO">
+		SELECT
+			*
+		FROM
+			bill_product bi
+		JOIN
+			(SELECT
+			item_id
+			FROM
+			bss_product_os) AS bso
+		ON
+			bi.item_id = bso.item_id
+		WHERE
+			1=1
+		AND
+			(
+				bi.item_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+
+<!-- 가상서버 상세 내용수정 -->
+    <update id="productUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product
+		SET
+			product_name=#{productName}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+
+<!-- 가상서버 vm상세 내용수정 -->
+    <update id="vmUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_vm
+		SET
+			vcpus=#{vcpus},
+			mem_gb=#{memGb},
+			disk_gb=#{diskGb},
+			image_type =#{imageType},
+			disk_type = #{diskType}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+
+<!-- 가상서버 vm image_type -->
+    <select id="getProductImageType" parameterType="CustomBssProductVO" resultType="CustomBssProductVO">
+				SELECT image_type, disk_type FROM bss_product_vm WHERE  product_seq =#{productSeq}
+    </select>
+
+    <!-- 가상서버 vm image_type -->
+    <select id="getProductDiskType" parameterType="CustomBssProductVO" resultType="CustomBssProductVO">
+				SELECT disk_type FROM bss_product_disk WHERE  product_seq =#{productSeq}
+    </select>
+
+<!-- 가상서버 os상세 내용수정 -->
+    <update id="osUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_os
+		SET
+			item_id=#{itemId}
+			,vm_image_id=#{vmImageId}
+			,vm_image_name=#{vmImageName}
+			,cloud_id=#{cloudId}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+
+  	<!-- 가상서버 os상세 내용수정 -->
+    <update id="diskUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_disk
+		SET
+			disk_gb=#{diskDiskGb}
+			,disk_type = #{diskType}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+  	<!-- 가상서버 os상세 내용수정 -->
+    <update id="nasUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_nas
+		SET
+			nas_gb=#{nasGb}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+  	<!-- 가상서버 os상세 내용수정 -->
+    <update id="ipUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_publicip
+		SET
+			publicip_ea=#{publicipEa}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+  	<!-- 가상서버 os상세 내용수정 -->
+    <update id="lbUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_loadbalancer
+		SET
+			loadbalancer_ea=#{loadbalancerEa}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+  	<!-- 가상서버 os상세 내용수정 -->
+<!--
+    <update id="scmUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_scm
+		SET
+			scm_ea=#{scmEa}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+-->
+  	<!-- 가상서버 os상세 내용수정 -->
+<!--
+    <update id="bkUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_backup
+		SET
+			backup_gb=#{backupGb}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+-->
+  	<!-- 가상서버 os상세 내용수정 -->
+<!--
+    <update id="serUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_security
+		SET
+			security_ea=#{securityEa}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+-->
+  	<!-- 가상서버 os상세 내용수정 -->
+<!--
+    <update id="mcaUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_mca
+		SET
+			mca_ea=#{mcaEa}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+-->
+  	<!-- 서비스상세 내용수정 -->
+    <update id="serviceUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+			bss_product_service
+		SET
+			service_ea=#{serviceEa}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+
+
+  	<!--  가상서버 상품 상세 -->
+<!--
+    <select id="pcList" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			code_name
+			,code_id
+			,code_value1
+		FROM
+			cmm_code
+		WHERE
+			parent_code_id=#{parentCodeId}
+		ORDER BY
+			code_sort_num ASC
+  	</select>
+-->
+
+  	<!--  이미지 리스트 -->
+<!--
+    <select id="getItemImageType" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			 code_name
+			,code_id
+			,parent_code_id
+		FROM
+			cmm_code
+
+		ORDER BY
+			code_sort_num ASC
+  	</select>
+-->
+  	<!--  공통코드 리스트 -->
+<!--
+    <select id="getCmmCode" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			 code_name
+			,code_id
+			,parent_code_id
+			,code_value
+			,code_value1
+			,code_value2
+			,code_value3
+		FROM
+			cmm_code
+		ORDER BY
+			code_sort_num ASC
+  	</select>
+-->
+	<!-- 상품 등록 -->
+    <update id="productInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product
+			(
+				product_seq,
+				product_name,
+				product_category,
+				reg_datetime,
+				reg_user_id
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{productName},
+				#{productCategory},
+				NOW(),
+				#{regUserId}
+
+			)
+  	</update>
+<!-- vm 등록 -->
+    <update id="vmInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_vm
+			(
+				product_seq,
+				vcpus,
+				mem_gb,
+				disk_gb,
+				image_type,
+				disk_type
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{vcpus},
+				#{memGb},
+				#{diskGb},
+				#{imageType},
+				#{diskType}
+
+			)
+  	</update>
+
+
+  	<!-- 서비스 상품 등록 -->
+    <update id="serviceInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_service
+			(
+				product_seq,
+				vcpus,
+				service_ea,
+				service_type
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{vcpus},
+				#{serviceEa},
+				#{serviceType}
+			)
+  	</update>
+
+
+
+
+<!-- os 등록 -->
+    <update id="osInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_os
+			(
+				product_seq
+				,item_id
+				,vm_image_id
+				,vm_image_name
+				,cloud_id
+			)
+		VALUES
+			(
+				#{productSeq}
+				,#{itemId}
+				,#{vmImageId}
+				,#{vmImageName}
+				,#{cloudId}
+			)
+  	</update>
+
+  	<insert id="templateInsert" parameterType="CustomBssProductVO">
+  		INSERT INTO bss_product_template
+  			(
+  				product_seq
+  				,template_id
+  				,template_vcpus
+  				,template_mem
+  				,template_pod
+  				,item_id
+  				,cloud_id
+  				,template_name
+  				,template_name_space
+  				,template_provider
+  			)
+  		VALUES
+  			(
+  				#{productSeq}
+  				,#{templateId}
+  				,#{templateVcpus}
+  				,#{templateMem}
+  				,#{templatePod}
+  				,#{itemId}
+  				,#{cloudId}
+  				,#{templateName}
+  				,#{templateNameSpace}
+  				,#{templateProvider}
+  			)
+  	</insert>
+
+  	<insert id="containerInsert" parameterType="CustomBssProductVO">
+  		INSERT INTO bss_product_app
+  			(
+				  product_seq
+				, pod_cpu
+				, pod_mem
+				, pod_cnt
+				, image_type
+				, cloud_id
+  			)
+  		VALUES
+  			(
+				  #{productSeq}
+				, #{podCpu}
+				, #{podMem}
+				, #{podCnt}
+				, #{imageType}
+				, #{cloudId}
+  			)
+  	</insert>
+
+  	<!-- disk 등록 -->
+    <update id="diskInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_disk
+			(
+				product_seq,
+				disk_gb,
+				disk_type
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{diskDiskGb},
+				#{diskType}
+			)
+  	</update>
+  	<!-- os 등록 -->
+    <update id="nasInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_nas
+			(
+				product_seq,
+				nas_gb
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{nasGb}
+
+			)
+  	</update>
+  	<!-- os 등록 -->
+    <update id="ipInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_publicip
+			(
+				product_seq,
+				publicip_ea
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{publicipEa}
+
+			)
+  	</update>
+  	<!-- os 등록 -->
+    <update id="lbInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_loadbalancer
+			(
+				product_seq,
+				loadbalancer_ea
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{loadbalancerEa}
+
+			)
+  	</update>
+
+    <update id="envInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_env
+			(
+				product_seq,
+				env_ea
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{envEa}
+
+			)
+  	</update>
+  	<!-- os 등록 -->
+<!--
+    <update id="scmInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_scm
+			(
+				product_seq,
+				scm_ea
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{scmEa}
+
+			)
+  	</update>
+-->
+  	<!-- os 등록 -->
+<!--
+    <update id="bkInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_backup
+			(
+				product_seq,
+				backup_gb
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{backupGb}
+
+			)
+  	</update>
+-->
+  	<!-- os 등록 -->
+<!--
+    <update id="serInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_security
+			(
+				product_seq,
+				security_ea
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{securityEa}
+
+			)
+  	</update>
+-->
+  	<!-- os 등록 -->
+<!--
+    <update id="mcaInsert" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_mca
+			(
+				product_seq,
+				mca_ea
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{mcaEa}
+			)
+  	</update>
+-->
+
+  	<select id="getItemsPriceInfo" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+	  	<![CDATA[
+	  	SELECT
+
+	  			ITEM.item_id,
+				PRIC.hourly_price,
+				PRIC.monthly_price,
+				ITEM.quantity,
+				CAST(PRIC.hourly_price AS INTEGER)/CAST(ITEM.quantity  AS INTEGER) AS quantity_hourly,
+				CAST(PRIC.monthly_price AS INTEGER)/CAST(ITEM.quantity AS INTEGER) AS quantity_monthly
+
+			FROM	bill_product_catalog POLC,
+				bill_policy_item POIT,
+				bill_product ITEM,
+				bill_product_catalog_item PRIC
+			WHERE	POLC.apply_date = (
+					SELECT	MAX(A.apply_date)
+					FROM	bill_product_catalog A
+					WHERE	A.apply_date <= #{applyDate}
+					AND	A.del_flag = 'N'
+				)
+			AND	POLC.policy_seq = POIT.policy_seq
+			AND	POIT.item_id = ITEM.item_id
+			AND	ITEM.item_id IN (SELECT item_id FROM bill_product)
+			AND	POIT.policy_seq = PRIC.policy_seq
+			AND	POIT.item_id = PRIC.item_id
+			AND	POLC.del_flag = 'N'
+			]]>
+  	</select>
+
+
+  	<select id="getItemPriceInfo" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+	  	<![CDATA[
+	  	SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.hourly_price ELSE 0 END) cpu_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+				SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.hourly_price ELSE 0 END) mem_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+				SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) disk_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_quantity,
+
+				SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) san_disk_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) san_disk_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) san_disk_quantity,
+				SUM(CASE ITEM.item_id WHEN 'DISK011' THEN PRIC.hourly_price ELSE 0 END) sata_disk_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'DISK011' THEN PRIC.monthly_price ELSE 0 END) sata_disk_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'DISK011' THEN ITEM.quantity ELSE 0 END) sata_disk_quantity,
+				SUM(CASE ITEM.item_id WHEN 'DISK012' THEN PRIC.hourly_price ELSE 0 END) sas_disk_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'DISK012' THEN PRIC.monthly_price ELSE 0 END) sas_disk_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'DISK012' THEN ITEM.quantity ELSE 0 END) sas_disk_quantity,
+
+				SUM(CASE ITEM.item_id WHEN 'SERVICE010' THEN PRIC.hourly_price ELSE 0 END) service_account_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE010' THEN PRIC.monthly_price ELSE 0 END) service_account_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE010' THEN ITEM.quantity ELSE 0 END) service_account_quantity,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE011' THEN PRIC.hourly_price ELSE 0 END) service_security_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE011' THEN PRIC.monthly_price ELSE 0 END) service_security_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE011' THEN ITEM.quantity ELSE 0 END) service_security_quantity,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE012' THEN PRIC.hourly_price ELSE 0 END) service_backup_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE012' THEN PRIC.monthly_price ELSE 0 END) service_backup_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE012' THEN ITEM.quantity ELSE 0 END) service_backup_quantity,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE013' THEN PRIC.hourly_price ELSE 0 END) service_sw_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE013' THEN PRIC.monthly_price ELSE 0 END) service_sw_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE013' THEN ITEM.quantity ELSE 0 END) service_sw_quantity,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE014' THEN PRIC.hourly_price ELSE 0 END) service_disk_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE014' THEN PRIC.monthly_price ELSE 0 END) service_disk_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'SERVICE014' THEN ITEM.quantity ELSE 0 END) service_disk_quantity,
+
+				SUM(CASE ITEM.item_id WHEN 'VMIMGLIN100' THEN PRIC.hourly_price ELSE 0 END) vmimglin_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGLIN100' THEN PRIC.monthly_price ELSE 0 END) vmimglin_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGLIN100' THEN ITEM.quantity ELSE 0 END) vmimglin_quantity,
+
+				SUM(CASE ITEM.item_id WHEN 'VMIMGWIN200' THEN PRIC.hourly_price ELSE 0 END) vmimgwin_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGWIN200' THEN PRIC.monthly_price ELSE 0 END) vmimgwin_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGWIN200' THEN ITEM.quantity ELSE 0 END) vmimgwin_quantity,
+
+				SUM(CASE ITEM.item_id WHEN 'VMIMGWEB110' THEN PRIC.hourly_price ELSE 0 END) vmimgweb_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGWEB110' THEN PRIC.monthly_price ELSE 0 END) vmimgweb_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGWEB110' THEN ITEM.quantity ELSE 0 END) vmimgweb_quantity,
+
+				SUM(CASE ITEM.item_id WHEN 'VMIMGWAS120' THEN PRIC.hourly_price ELSE 0 END) vmimgwas_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGWAS120' THEN PRIC.monthly_price ELSE 0 END) vmimgwas_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGWAS120' THEN ITEM.quantity ELSE 0 END) vmimgwas_quantity,
+
+				SUM(CASE ITEM.item_id WHEN 'VMIMGDB130' THEN PRIC.hourly_price ELSE 0 END) vmimgwdb_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGDB130' THEN PRIC.monthly_price ELSE 0 END) vmimgwdb_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGDB130' THEN ITEM.quantity ELSE 0 END) vmimgwdb_quantity,
+
+				SUM(CASE ITEM.item_id WHEN 'VMIMGDEV140' THEN PRIC.hourly_price ELSE 0 END) vmimgwdev_hourly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGDEV140' THEN PRIC.monthly_price ELSE 0 END) vmimgwdev_monthly_price,
+				SUM(CASE ITEM.item_id WHEN 'VMIMGDEV140' THEN ITEM.quantity ELSE 0 END) vmimgwdev_quantity
+
+			FROM	bill_product_catalog POLC,
+				bill_policy_item POIT,
+				bill_product ITEM,
+				bill_product_catalog_item PRIC
+			WHERE	POLC.apply_date = (
+					SELECT	MAX(A.apply_date)
+					FROM	bill_product_catalog A
+					WHERE	A.apply_date <= #{applyDate}
+					AND	A.del_flag = 'N'
+				)
+			AND	POLC.policy_seq = POIT.policy_seq
+			AND	POIT.item_id = ITEM.item_id
+			AND	ITEM.item_id IN (SELECT item_id FROM bill_product)
+			AND	POIT.policy_seq = PRIC.policy_seq
+			AND	POIT.item_id = PRIC.item_id
+			AND	POLC.del_flag = 'N'
+			AND  POLC.cloud_id = #{cloudId}
+			]]>
+  	</select>
+
+	<!--
+  	 카탈로그 상세 탭 가상서버 리스트
+    <select id="getCatalogueProductList" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			CAPR.catalog_seq,
+			CAPR.display_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.image_path,
+			CAPR.image_name,
+			CAPR.description,
+			CAPR.display_order,
+			CAPR.display_flag,
+			VM.vcpus,
+			VM.mem_gb,
+			VM.disk_gb,
+			(((VM.vcpus / PRIC.cpu_quantity) * PRIC.cpu_hourly_price) + ((VM.mem_gb / PRIC.mem_quantity) * PRIC.mem_hourly_price) + ((VM.disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price)) hourly_price,
+			(((VM.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((VM.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((VM.disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price)) monthly_price
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			bss_product PROD,
+			bss_product_vm VM,
+			( 가격표
+				SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.hourly_price ELSE 0 END) cpu_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.hourly_price ELSE 0 END) mem_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) disk_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_quantity
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <![CDATA[<=]]> NOW()
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN ('CPU010', 'MEM010', 'DISK010')
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+			) PRIC
+		WHERE	CATA.catalog_seq =#{catalogSeq}
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.catalog_category = 'CATACATE_VM'
+		AND	CAPR.product_seq = PROD.product_seq
+		AND	PROD.product_category = 'PRODCATE_VM'
+		AND	PROD.product_seq = VM.product_seq
+		ORDER BY display_order ASC
+  	</select>
+
+  	 카탈로그 상세 탭 OS 리스트
+    <select id="getCatalogueProductOsList" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+	카탈로그 운영체제 목록
+	SELECT
+		CATA.catalog_seq ,
+		CAPR.product_seq,
+		CAPR.display_name,
+		PROD.product_name,
+		PROD.product_category,
+		PRODOS.item_id,
+		PRIC.item_name,
+		CAPR.display_order,
+		CAPR.display_flag,
+		PROD.del_flag,
+		PRIC.hourly_price,
+		PRIC.monthly_price
+	FROM	bss_product_catalog CATA,
+		bss_product_catalog_item CAPR,
+		bss_product PROD,
+		bss_product_os PRODOS,
+		(
+			SELECT
+
+				PRIC.policy_seq,
+				PRIC.item_id,
+				ITEM.item_name,
+				PRIC.hourly_price,
+				PRIC.monthly_price
+			FROM	bill_product_catalog POLC,
+				bill_policy_item POIT,
+				bill_product ITEM,
+				bill_product_catalog_item PRIC,
+				cmm_code cd
+			WHERE	POLC.apply_date = (
+					SELECT	MAX(A.apply_date)
+					FROM	bill_product_catalog A
+					WHERE	A.apply_date <![CDATA[<=]]> NOW()
+					AND	A.del_flag = 'N'
+				)
+			AND	POLC.policy_seq = POIT.policy_seq
+			AND	POIT.item_id = ITEM.item_id
+			AND	ITEM.item_category = cd.code_id
+			AND	POIT.policy_seq = PRIC.policy_seq
+			AND	POIT.item_id = PRIC.item_id
+			AND 	cd.parent_code_id = 'ITEMCATE_OS'
+		) PRIC
+
+	WHERE	CATA.catalog_seq = #{catalogSeq}
+	AND 	CATA.catalog_seq = CAPR.catalog_seq
+	AND	CAPR.catalog_category = 'CATACATE_OS'
+	AND	CAPR.product_seq = PROD.product_seq
+	AND	PROD.product_seq = PRODOS.product_seq
+	AND 	PRODOS.item_id = PRIC.item_id
+	ORDER BY display_order ASC
+  	</select>
+
+  	카탈로그 수정상세
+    <select id="catalogDetail" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+				*
+		 FROM
+		 	bss_product_catalog
+		WHERE
+			catalog_seq=#{catalogSeq}
+  	</select>
+  		카탈로그 가상서버 상세
+    <select id="productView" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		SELECT
+			a.product_seq
+			,display_name
+			,image_path
+			,catalog_category
+			,display_flag
+			,product_category
+			,product_name
+			,description
+			,display_order
+			,vcpus
+			,mem_gb
+			,disk_gb
+		FROM
+			bss_product_catalog_item a
+		INNER JOIN
+		(SELECT
+			a.product_seq
+			,product_name
+			,product_category
+			,vcpus
+			,mem_gb
+			,disk_gb
+		FROM
+			bss_product a
+		INNER JOIN
+			bss_product_vm b
+		ON
+			a.product_seq=b.product_seq) AS c
+		ON
+		 a.product_seq =#{productSeq}
+		AND catalog_category='CATACATE_VM'
+		AND display_flag ='Y'
+		AND a.product_seq=c.product_seq
+		GROUP BY a.product_seq
+  	</select>
+  		카탈로그 운영체제 상세
+
+
+  	가상서버 팝업 리스트
+    <select id="productPopList" parameterType="CustomBssProductVO" resultType="CustomBssProductVO">
+SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.vcpus,
+			PRO.mem_gb,
+			PRO.disk_gb
+		FROM
+		(SELECT
+			BPR.product_seq,
+			BPR.product_name,
+			BPR.product_category,
+			BPR.reg_user_id,
+			BPR.mod_datetime,
+			BPR.mod_user_id,
+			BPR.del_flag,
+			BVM.vcpus,
+			BVM.mem_gb,
+			BVM.disk_gb
+		FROM
+			bss_product BPR , bss_product_vm BVM
+		WHERE
+			BPR.product_seq = BVM.product_seq) PRO
+		LEFT JOIN
+		(SELECT
+			*
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_seq =#{catalogSeq}) CAT
+
+		ON
+			PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+		AND
+			PRO.product_category = 'PRODCATE_VM'
+  	</select>
+
+  	os 팝업 리스트
+
+  	카탈로그 등록
+    <update id="setCatalog" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_catalog
+			(
+				catalog_seq,
+				catalog_name,
+				apply_date,
+				reg_datetime,
+				reg_user_id
+			)
+		VALUES
+			(
+				#{catalogSeq},
+				#{catalogName},
+				#{applyDate},
+				NOW(),
+				#{regUserId}
+			)
+  	</update>
+
+   	카탈로그 프로덕트 등록
+    <update id="setCatalogProduct" parameterType="CustomBssProductVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				catalog_seq,
+				product_seq,
+				display_name,
+				image_path,
+				image_name,
+				description,
+				hot_badge,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				mod_datetime,
+				mod_user_id
+			)
+		VALUES
+			(
+				#{catalogSeq},
+				#{productSeq},
+				#{displayName},
+				#{imagePath},
+				#{imageName},
+				#{description},
+				#{hotBadge},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				#{regDatetime},
+				#{regUserId},
+				#{modDatetime},
+				#{modUserId}
+			)
+  	</update>
+  	  	카탈로그 수정
+    <update id="catalogUpdate" parameterType="CustomBssProductVO" >
+		UPDATE
+				bss_product_catalog
+		SET
+				catalog_name = #{catalogName},
+				apply_date = #{applyDate},
+				mod_datetime = NOW(),
+				mod_user_id = #{regUserId}
+		WHERE
+				catalog_seq = #{catalogSeq}
+  	</update>
+ 		카탈로그 복사 리스트 체크
+    <select id="getCopyCataloginfo" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+ 	<![CDATA[
+		SELECT
+			BCP.*
+		FROM
+			bss_product_catalog BC,bss_product_catalog_item BCP
+		WHERE
+			del_flag='N'
+		AND
+			BC.apply_date=
+			(
+			SELECT MAX(apply_date)
+			FROM
+			bss_product_catalog
+			WHERE catalog_seq=#{productSeq}
+			)
+		AND
+			BC.catalog_seq =BCP.catalog_seq
+		]]>
+  	</select>
+  	카탈로그 중복 리스트 체크
+     <select id="getCatalogCnt" resultType="int" parameterType="CustomBssProductVO">
+    	SELECT
+			COUNT(*)
+    	FROM bss_product_catalog
+    	WHERE apply_date = #{applyDate} AND del_flag = 'N'
+    </select>
+	카탈로그 등록 리스트 체크
+    <select id="getOldCataloginfo" resultType="CustomBssProductVO" parameterType="CustomBssProductVO">
+		<![CDATA[
+		SELECT
+			BCP.*
+		FROM
+			bss_product_catalog BC,bss_product_catalog_item BCP
+		WHERE
+			del_flag='N'
+		AND
+			BC.apply_date=
+			(
+			SELECT MAX(apply_date)
+			FROM
+			bss_product_catalog
+			WHERE apply_date <= #{applyDate}
+			)
+		AND
+			BC.catalog_seq =BCP.catalog_seq
+		]]>
+  	</select> 	 -->
+
+
+    <delete id="productDelete" parameterType="CustomBssProductVO" >
+		 	DELETE
+		 	   FROM bss_product
+            WHERE product_seq = #{productSeq}
+  	</delete>
+
+
+
+  	<delete id="vmDelete" parameterType="CustomBssProductVO" >
+		 	DELETE
+		 	   FROM bss_product_vm
+            WHERE product_seq = #{productSeq}
+  	</delete>
+
+  	<delete id="diskDelete" parameterType="CustomBssProductVO" >
+		 	DELETE
+		 	   FROM bss_product_disk
+            WHERE product_seq = #{productSeq}
+  	</delete>
+
+  	<delete id="seviceDelete" parameterType="CustomBssProductVO" >
+		 	DELETE
+		 	   FROM bss_product_service
+            WHERE product_seq = #{productSeq}
+  	</delete>
+
+  	<delete id="osDelete" parameterType="CustomBssProductVO" >
+		 	DELETE
+		 	   FROM bss_product_os
+            WHERE product_seq = #{productSeq}
+  	</delete>
+
+</mapper>

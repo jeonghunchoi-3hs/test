@@ -1,0 +1,1228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.App.OssAppDAO">
+
+	<select id="returnVoInfo" parameterType="CustomOssAppVO" resultType="CustomOssAppVO" >
+		SELECT *
+			FROM oss_app
+		WHERE app_uid = #{appUid}
+
+	</select>
+
+	<select id="appProjectlist" parameterType="CustomOssAppVO" resultType="CustomOssAppVO">
+
+    		SELECT
+				OV.*
+				, DATE_FORMAT(OV.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, DATE_FORMAT(OV.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+		    FROM
+		    (
+		    	SELECT
+			    		a.app_uid,
+			    		a.project_id,
+			    		a.app_name,
+			    		a.app_name_space,
+			    		a.app_alias,
+			    		a.create_datetime,
+			    		a.delete_datetime,
+			    		a.reg_datetime,
+			    		a.reg_user_id,
+			    		a.mod_datetime,
+			    		a.mod_user_id,
+			    		a.del_flag,
+			    		a.hourly_flag,
+			    		a.kind,
+			    		a.api_version,
+			    		a.template_product_seq,
+						a.template_catalog_seq,
+						oc.cloud_type,
+						oc.cloud_id,
+						oc.cloud_name,
+						prdt.vm_image_id 	as template_name,
+						a.os_product_seq 	as os_product_seq,
+						a.pod 				as pod,
+						a.cpu_limit 		as cpu_limit,
+						a.mem_limit 		as mem_limit,
+						a.cpu_req 			as cpu_req,
+						a.mem_req 			as mem_req,
+						(select count(*) as scale_cnt from oss_scale_out osscl where osscl.app_uid = a.app_uid and osscl.project_id = a.project_id AND osscl.del_flag = 'N') as scale_cnt,
+						osout.scale_out_name as scale_out_name
+	    	FROM oss_project_box opb
+	    	LEFT JOIN oss_project op 		ON opb.project_box_id = op.project_box_id
+	    	LEFT JOIN oss_app a 			ON op.project_id = a.project_id
+			LEFT JOIN oss_scale_out osout	ON osout.project_id = a.project_id AND osout.app_uid = a.app_uid AND osout.del_flag = 'N'
+	    	LEFT JOIN bss_product_os prdt 	ON a.os_product_seq = prdt.product_seq
+	    	LEFT JOIN oss_cloud oc 			ON op.cloud_id = oc.cloud_id
+	    	WHERE opb.project_box_id =  #{projectBoxId}
+	    	  AND a.del_flag = 'N'
+			ORDER BY a.app_alias
+	    ) OV
+	    WHERE 1=1
+    	<if test="searchKind == 'searchAll' and keyword != ''">
+	    	AND(
+		    	OV.app_name like CONCAT('%',#{keyword},'%')
+		    	OR
+		    	OV.app_alias like CONCAT('%',#{keyword},'%')
+	    	)
+    	</if>
+		<if test="searchKind == 'app_alias' and keyword != ''">
+			AND
+				oa.app_alias like CONCAT('%',#{keyword},'%')
+		</if>
+
+		<if test="searchKind == 'app_name' and keyword != ''">
+			AND
+				oa.app_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="pvAppList" parameterType="CustomOssAppVO" resultType="CustomOssAppVO">
+
+	SELECT
+		oa.app_uid,
+		oa.project_id,
+		oa.app_name,
+		oa.app_name_space,
+		oa.app_alias,
+		oa.pod,
+		oa.volume,
+		oa.create_datetime,
+		oa.expire_datetime,
+		oa.delete_datetime,
+		oa.reg_datetime,
+		oa.reg_user_id,
+		oa.mod_datetime,
+		oa.mod_user_id,
+		oa.del_flag,
+		oa.hourly_flag,
+		oa.api_version,
+		oa.order_product_seq,
+		oa.template_product_seq,
+		oa.template_catalog_seq,
+		oa.os_product_seq,
+		oa.image_id,
+		oa.description,
+		oa.pvc_yn,
+		oa.cpu_req,
+		oa.cpu_limit,
+		oa.mem_req,
+		oa.mem_limit,
+		oa.service_cnt,
+		oa.routes_cnt,
+		oa.builds_cnt,
+		oa.deployment_config_cnt,
+		op.cloud_id,
+		op.env_type
+	FROM
+		oss_app oa
+	LEFT JOIN oss_project op ON oa.project_id = op.project_id
+	WHERE 1=1
+	AND op.project_box_id = #{projectBoxId}
+	AND oa.del_flag = 'N'
+	AND oa.pvc_yn = 'N'
+
+		<if test="searchKind == 'app_uid' and keyword != ''">
+			AND
+				oa.app_uid like CONCAT('%',#{keyword},'%')
+		</if>
+
+		<if test="searchKind == 'app_name' and keyword != ''">
+			AND
+				oa.app_name like CONCAT('%',#{keyword},'%')
+		</if>
+
+    	<if test="searchKind == 'searchAll' and keyword != ''">
+	    	AND(
+		    	oa.app_name like CONCAT('%',#{keyword},'%')
+		    	OR
+		    	oa.app_uid like CONCAT('%',#{keyword},'%')
+	    	)
+    	</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="appDetail" parameterType="CustomOssAppVO" resultType="CustomOssAppVO">
+
+    		SELECT
+				OV.*
+				, DATE_FORMAT(OV.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, DATE_FORMAT(OV.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+		    FROM
+		    (
+		    	SELECT
+			    		a.app_uid,
+			    		a.project_id,
+			    		a.app_name,
+			    		a.app_name_space,
+			    		a.app_alias,
+			    		a.create_datetime,
+			    		a.delete_datetime,
+			    		a.reg_datetime,
+			    		a.reg_user_id,
+			    		a.mod_datetime,
+			    		a.mod_user_id,
+			    		a.del_flag,
+			    		a.hourly_flag,
+			    		a.kind,
+			    		a.api_version,
+			    		a.template_product_seq,
+						a.template_catalog_seq,
+						oc.cloud_type,
+						oc.cloud_id,
+						oc.cloud_name,
+						prdt.vm_image_id 	as template_name,
+						a.os_product_seq 	as os_product_seq,
+						a.pod 				as pod,
+						a.cpu_limit 		as cpu_limit,
+						a.mem_limit 		as mem_limit,
+						a.cpu_req 			as cpu_req,
+						a.mem_req 			as mem_req,
+						(select count(*) as scale_cnt from oss_scale_out osscl where osscl.app_uid = a.app_uid and osscl.project_id = a.project_id AND osscl.del_flag = 'N') as scale_cnt,
+						osout.scale_out_name as scale_out_name,
+						osout.scale_out_uid
+	    	FROM oss_project_box opb
+	    	LEFT JOIN oss_project op 		ON opb.project_box_id = op.project_box_id
+	    	LEFT JOIN oss_app a 			ON op.project_id = a.project_id
+			LEFT JOIN oss_scale_out osout	ON osout.project_id = a.project_id AND osout.app_uid = a.app_uid AND osout.del_flag = 'N'
+	    	LEFT JOIN bss_product_os prdt 	ON a.os_product_seq = prdt.product_seq
+	    	LEFT JOIN oss_cloud oc 			ON op.cloud_id = oc.cloud_id
+	    	WHERE a.app_uid = #{appUid}
+	    	  AND a.del_flag = 'N'
+			ORDER BY a.app_alias
+	    ) OV
+	    WHERE 1=1
+	</select>
+
+	<select id="appResouceTotal" parameterType="CustomOssAppVO" resultType="CustomOssAppVO">
+    		SELECT
+				OV.*
+		    FROM
+		    (
+		    	SELECT
+					IFNULL(FORMAT(SUM(a.pod), 0), 0)					AS pod_total,
+					IFNULL(FORMAT(SUM(a.volume), 0), 0)					AS volume_total,
+					IFNULL(FORMAT(SUM(a.service_cnt), 0), 0)			AS service_total,
+					IFNULL(FORMAT(SUM(a.routes_cnt), 0), 0)				AS routes_total,
+					IFNULL(FORMAT(SUM(a.builds_cnt), 0), 0) 			AS builds_total,
+					IFNULL(FORMAT(SUM(a.deployment_config_cnt), 0), 0) 	AS deployment_config_total
+	    	FROM oss_project_box opb
+	    	LEFT JOIN oss_project op 	   		ON opb.project_box_id = op.project_box_id
+	    	LEFT JOIN oss_app a 	    		ON op.project_id = a.project_id
+	    	LEFT JOIN bss_product_os prdt		ON a.os_product_seq = prdt.product_seq
+	    	LEFT JOIN oss_cloud oc 	    		ON op.cloud_id = oc.cloud_id
+	    	WHERE
+	    		opb.project_box_id =  #{projectBoxId}
+	    		AND a.del_flag = 'N'
+			ORDER BY
+				a.app_alias
+	    ) OV
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="ossAppByAppUid" parameterType="CustomOssAppVO" resultType="CustomOssAppVO">
+
+    		SELECT
+				OV.*
+				, DATE_FORMAT(OV.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, DATE_FORMAT(OV.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+		    FROM
+		    (
+		    	SELECT
+			    		a.app_uid,
+			    		a.project_id,
+			    		a.app_name,
+			    		a.app_name_space,
+			    		a.app_alias,
+			    		a.create_datetime,
+			    		a.delete_datetime,
+			    		DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime,
+			    		a.reg_user_id,
+			    		a.mod_datetime,
+			    		a.mod_user_id,
+			    		a.del_flag,
+			    		a.hourly_flag,
+			    		a.kind,
+			    		a.api_version,
+			    		a.template_product_seq,
+						a.template_catalog_seq,
+						oc.cloud_type,
+						a.pod,
+						oc.cloud_id,
+						oc.cloud_name,
+<!-- 						bpt.template_name, -->
+						IF(a.del_flag = 'N' ,'정상' ,'삭제') AS status,
+						opb.project_name,
+						opb.project_alias,
+						osout.scale_out_name as scale_out_name,
+						osout.scale_out_uid,
+						prdt.vm_image_id AS template_name
+	    	FROM oss_project_box opb
+	    	LEFT JOIN oss_project op ON opb.project_box_id = op.project_box_id
+	    	LEFT JOIN oss_app a ON a.project_id = op.project_id
+	    	LEFT JOIN bss_product_template bpt ON a.	template_product_seq = bpt.product_seq
+	    	LEFT JOIN oss_cloud oc ON op.cloud_id = oc.cloud_id
+	    	LEFT JOIN bss_order_product_app bopa  ON bopa.order_product_seq = a.order_product_seq
+	    	LEFT JOIN oss_scale_out osout	ON osout.project_id = a.project_id AND osout.app_uid = a.app_uid AND osout.del_flag = 'N'
+	    	LEFT JOIN bss_product_os prdt ON a.os_product_seq = prdt.product_seq
+	    	WHERE a.app_uid =  #{appUid}
+	    		AND a.del_flag = 'N'
+	    ) OV
+	</select>
+
+	<select id="getDetailOssApp" parameterType="CustomOssAppVO" resultType="CustomOssAppVO">
+
+    		SELECT
+				OA.*
+		    FROM
+		    (
+		    	SELECT
+			    		a.app_uid,
+			    		a.project_id,
+			    		a.app_name,
+			    		a.app_name_space,
+			    		a.app_alias,
+			    		a.create_datetime,
+			    		a.delete_datetime,
+			    		DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime,
+			    		a.reg_user_id,
+			    		a.mod_datetime,
+			    		a.mod_user_id,
+			    		a.del_flag,
+			    		a.hourly_flag,
+			    		a.kind,
+			    		a.api_version,
+			    		a.template_product_seq,
+						a.template_catalog_seq,
+						oc.cloud_type,
+						a.pod,
+						oc.cloud_id,
+						oc.cloud_name,
+						bpt.template_name,
+						IF(a.del_flag = 'N' ,'정상' ,'삭제') AS status,
+						opb.project_name,
+						opb.project_alias,
+						osout.scale_out_name as scale_out_name,
+						osout.scale_out_uid
+	    	FROM oss_project_box opb
+	    	LEFT JOIN oss_project op ON opb.project_box_id = op.project_box_id
+	    	LEFT JOIN oss_app a ON a.project_id = op.project_id
+	    	LEFT JOIN bss_product_template bpt ON a.	template_product_seq = bpt.product_seq
+	    	LEFT JOIN oss_cloud oc ON op.cloud_id = oc.cloud_id
+	    	LEFT JOIN bss_order_product_app bopa  ON bopa.order_product_seq = a.order_product_seq
+	    	LEFT JOIN oss_scale_out osout	ON osout.project_id = a.project_id AND osout.app_uid = a.app_uid AND osout.del_flag = 'N'
+	    	WHERE 1=1
+	    		AND a.app_name 		 =  #{appName}
+	    		AND a.app_name_space = #{appNameSpace}
+	    		AND a.project_id 	 = #{projectId}
+<!-- 	    		AND a.app_uid		= #{appUid} -->
+	    		AND a.del_flag = 'N'
+	    	ORDER BY create_datetime DESC
+	    ) OA
+	</select>
+
+	<insert id="insertAutoscaler" parameterType="CustomOssAppVO">
+
+			INSERT INTO
+			oss_autoscaler (
+				autoscaler_uuid,
+				autoscaler_name,
+				cloud_id,
+				project_id,
+				app_uid,
+				reg_datetime,
+				reg_user_id
+			)
+		VALUES
+			(
+				#{autoscalerUuid},
+				#{autoscalerName},
+				#{cloudId},
+				#{projectId},
+				#{appUid},
+				   NOW(),
+				#{regUserId}
+			)
+	</insert>
+
+	<insert id="insertScaleOut" parameterType="CustomOssAppVO">
+
+			INSERT INTO	oss_scale_out (
+					scale_out_uid,
+					project_id,
+					scale_out_name,
+					app_uid,
+					service_id,
+					hpa_division,
+					hpa_min,
+					hpa_max,
+					hpa_incre_pod,
+					hpa_min_pod,
+					hpa_max_pod,
+					hpa_continue,
+					reg_datetime,
+					reg_user_id
+				)
+			VALUES
+				(
+					#{scaleOutUid},
+					#{projectId},
+					#{scaleOutName},
+					#{appUid},
+					#{serviceId},
+					#{hpaDivision},
+					#{hpaMin},
+					#{hpaMax},
+					#{hpaIncrePod},
+					#{hpaMinPod},
+					#{hpaMaxPod},
+					#{hpaContinue},
+					NOW(),
+					#{regUserId}
+				)
+
+	</insert>
+
+    <select id ="scaleOutDetail"  parameterType="CustomOssAppVO" resultType="CustomOssAppVO">
+
+			SELECT *
+			FROM (
+					 SELECT
+						      OP.*
+						    , OPJ.cloud_id
+						    , OPJ.project_id
+							, OSO.scale_out_uid
+							, OSO.service_id
+							, OSO.scale_out_name
+							, OSO.hpa_min
+							, OSO.hpa_max
+							, OSO.hpa_min_pod
+							, OSO.hpa_max_pod
+							, OSO.hpa_incre_pod
+							, OSO.hpa_continue
+							, OSO.hpa_division
+						    , OC.cloud_name
+						    , OAPP.app_alias
+						    , OAPP.app_name
+						    , OAPP.app_name_space as name_space
+						    , PRD.product_name AS app_image_name
+			      FROM oss_project_box OP
+			INNER JOIN oss_project OPJ
+			 	    ON OP.project_box_id = OPJ.project_box_id
+			INNER JOIN oss_scale_out OSO
+			 	    ON OPJ.project_id = OSO.project_id
+			INNER JOIN oss_service OSS
+					ON OSO.service_id = OSS.service_id
+			INNER JOIN oss_app OAPP
+					ON OPJ.project_id = OAPP.project_id
+				   AND OAPP.app_uid = OSO.app_uid
+			INNER JOIN bss_product PRD
+					ON PRD.product_seq = OAPP.os_product_seq
+			INNER JOIN oss_cloud OC
+				 	    ON OPJ.cloud_id = OC.cloud_id
+			 WHERE 1=1
+			   AND OSO.scale_out_uid = #{scaleOutUid}
+			) TOT
+
+    </select>
+
+	<update id="scaleOutUpdate" parameterType="CustomOssAppVO">
+			UPDATE	oss_scale_out SET
+					scale_out_name	= #{scaleOutName},
+					hpa_min 			= #{hpaMin},
+					hpa_max 			= #{hpaMax},
+					hpa_min_pod   	= #{hpaMinPod},
+					hpa_max_pod   	= #{hpaMaxPod},
+					mod_datetime 	= now(),
+					mod_user_id   	= #{userId},
+					hpa_continue  	= #{hpaContinue},
+					hpa_incre_pod 	= #{hpaIncrePod},
+					hpa_division  		= #{hpaDivision}
+	       WHERE
+	       		scale_out_uid	= #{scaleOutUid}
+	</update>
+
+	<select id="batchSelectListCicdPipeline" parameterType="java.util.Map" resultType="BatchCicdPipelineVO">
+		SELECT
+			CICD.pipeline_id,
+			CICD.cicd_project_id,
+			CICD.app_uid,
+			CICD.app_name,
+			CICD.project_id,
+			CICD.cicd_request_type,
+			CICD.sync_app_status,
+			CICD.del_flag,
+			CICD.reg_user_id,
+			CICD.reg_datetime,
+			CICD.mod_user_id,
+			CICD.mod_datetime,
+			CICD.order_product_seq,
+			BOPA.template_product_seq,
+			BOPA.template_catalog_seq,
+			BOPA.os_product_seq,
+			BOPA.image_id,
+			OP.project_name,
+			OP.env_type,
+			OC.cloud_id,
+			OC.cloud_type
+		FROM
+			cicd_pipeline CICD
+		LEFT JOIN oss_project OP ON CICD.project_id = OP.project_id
+		LEFT JOIN oss_cloud OC ON OP.cloud_id = OC.cloud_id
+		LEFT JOIN bss_order_product_app BOPA ON CICD.order_product_seq = BOPA.order_product_seq
+<!-- 		<if test="syncAppStatus == 'SYNC_APP_READY' "> -->
+		WHERE
+			CICD.sync_app_status IN ('SYNC_APP_READY')
+<!-- 		</if> -->
+<!-- 			AND (CICD.reg_datetime <![CDATA[<=]]> #{applyDatetime} OR CICD.del_flag ='N') -->
+			AND CICD.reg_datetime <![CDATA[<=]]> #{applyDatetime}
+			AND CICD.del_flag ='N'
+		ORDER BY
+			CICD.reg_datetime desc, CICD.cicd_project_id
+	</select>
+
+	<update id="updateCicdPipelineStatus" parameterType="BatchCicdPipelineVO">
+		UPDATE	cicd_pipeline
+		SET	sync_app_status = #{syncAppStatus}
+				, mod_user_id= #{modUserId}
+				, mod_datetime = NOW()
+
+				<if test="appUid != null">
+				, app_uid = #{appUid}
+				</if>
+		WHERE	pipeline_id =  #{pipelineId}
+	</update>
+
+  	<insert id="insertOssApp" parameterType="CustomReqProductVO" >
+    	INSERT INTO	oss_app (
+				app_uid,
+				project_id,
+				app_name,
+				app_name_space,
+				app_alias,
+				create_datetime,
+				reg_datetime,
+				reg_user_id,
+				del_flag,
+				kind,
+				api_version,
+				order_product_seq,
+				template_product_seq,
+				template_catalog_seq,
+				pod,
+				cpu_req,
+				cpu_limit,
+				mem_req,
+				mem_limit,
+				volume,
+				os_product_seq,
+				image_id,
+				description,
+				pvc_yn,
+				service_cnt,
+				routes_cnt,
+				builds_cnt,
+				deployment_config_cnt,
+				app_version
+			)
+		VALUES
+			(
+				#{appUid},
+				#{projectId},
+				#{appName},
+				#{appNameSpace},
+				#{appName},
+				#{createDatetime},
+				NOW(),
+				#{regUserId},
+				'N',
+				#{kind},
+				#{apiVersion},
+				#{orderProductSeq},
+				#{templateProductSeq},
+				#{templateCatalogSeq},
+				#{pod},
+				#{cpuReq},
+				#{cpuLimit},
+				#{memReq},
+				#{memLimit},
+				#{volume},
+				#{osProductSeq},
+				#{imageId},
+				#{description},
+<!-- 				#{pvcYn}, -->
+				'N',
+				#{serviceCnt},
+				#{routesCnt},
+				#{buildsCnt},
+				#{deploymentConfigCnt},
+				#{appVersion}
+			);
+  	</insert>
+
+    <update id="deleteOssApp" parameterType="CustomReqProductVO" >
+		UPDATE
+			oss_app
+		SET
+			del_flag = 'Y'
+			, mod_datetime = NOW()
+			, mod_user_id = #{orderUserId}
+		WHERE
+			app_uid = #{appUid}
+  	</update>
+
+    <update id="updateOssAppVersion" parameterType="CustomReqProductVO" >
+		UPDATE
+			oss_app
+		SET
+			app_version = #{appVersion}
+			, mod_datetime = NOW()
+			, mod_user_id = #{orderUserId}
+		WHERE
+			app_uid = #{appUid}
+  	</update>
+
+  	<select id="projectEnvList" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+
+ 		SELECT	a.cicd_project_id,
+				a.group_id,
+				a.[name] AS cicd_project_name,
+				a.description,
+				a.project_box_id,
+				a.order_product_seq,
+				a.url,
+				a.visibility,
+				a.default_branch,
+				a.reg_datetime,
+				DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2,
+				a.reg_user_id,
+				a.mod_datetime,
+				a.mod_user_id,
+				a.del_flag,
+				a.environment_status,
+				b.project_name,
+				c.[name] AS cicd_group_name,
+				d.user_email,
+				f.alias AS dev_user_name
+			FROM cicd_project a
+   			INNER JOIN oss_project_box b
+	           ON a.project_box_id = b.project_box_id
+   			INNER JOIN cicd_group c
+               ON a.group_id = c.group_id
+
+            INNER JOIN (SELECT * FROM cicd_project_user WHERE access_level = '40') d
+   				ON a.cicd_project_id = d.cicd_project_id
+
+   			INNER JOIN cicd_user f
+   				ON d.cicd_user_id = f.user_id
+		WHERE
+			1=1
+		AND
+			a.project_box_id = #{projectBoxId}
+		<if test="cicdProjectId != '' and cicdProjectId != null">
+			AND C.cicd_project_id = #{cicdProjectId}
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+  	</select>
+
+  	<select id="mbrEnvDetailInfo" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+  		SELECT	a.cicd_project_id,
+				a.group_id,
+				a.[name] AS cicd_project_name,
+				a.description,
+				a.project_box_id,
+				a.order_product_seq,
+				a.url,
+				a.visibility,
+				a.default_branch,
+				a.reg_datetime,
+				DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2,
+				a.reg_user_id,
+				a.mod_datetime,
+				a.mod_user_id,
+				a.del_flag,
+				a.environment_status,
+				b.project_name,
+				c.[name] AS cicd_group_name,
+				c.path AS cicd_group_path
+		FROM cicd_project a
+   		INNER JOIN oss_project_box b
+	           ON a.project_box_id = b.project_box_id
+   		INNER JOIN cicd_group c
+               ON a.group_id = c.group_id
+		WHERE
+			1=1
+		AND
+			a.cicd_project_id = #{cicdProjectId}
+  	</select>
+
+  	<select id="mbrEnvUserList" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+  		SELECT
+			a.user_email
+			, a.token
+			, a.access_level
+			, b.user_id
+			, b.name
+			, b.alias
+			, b.password
+			, b.reg_datetime
+			, b.del_flag
+			, c.code_name
+		FROM cicd_project_user a
+		LEFT JOIN cicd_user b
+		ON a.user_email = b.user_email
+		LEFT JOIN cmm_code c
+		ON a.access_level = c.code_value
+		AND c.code_key_id = 'ENV_ACCESS_LEVEL'
+		WHERE
+			a.cicd_project_id = #{cicdProjectId}
+  	</select>
+
+  	<select id="mbrDevCicdPipelineList" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+			SELECT op.project_id
+				, op.project_alias
+				, op.project_name
+				, cip."url"
+				, cip.name AS envName
+				, cip.visibility AS envVisibilityLevel
+				, cip.reg_user_id
+				, cip.cicd_project_id
+				, cp.pipeline_id
+				, cp."ref"
+				, cp.app_name
+				, cpops."status"
+				, cpops.sync_app_status
+				, cpops.order_product_seq
+				, op.env_type
+				, cpops.env_application_version
+				, DATE_FORMAT(cpops.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+
+				, deploy.deploy_status
+				, production.production_status
+				, opb.project_box_id
+
+			FROM oss_project_box opb
+				LEFT JOIN oss_project op on
+					opb.project_box_id = op.project_box_id
+				INNER JOIN cicd_project cip on
+					op.project_box_id = cip.project_box_id
+				LEFT JOIN cicd_group cig on
+					cip.group_id = cig.group_id
+				INNER JOIN (select MAX(cipipe.pipeline_id) as pipeline_id ,
+											cipipe.cicd_project_id,
+											cipipe."ref",
+											cipipe.app_name ,
+											cipipe.project_id
+									from cicd_pipeline cipipe
+									where cipipe."status" = 'success' or cipipe."status" = 'fail'
+									group by
+										cipipe.cicd_project_id, cipipe."ref", cipipe.app_name, cipipe.project_id
+					) cp
+					ON cp.cicd_project_id = cip.cicd_project_id
+					AND op.project_id = cp.project_id
+				INNER JOIN cicd_pipeline cpops
+					ON cpops.cicd_project_id = cp.cicd_project_id
+					AND cpops.pipeline_id = cp.pipeline_id
+
+				LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS deploy_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_staging') deploy
+				ON deploy.cicd_project_id = cp.cicd_project_id
+				AND deploy.app_name = cp.app_name
+				AND deploy.env_application_version = cpops.env_application_version
+
+				LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS production_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_production') production
+				ON production.cicd_project_id = cp.cicd_project_id
+				AND production.app_name = cp.app_name
+				AND production.env_application_version = cpops.env_application_version
+
+			WHERE 1=1
+				AND op.env_type = 'DEV'
+				<if test="searchKind == 'projectAlias' and keyword != ''">
+				AND
+					op.project_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'projectName' and keyword != ''">
+				AND
+					op.project_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'envName' and keyword != ''">
+				AND
+					cip.name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'appName' and keyword != ''">
+				AND
+					cp.app_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'searchAll' and keyword != ''">
+				AND
+					(
+						op.project_alias like CONCAT('%',#{keyword},'%')
+						OR
+							op.project_name like CONCAT('%',#{keyword},'%')
+						OR
+							cip.name like CONCAT('%',#{keyword},'%')
+						OR
+							cp.app_name like CONCAT('%',#{keyword},'%')
+					)
+				</if>
+			GROUP BY cp.pipeline_id
+			ORDER BY cpops.reg_datetime DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+  	</select>
+
+  	<select id="mbrPrdCicdPipelineList" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+			SELECT
+				op.project_id ,
+				op.project_box_id ,
+				op.project_alias ,
+				op.project_name ,
+				op.env_type ,
+				cip."url" ,
+				cip.name as envName ,
+				cip.visibility as envVisibilityLevel ,
+				cip.reg_user_id ,
+				cp.cicd_project_id ,
+				dev_cp.pipeline_id ,
+				cp."ref" ,
+				cp.app_name ,
+				cp."status" ,
+				cp.sync_app_status ,
+				dev_cp.order_product_seq ,
+				cp.env_application_version ,
+				dev_cp.env_application_version as redeploy_dev_app_version,
+				DATE_FORMAT(cp.reg_datetime, '%Y-%m-%d %H:%i') as reg_datetime,
+				deploy.deploy_status,
+				production.production_status
+			FROM
+				(
+				SELECT
+					MAX(a.pipeline_id) as pipeline_id ,
+					a.cicd_project_id,
+					a."ref",
+					a.app_name ,
+					a.project_id,
+					a."status",
+					a.sync_app_status,
+					a.order_product_seq,
+					a.env_application_version,
+					a.reg_datetime
+				FROM (select tb_a.*
+						from cicd_pipeline tb_a, oss_project tb_b
+							where tb_a.project_id = tb_b.project_id
+							  and tb_b.env_type = 'PROD'
+							  and tb_a.sync_app_status != 'SYNC_APP_SKIP'
+					  ) a
+				GROUP BY a.cicd_project_id
+						, a."ref"
+						, a.app_name
+						, a.project_id
+						, a."status"
+						, a.sync_app_status
+						, a.order_product_seq
+						, a.env_application_version
+						, a.reg_datetime
+			) cp LEFT JOIN (
+					SELECT
+						MAX(a.pipeline_id) as pipeline_id
+						, a.cicd_project_id
+						, a."ref"
+						, a.app_name
+						, a.project_id
+						, a."status"
+						, a.sync_app_status
+						, a.order_product_seq
+						, a.env_application_version
+						, a.reg_datetime
+					FROM (select tb_a.* from cicd_pipeline tb_a, oss_project tb_b
+							where tb_a.project_id = tb_b.project_id
+							and tb_b.env_type = 'DEV'
+							and tb_a.sync_app_status = 'SYNC_APP_SUCCESS'
+							and tb_a.cicd_request_type = 'CICD_REQTYPE_REDEPLOY') a
+					GROUP BY
+						  a.cicd_project_id
+						, a."ref"
+						, a.app_name
+						, a.project_id
+						, a."status"
+						, a.sync_app_status
+						, a.order_product_seq
+						, a.env_application_version
+						, a.reg_datetime
+			) dev_cp ON cp.cicd_project_id = dev_cp.cicd_project_id and cp.app_name = dev_cp.app_name
+				LEFT JOIN oss_project op on op.project_id = cp.project_id
+				LEFT JOIN cicd_project cip on op.project_box_id = cip.project_box_id
+
+				LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS deploy_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_staging') deploy
+				ON deploy.cicd_project_id = cp.cicd_project_id
+				AND deploy.app_name = cp.app_name
+				AND deploy.env_application_version = dev_cp.env_application_version
+
+				LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS production_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_production') production
+				ON production.cicd_project_id = cp.cicd_project_id
+				AND production.app_name = cp.app_name
+				AND production.env_application_version = dev_cp.env_application_version
+
+			WHERE 1=1
+				<if test="searchKind == 'projectAlias' and keyword != ''">
+				AND
+					op.project_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'projectName' and keyword != ''">
+				AND
+					op.project_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'envName' and keyword != ''">
+				AND
+					cip.name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'appName' and keyword != ''">
+				AND
+					cp.app_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'searchAll' and keyword != ''">
+				AND
+					(
+						op.project_alias like CONCAT('%',#{keyword},'%')
+						OR
+							op.project_name like CONCAT('%',#{keyword},'%')
+						OR
+							cip.name like CONCAT('%',#{keyword},'%')
+						OR
+							cp.app_name like CONCAT('%',#{keyword},'%')
+					)
+				</if>
+			GROUP BY cp.cicd_project_id, cp.app_name, dev_cp.env_application_version
+			ORDER BY cp.reg_datetime DESC, dev_cp.env_application_version DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+  	</select>
+
+  	<select id="mbrPrdList" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+			SELECT op.project_id
+				, op.project_alias
+				, op.project_name
+				, cip.name AS envName
+				, cip."url"
+				, cip.reg_user_id
+				, cip.cicd_project_id
+				, cp.pipeline_id
+				, cp."ref"
+				, cp.app_name
+				, cpops."status"
+				, cpops.sync_app_status
+				, cpops.order_product_seq
+				, op.env_type
+				, cpops.env_application_version
+				, DATE_FORMAT(cpops.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+				, oa.app_uid
+
+				, deploy.deploy_status
+				, copy.copy_status
+				, production.production_status
+				, opb.project_box_id
+
+			FROM oss_project_box opb
+				LEFT JOIN oss_project op on
+					opb.project_box_id = op.project_box_id
+				INNER JOIN cicd_project cip on
+					op.project_box_id = cip.project_box_id
+				INNER JOIN oss_app oa on
+					oa.project_id = op.project_id
+					and oa.del_flag = 'N'
+				INNER JOIN (SELECT MAX(cipipe.pipeline_id) as pipeline_id ,
+									cipipe.app_uid,
+									cipipe.cicd_project_id,
+									cipipe."ref",
+									cipipe.app_name ,
+									cipipe.project_id
+							FROM cicd_pipeline cipipe
+							WHERE cipipe."status" = 'success' or cipipe."status" = 'fail'
+							GROUP BY
+								cipipe.app_uid, cipipe.cicd_project_id, cipipe."ref", cipipe.app_name, cipipe.project_id
+					) cp
+					ON cp.cicd_project_id = cip.cicd_project_id
+					AND op.project_id = cp.project_id
+					AND oa.app_uid = cp.app_uid
+				INNER JOIN cicd_pipeline cpops
+					ON cpops.cicd_project_id = cp.cicd_project_id
+					AND cpops.pipeline_id = cp.pipeline_id
+					AND oa.app_uid = cpops.app_uid
+
+				LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_b.[status] AS deploy_status FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_staging') deploy
+				ON deploy.cicd_project_id = cp.cicd_project_id
+				AND deploy.app_name = cp.app_name
+
+				LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_b.[status] AS copy_status FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'copy_staging_to_prod') copy
+				ON copy.cicd_project_id = cp.cicd_project_id
+				AND copy.app_name = cp.app_name
+
+				LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_b.[status] AS production_status FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_production') production
+				ON production.cicd_project_id = cp.cicd_project_id
+				AND production.app_name = cp.app_name
+
+			WHERE 1=1
+				AND op.env_type = 'DEV'
+				AND cpops.sync_app_status = 'SYNC_APP_SUCCESS'
+				AND cp.app_name not in (select app_name from cicd_pipeline where [ref] like ('prod%'))
+				<if test="searchKind == 'projectAlias' and keyword != ''">
+				AND
+					op.project_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'projectName' and keyword != ''">
+				AND
+					op.project_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'envName' and keyword != ''">
+				AND
+					cip.name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'appName' and keyword != ''">
+				AND
+					cp.app_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'searchAll' and keyword != ''">
+				AND
+					(
+						op.project_alias like CONCAT('%',#{keyword},'%')
+						OR
+							op.project_name like CONCAT('%',#{keyword},'%')
+						OR
+							cip.name like CONCAT('%',#{keyword},'%')
+						OR
+							cp.app_name like CONCAT('%',#{keyword},'%')
+					)
+				</if>
+			GROUP BY cp.pipeline_id
+			ORDER BY cpops.reg_datetime DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+  	</select>
+
+  	<select id="getPrdPipeLineDetail" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+		SELECT
+			a.cicd_project_id,
+			a.group_id,
+			b.pipeline_id,
+			b.app_name,
+			a.[name] as env_name,
+			a.description env_alias,
+			a.order_product_seq,
+			a.url,
+			a.visibility,
+			a.reg_datetime,
+			b."ref",
+			b."status",
+			b.sync_app_status,
+			b.project_id,
+			b.env_application_version,
+			c.app_alias,
+			c.pod_cnt,
+			c.flavor_id,
+			c.domain_url,
+			c.template_product_seq,
+			c.template_catalog_seq,
+			c.app_name,
+			c.cpu_req,
+			c.cpu_limit,
+			c.mem_req,
+			c.mem_limit,
+			c.git_repository,
+			c.deployment_port,
+			c.deploys_directory,
+			c.os_product_seq,
+			(SELECT display_name
+				FROM bss_product_catalog_item
+			WHERE catalog_category = 'CATACATE_OS'
+				AND product_seq = c.os_product_seq) as image_product_name,
+			c.image_id,
+			d.project_name,
+			d.project_alias,
+			e.image_type,
+			f.cloud_name,
+			f.cloud_type,
+			f.cloud_id,
+			(select project_id from oss_project where env_type = 'PROD' and d.project_box_id = project_box_id) as prod_project_id,
+			deploy.deploy_status,
+			copy.copy_status,
+			production.production_status,
+			before_success.order_product_seq AS before_order_product_seq
+		FROM
+			cicd_project a
+		INNER JOIN cicd_pipeline b ON a.cicd_project_id = b.cicd_project_id
+		INNER JOIN bss_order_product_app c ON b.order_product_seq = c.order_product_seq
+		INNER JOIN oss_project d ON c.project_id = d.project_id
+		INNER JOIN bss_product_app e ON c.template_product_seq = e.product_seq
+		INNER JOIN oss_cloud f ON d.cloud_id = f.cloud_id
+
+		LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS deploy_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_staging') deploy
+		ON deploy.cicd_project_id = b.cicd_project_id
+		AND deploy.app_name = b.app_name
+		AND deploy.env_application_version = b.env_application_version
+
+		LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS copy_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'copy_staging_to_prod') copy
+		ON copy.cicd_project_id = b.cicd_project_id
+		AND copy.app_name = b.app_name
+		AND copy.env_application_version = b.env_application_version
+
+		LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS production_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_production') production
+		ON production.cicd_project_id = b.cicd_project_id
+		AND production.app_name = b.app_name
+		AND production.env_application_version = b.env_application_version
+
+		LEFT JOIN (SELECT * FROM cicd_pipeline WHERE cicd_project_id = #{cicdProjectId} AND "ref" LIKE '%prod%' AND sync_app_status = 'SYNC_APP_SUCCESS' ORDER BY env_application_version DESC LIMIT 1) before_success
+		ON before_success.app_name = b.app_name
+
+		WHERE 1=1
+			AND a.cicd_project_id = #{cicdProjectId}
+			<choose>
+				<when test="orderProductSeq != '' and orderProductSeq != null">
+					AND b.order_product_seq = #{orderProductSeq}
+				</when>
+				<otherwise>
+					AND b.pipeline_id = #{pipelineId}
+				</otherwise>
+			</choose>
+		GROUP BY a.cicd_project_id
+  	</select>
+
+  	<select id="getPrdPipeLineVersion" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+  		SELECT
+			CASE WHEN EXISTS(
+				SELECT env_application_version FROM cicd_pipeline
+				WHERE cicd_project_id = #{cicdProjectId} AND app_name = #{appName}
+				AND env_application_version > (SELECT env_application_version FROM cicd_pipeline WHERE cicd_project_id = #{cicdProjectId} AND app_name = #{appName} AND order_product_seq = #{orderProductSeq})
+			) THEN 'Y'
+			ELSE 'N'
+			END AS after_version
+		FROM
+			cicd_project a
+		INNER JOIN cicd_pipeline b ON a.cicd_project_id = b.cicd_project_id
+
+		WHERE 1=1
+		AND a.cicd_project_id = #{cicdProjectId}
+		AND b.order_product_seq = #{orderProductSeq}
+		GROUP BY a.cicd_project_id
+  	</select>
+
+  	<select id="getDevPipeLineDetail" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+		SELECT
+			a.cicd_project_id,
+			a.group_id,
+			b.pipeline_id,
+			b.app_name,
+			a.[name] as env_name,
+			a.description env_alias,
+			a.order_product_seq,
+			a.url,
+			a.visibility,
+			a.reg_datetime,
+			b."ref",
+			b."status",
+			b.sync_app_status,
+			b.project_id,
+			b.env_application_version,
+			c.app_alias,
+			c.pod_cnt,
+			c.flavor_id,
+			c.domain_url,
+			c.template_product_seq,
+			c.template_catalog_seq,
+			c.app_name,
+			c.cpu_req,
+			c.cpu_limit,
+			c.mem_req,
+			c.mem_limit,
+			c.git_repository,
+			c.deployment_port,
+			c.deploys_directory,
+			c.os_product_seq,
+			(SELECT display_name
+				FROM bss_product_catalog_item
+			WHERE catalog_category = 'CATACATE_OS'
+				AND product_seq = c.os_product_seq) as image_product_name,
+			c.image_id,
+			d.project_name,
+			e.image_type,
+			f.cloud_name,
+			f.cloud_type,
+			f.cloud_id,
+			deploy.deploy_status,
+			copy.copy_status,
+			production.production_status
+
+		FROM
+			cicd_project a
+		INNER JOIN cicd_pipeline b ON a.cicd_project_id = b.cicd_project_id
+		INNER JOIN bss_order_product_app c ON b.order_product_seq = c.order_product_seq
+		INNER JOIN oss_project d ON c.project_id = d.project_id
+		INNER JOIN bss_product_app e ON c.template_product_seq = e.product_seq
+		INNER JOIN oss_cloud f ON d.cloud_id = f.cloud_id
+
+		LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS deploy_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_staging') deploy
+		ON deploy.cicd_project_id = b.cicd_project_id
+		AND deploy.app_name = b.app_name
+		AND deploy.env_application_version = b.env_application_version
+
+		LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS copy_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'copy_staging_to_prod') copy
+		ON copy.cicd_project_id = b.cicd_project_id
+		AND copy.app_name = b.app_name
+		AND copy.env_application_version = b.env_application_version
+
+		LEFT JOIN (SELECT tb_a.cicd_project_id , tb_a.app_name , tb_a.sync_app_status AS production_status , tb_a.env_application_version FROM cicd_pipeline tb_a , cicd_job tb_b WHERE tb_a.pipeline_id = tb_b.pipeline_id AND job_name = 'deploy_production') production
+		ON production.cicd_project_id = b.cicd_project_id
+		AND production.app_name = b.app_name
+		AND production.env_application_version = b.env_application_version
+
+		WHERE a.cicd_project_id = #{cicdProjectId}
+		AND b.pipeline_id = #{pipelineId}
+		GROUP BY a.cicd_project_id
+  	</select>
+
+  	<select id="getDevPipeLineVersion" parameterType="CustomReqProductVO" resultType="CustomReqProductVO">
+  		SELECT
+			CASE WHEN EXISTS(
+				SELECT env_application_version FROM cicd_pipeline
+				WHERE cicd_project_id = #{cicdProjectId} AND app_name = #{appName}
+				AND env_application_version > (SELECT env_application_version FROM cicd_pipeline WHERE cicd_project_id = #{cicdProjectId} AND app_name = #{appName} AND pipeline_id = #{pipelineId})
+			) THEN 'Y'
+			ELSE 'N'
+			END AS after_version
+		FROM
+			cicd_project a
+		INNER JOIN cicd_pipeline b ON a.cicd_project_id = b.cicd_project_id
+
+		WHERE a.cicd_project_id = #{cicdProjectId}
+		AND b.pipeline_id = #{pipelineId}
+		GROUP BY a.cicd_project_id
+  	</select>
+
+  	<select id="devAppIdChk" parameterType="CustomReqProductVO" resultType="Integer">
+		SELECT COUNT(*) FROM bss_order_product_app WHERE app_name = #{appName}
+	</select>
+
+	<select id="devUsersMailCheck" parameterType="CustomReqProductVO" resultType="Integer">
+		SELECT COUNT(*) FROM cicd_user WHERE user_email IN
+		<foreach item="item" index="index" collection="emailList" open="(" close=")" separator="," >
+			#{item}
+		</foreach>
+	</select>
+
+	<select id="devUsersNameCheck" parameterType="CustomReqProductVO" resultType="Integer">
+		SELECT COUNT(*) FROM cicd_user WHERE name IN
+		<foreach item="item" index="index" collection="nameList" open="(" close=")" separator="," >
+			#{item}
+		</foreach>
+	</select>
+
+</mapper>

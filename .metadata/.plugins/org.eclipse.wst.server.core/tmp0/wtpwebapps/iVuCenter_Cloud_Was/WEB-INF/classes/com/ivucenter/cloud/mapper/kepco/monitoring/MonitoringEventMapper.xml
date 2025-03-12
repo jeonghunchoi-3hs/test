@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hq.itrm.kepco.monitoring.event.MonitoringEventDAO">
+
+	<!-- ORACLE Query -->
+
+	<select id="list" parameterType="java.util.Map" resultType="CustomMonitoringEventVO" >
+		SELECT
+			EVT.*
+		FROM
+		(
+			SELECT '' HOSTNAME, '' hostname_alias from dual
+			<foreach collection="list" item="item">
+			UNION ALL
+			SELECT #{item.hostname} as hostname, #{item.hostnameAlias} as hostname_alias FROM DUAL
+			</foreach>
+		) HO,
+		(
+			SELECT
+			    DISTINCT OMROWID,
+			    IDENTIFIER,
+			    NODE,
+			    MANAGER,
+			    AGENT,
+			    ALERTGROUP,
+			    ALERTKEY,
+			    SEVERITY,
+			    CASE WHEN SEVERITY = 5 THEN '위험' WHEN SEVERITY = 4 THEN '사소' WHEN SEVERITY = 3 THEN '경고' WHEN SEVERITY = 1 THEN '무해' ELSE '미결정' END AS SEVERITY_NAME,
+			    SUMMARY,
+			    FIRSTOCCURRENCE,
+			    FIRSTOCCURTIME,
+			    LASTOCCURRENCE,
+			    LASTOCCURTIME,
+			    ACKNOWLEDGED,
+			    ITMDISPLAYITEM,
+			    IS_FAULT
+			FROM
+			    IVU.IVU_T_OMN_EVENT
+			WHERE
+			    LASTOCCURTIME BETWEEN (select to_char(sysdate -7, 'YYYYMMDDHH24MISS') from dual) AND (select to_char(sysdate, 'YYYYMMDDHH24MISS') from dual)
+		) EVT
+		WHERE
+			UPPER(HO.hostname) = UPPER(EVT.NODE)
+			<if test="searchKind == 'searchAll' and keyword != ''">
+    		AND (
+    			HO.hostname_alias  like CONCAT('%',#{keyword},'%')
+    			OR
+    			HO.hostname  like CONCAT('%',#{keyword},'%')
+    			)
+    		</if>
+
+		<if test="searchKind == 'hostname_alias' and keyword != ''">
+			AND
+				HO.hostname_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'hostname' and keyword != ''">
+			AND
+				HO.hostname like CONCAT('%',#{keyword},'%')
+		</if>
+    </select>
+
+    <select id="getEventSummaryCnt" parameterType="java.util.Map" resultType="CustomMonitoringEventVO" >
+    	SELECT
+	        NVL(SUM(CASE WHEN SEVERITY = 6 THEN 1 ELSE 0 END), 0) AS FATAL_CNT,
+	        NVL(SUM(CASE WHEN SEVERITY = 5 THEN 1 ELSE 0 END), 0) AS CRITICAL_CNT,
+	        NVL(SUM(CASE WHEN SEVERITY = 4 THEN 1 ELSE 0 END), 0) AS MAJOR_CNT,
+	        NVL(SUM(CASE WHEN SEVERITY = 3 THEN 1 ELSE 0 END), 0) AS MINOR_CNT,
+	        NVL(SUM(CASE WHEN SEVERITY = 2 THEN 1 ELSE 0 END), 0) AS WARING_CNT,
+	        NVL(SUM(CASE WHEN SEVERITY = 1 THEN 1 ELSE 0 END), 0) AS INTERMINATE_CNT,
+	        NVL(SUM(CASE WHEN SEVERITY = 0 THEN 1 ELSE 0 END), 0) AS CLEAR_CNT
+		FROM
+		(
+			SELECT '' HOSTNAME, '' hostname_alias from dual
+			<foreach collection="list" item="item" >
+			UNION ALL
+			SELECT #{item.hostname} as hostname, #{item.hostnameAlias} as hostname_alias FROM DUAL
+			</foreach>
+		) HO,
+		(
+			SELECT * FROM IVU.IVU_T_OMN_EVENT WHERE LASTOCCURTIME BETWEEN (select to_char(sysdate -7, 'YYYYMMDDHH24MISS') from dual) AND (select to_char(sysdate, 'YYYYMMDDHH24MISS') from dual)
+		) EVT
+		WHERE
+			UPPER(HO.hostname) = UPPER(EVT.NODE)
+    </select>
+
+</mapper>

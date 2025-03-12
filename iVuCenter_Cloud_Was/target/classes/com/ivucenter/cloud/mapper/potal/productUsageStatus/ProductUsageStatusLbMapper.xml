@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.productUsageStatus.lb.ProductUsageStatusLbDAO">
+ 	
+    <select id="list" parameterType="CustomProductUsageStatusLbVO" resultType="CustomProductUsageStatusLbVO">
+    	SELECT
+    		* 
+    	FROM(
+			SELECT 
+				CC3.company_name AS company_name
+				, CC.customer_id AS customer_id
+				, CC.customer_name AS customer_name
+				, OP.project_id
+				, OP.project_name 
+				, OP.project_alias
+				, OL.loadbalancer_name
+				, OL.hourly_flag
+				, OL.reg_datetime				
+			FROM (
+				SELECT
+					project_id
+					, loadbalancer_name
+					, IF(hourly_flag ='N', '월', '시간') AS hourly_flag
+					, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+				FROM oss_loadbalancer
+				WHERE del_flag = 'N'
+				AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				<if test="searchKey3 != '' ">
+					AND hourly_flag = #{searchKey3}		
+				</if>	
+			) OL
+			LEFT JOIN oss_project OP
+			ON OP.project_id = OL.project_id					
+			
+			LEFT JOIN cmm_customer CC
+			ON OP.customer_id=CC.customer_id
+			
+			LEFT JOIN cmm_company CC2
+			ON CC.ref_company_id = CC2.company_id
+			
+			LEFT JOIN cmm_company CC3
+			ON CC2.up_company_id = CC3.company_id
+								
+			WHERE 1=1
+			AND OP.project_id is not null
+			<if test="searchKey0 != '' ">
+				AND CC3.company_name = #{searchKey0}		
+			</if>
+			<if test="searchKey1 != '' ">
+				AND CC.customer_name = #{searchKey1}		
+			</if>		    	
+			<if test="searchKey2 != '' ">
+				AND OP.project_alias = #{searchKey2}		
+			</if>	
+    	) A
+		WHERE 1=1
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			A.project_alias like CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+    	<if test="searchKind == 'project_alias' and keyword != '' ">
+			AND A.project_alias like CONCAT('%',#{keyword},'%')	
+		</if> 
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 		
+	</select>
+	
+    <select id="total" parameterType="CustomProductUsageStatusLbVO" resultType="CustomProductUsageStatusLbVO">
+    	SELECT
+			COUNT(*) AS length
+    	FROM	(	
+					SELECT	*
+					FROM	(
+								SELECT 
+									OP.project_name
+									, OP.project_alias  
+								FROM (
+									SELECT
+										project_id 
+									FROM oss_loadbalancer
+									WHERE del_flag = 'N'
+									AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+									<if test="searchKey3 != '' ">
+										AND hourly_flag = #{searchKey3}		
+									</if>
+								) OL
+								LEFT JOIN oss_project OP
+								ON OP.project_id = OL.project_id					
+								
+								LEFT JOIN cmm_customer CC
+								ON OP.customer_id=CC.customer_id
+								
+								LEFT JOIN cmm_company CC2
+								ON CC.ref_company_id = CC2.company_id
+								
+								LEFT JOIN cmm_company CC3
+								ON CC2.up_company_id = CC3.company_id
+								
+								WHERE 1=1
+								AND OP.project_id is not null
+								<if test="searchKey0 != '' ">
+									AND CC3.company_name = #{searchKey0}		
+								</if>
+								<if test="searchKey1 != '' ">
+									AND CC.customer_name = #{searchKey1}		
+								</if>		    	
+								<if test="searchKey2 != '' ">
+									AND OP.project_alias = #{searchKey2}		
+								</if>	
+							) A
+					WHERE 1=1
+			    	<if test="searchKind == 'searchAll' and keyword != '' ">
+			    		AND (
+			    			A.project_alias like CONCAT('%',#{keyword},'%')
+			    			)
+			    	</if>
+			    	<if test="searchKind == 'project_alias' and keyword != '' ">
+						AND A.project_alias like CONCAT('%',#{keyword},'%')	
+					</if> 
+				) X
+		WHERE 1=1
+	</select>
+		
+</mapper>

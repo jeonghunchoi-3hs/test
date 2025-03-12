@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bss.product.MngBssProductOsDAO">
+  	
+  	<select id="productSeqReturn" resultType="CustomBssProductOsVO" parameterType="CustomBssProductOsVO">
+		SELECT 
+			a.product_seq
+		FROM bss_product_os AS a
+		WHERE vm_image_id = #{vmImageId}
+	</select>
+  	
+	<!-- Openstack Image List -->
+    <select id="list" resultType="CustomBssProductOsVO" parameterType="CustomBssProductOsVO">
+		SELECT
+			a.product_seq
+			,a.item_id
+			,a.vm_image_id
+			,a.vm_image_name
+			,a.image_alias
+			,a.image_range
+			,a.image_path
+			,a.image_size
+			,a.image_content
+			,a.image_format
+			,a.container_format
+			,b.product_name
+			,b.product_category
+			,(select code_name from cmm_code where code_id = b.product_category) as product_category_name
+			,b.mod_user_id
+			,b.mod_datetime
+			,(select item_name from bill_product where item_id = a.item_id) as item_name
+		FROM
+		 	bss_product_os a, (select * from bss_product where del_flag = 'N') b
+		WHERE 
+			a.product_seq = b.product_seq
+		<if test="searchKind == 'sItemName' and keyword != ''">
+		AND
+			(select item_name from bill_product where item_id = a.item_id) like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'sItemId' and keyword != ''">
+		AND
+			a.item_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'sVmImageId' and keyword != ''">
+		AND
+			a.vm_image_id like CONCAT('%',#{keyword},'%')
+		</if>
+				
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND
+			(
+			(select item_name from bill_product where item_id = a.item_id) like CONCAT('%',#{keyword},'%')
+			OR
+			a.item_id like CONCAT('%',#{keyword},'%')
+			OR
+			a.vm_image_id like CONCAT('%',#{keyword},'%')
+			)
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 		
+	
+	</select>
+   	  	
+	<!--카탈로그 관리 리스트-->
+    <select id="view" resultType="CustomBssProductOsVO" parameterType="CustomBssProductOsVO">
+		SELECT 
+			a.product_seq
+			,a.item_id
+			,a.vm_image_id
+			,a.vm_image_name
+			,a.image_alias
+			,a.image_range
+			,a.image_path
+			,a.image_size
+			,a.image_content
+			,a.image_format
+			,a.container_format
+			,b.product_name
+			,b.product_category
+				,(select code_name from cmm_code where code_id = b.product_category) as product_category_name
+				,(select item_name from bill_product where item_id = a.item_id) as item_name
+		 FROM
+		      bss_product_os a, bss_product b
+		 where 
+		      a.product_seq = b.product_seq
+		 AND 
+		 	a.product_seq=#{productSeq}	
+  	</select>
+  	
+  	<select id="listTot" resultType="Int" parameterType="CustomBssProductOsVO">
+		SELECT 
+			count(*)
+		 FROM
+		 	bss_product_os a, bss_product b
+		 WHERE 
+		 	a.product_seq = b.product_seq
+    </select>
+	
+	<!--  카탈로그 상세 -->
+    <select id="detail" resultType="CustomBssProductOsVO" parameterType="CustomBssProductOsVO">
+		SELECT 
+				*
+		 FROM 
+		 	bss_product
+		WHERE
+			product_seq=#{productSeq}
+  	</select>
+  	
+  	<!-- 이미지삭제 -->
+    <delete id="delete" parameterType="CustomBssProductOsVO">
+		DELETE FROM bss_product_os
+		product_seq = #{productSeq}	
+  	</delete>
+  	
+  	<!-- 상품-이미지 삭제 -->
+    <update id="productDelete" parameterType="CustomBssProductOsVO">
+		UPDATE bss_product
+		SET			
+			del_flag = 'Y' 
+		WHERE
+			product_seq = #{productSeq}	
+  	</update>
+  	
+	<!--  os 상품 상세 -->
+    <select id="osView" resultType="CustomBssProductOsVO" parameterType="CustomBssProductOsVO">
+		SELECT
+			a.product_seq, 
+			a.product_name,
+			a.product_category,
+			(SELECT code_name FROM cmm_code WHERE code_id =a.product_category)AS productCategoryName,
+			bi.item_name,
+			bi.unit,
+			bi.quantity,
+			bi.item_id
+		FROM
+			bss_product a
+		JOIN
+			(SELECT * FROM bss_product_os)AS os
+		ON 
+			a.product_seq= os.product_seq
+			AND a.product_seq=#{productSeq}
+		JOIN
+			(SELECT * FROM bill_product) AS bi
+		ON 
+			os.item_id=bi.item_id
+  	</select>
+  	
+	<!-- os 팝업 리스트  -->	
+	<select id="osPopList" parameterType="CustomBssProductOsVO" resultType="CustomBssProductOsVO">
+		SELECT 
+			*
+		FROM
+			bill_product bi
+		JOIN
+			(SELECT 
+			item_id
+			FROM
+			bss_product_os) AS bso
+		ON 
+			bi.item_id = bso.item_id
+  	</select>
+  	
+	<!-- 가상서버 상세 내용수정 -->
+    <update id="productUpdate" parameterType="CustomBssProductOsVO" >
+		UPDATE 
+			bss_product
+		SET
+			product_name=#{productName}
+		WHERE
+			product_seq = #{productSeq}
+  	</update>
+  	
+	<!-- 가상서버 os상세 내용수정 -->  	  	
+    <update id="osUpdate" parameterType="CustomBssProductOsVO" >
+		UPDATE 
+			bss_product_os
+		SET
+			image_alias 	= #{imageAlias},
+			image_content 	= #{imageContent},
+			item_id			= #{imageType}
+		WHERE
+			product_seq 	= #{productSeq}
+  	</update>
+  	
+  	<!--  가상서버 상품 상세 -->
+    <select id="pcList" resultType="CustomBssProductOsVO" parameterType="CustomBssProductOsVO">
+		SELECT 
+			code_name
+			,code_id
+			,code_value1
+		FROM
+			cmm_code
+		WHERE
+			parent_code_id=#{parentCodeId}
+  	</select>
+	
+	<!-- 상품 테이블에 이미지상품 등록 -->  	
+    <update id="productInsert" parameterType="CustomBssProductOsVO" >
+		INSERT INTO bss_product 
+			(
+				product_seq, 
+				product_name, 
+				product_category,
+				reg_datetime,
+				reg_user_id
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{imageAlias},
+				#{productCategory},
+				NOW(),
+				#{regUserId}
+				
+			)
+  	</update>
+
+	<!-- image 등록 -->
+    <update id="osInsert" parameterType="CustomBssProductOsVO" >
+		INSERT INTO bss_product_os 
+			(
+				product_seq, 
+				item_id, 
+				vm_image_id,
+				vm_image_name,
+				image_alias,
+				image_path,
+				image_range,
+				image_size,
+				image_format,
+				container_format,
+				image_content,
+				item_id
+				
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{itemId},
+				#{vmImageId},
+				#{vmImageName},
+				#{imageAlias},
+				#{imagePath},
+				#{imageRange},
+				#{imageSize},
+				#{imageFormat},
+				#{imageContainerFormat},
+				#{imageContent},
+				#{imageType}
+				
+			)
+  	</update>
+
+
+</mapper>

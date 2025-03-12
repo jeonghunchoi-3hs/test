@@ -1,0 +1,123 @@
+#----------------------------------------------------------#
+#---------------- iVu CLOUD DB(Cubrid) --------------------#
+#----------------------------------------------------------#
+
+# 디버깅모드
+#db.driverClassName=net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+# 배포모드
+db.driverClassName=cubrid.jdbc.driver.CUBRIDDriver
+
+# 디버깅모드
+#db.url=jdbc:log4jdbc:cubrid:100.1.221.207:33000:multiclouddb:::
+db.url=jdbc:log4jdbc:cubrid:192.168.100.101:33000:kcloud:::
+# 배포모드
+#db.url=jdbc:cubrid:100.1.221.207:30000:multiclouddb:::
+
+
+
+#db.url=jdbc:log4jdbc:cubrid:100.1.221.204:30000:cloud:::
+
+db.username=dba
+#db.password=Cubrid12#$
+db.password=passw0rd
+db.validationQuery=select 1 from db_root
+db.initialSize=10
+db.minIdle=10
+db.maxActive=100
+db.testWhileIdle=true
+db.testOnBorrow=true
+db.timeBetweenEvictionRunsMillis=30000
+db.minEvictableIdleTimeMillis=60000
+
+#---------------------------------------------------------#
+#-------------------- ITRM DB(Oracle) --------------------#
+#---------------------------------------------------------#
+itrm.db.driverClassName=net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+itrm.db.url=jdbc:log4jdbc:oracle:thin:@100.1.22.22:21152:ORKESMDB
+#itrm.db.driverClassName=oracle.jdbc.driver.OracleDriver
+#itrm.db.url=jdbc:oracle:thin:@100.1.22.22:21152:ORKESMDB
+itrm.db.username=eclouddb
+itrm.db.password=aaecloud.ekfEk=4fkaaa!!
+itrm.db.validationQuery=select 1 from dual
+itrm.db.initialSize=3
+itrm.db.minIdle=3
+itrm.db.maxActive=20
+itrm.db.testWhileIdle=true
+itrm.db.testOnBorrow=true
+itrm.db.timeBetweenEvictionRunsMillis=30000
+itrm.db.minEvictableIdleTimeMillis=60000
+
+#---------------------------------------------------------#
+#-------------------- INSA DB(Oracle) --------------------#
+#---------------------------------------------------------#
+insa.db.driverClassName=net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+insa.db.url=jdbc:log4jdbc:oracle:thin:@100.1.5.174:21152:DBA
+#insa.db.driverClassName=oracle.jdbc.driver.OracleDriver
+#insa.db.url=jdbc:oracle:thin:@100.1.5.174:21152:DBA
+insa.db.username=opnuser14
+insa.db.password=kzmffkdnem1$
+insa.db.validationQuery=select 1 from dual
+insa.db.initialSize=3
+insa.db.minIdle=3
+insa.db.maxActive=20
+insa.db.testWhileIdle=true
+insa.db.testOnBorrow=true
+insa.db.timeBetweenEvictionRunsMillis=30000
+insa.db.minEvictableIdleTimeMillis=60000
+
+#----------------------------------------#
+#------------OPENSTACK-------------------#
+#----------------------------------------#
+openStack.adminDomain=Default
+openStack.adminProject=admin
+openStack.adminUsername=admin
+openStack.adminPassword=ekfEk=4fka1!
+openStack.projectUsername=admin
+openStack.projectPassword=ekfEk=4fka1!
+openStack.apiGatewayServer=http://30.1.1.10:8280
+openStack.apiIdentityServer=http://30.1.1.10:5000/v3
+openStack.apiNetworkServer=http://30.1.1.10:9696/v2.0
+openStack.apiComputeServer=http://30.1.1.10:8774/v2.1
+openStack.apiMetricsServer=http://30.1.1.10:8041/v1
+openStack.apiVolumev3Server=http://30.1.1.10:8776/v3
+openStack.apiImagesServer=http://30.1.1.10:9292/v2
+openStack.apiAlarmsServer=http://30.1.1.10:8042
+
+#openStack.apiGatewayServer=http://168.78.241.246:8280
+#openStack.apiIdentityServer=http://168.78.241.246:5000/v3
+#openStack.apiNetworkServer=http://168.78.241.246:9696/v2.0
+#openStack.apiComputeServer=http://168.78.241.246:8774/v2.1
+#openStack.apiMetricsServer=http://168.78.241.246:8041/v1
+#openStack.apiVolumev3Server=http://168.78.241.246:8776/v3
+#openStack.apiImagesServer=http://168.78.241.246:9292/v2
+#openStack.apiAlarmsServer=http://168.78.241.246:8042
+
+
+openStack.alarmOccurredURL=http://192.168.30.124:80/alarm/open/[[instance_id]]/[[type]]/[[threadhold]]
+openStack.alarmClearURL=http://192.168.130.124:80/alarm/close/[[instance_id]]/[[type]]/[[threadhold]]
+
+
+#----------------------------------------#
+#----------- resources -------------------#
+#----------------------------------------#
+# 1. Local (Seperated config) 2. Server (Non Seperated config)
+#web.resources=http://localhost:8080/PORTAL_WEB/resources/
+web.resources=http://localhost:8080/resources/
+
+#----------------------------------------------------------------------------------------------------#
+#--------------------------------- iVu Center Cloud -------------------------------------------------#
+#----------------------------------------------------------------------------------------------------#
+# You Can On/Off Function
+fn.alarm=false
+
+SystemCalculator.vmCalculator = 4096
+SystemCalculator.cpuCalculator = 4
+SystemCalculator.memoryCalculator = 3
+
+openstack.isSSL=false
+Provisioning.sleepTime = 10000
+
+ansible.ansibleusername = admin
+ansible.ansiblepassword = kepco123$
+ansible.ansiblehost = https://100.1.221.220
+

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Delete resource &apos;iVuCenter_Cloud_Was/src/main/java/com/ivucenter/cloud/api/openshift/connector/OpenshiftTest.java&apos;" deleteContents="false" description="Delete resource &apos;iVuCenter_Cloud_Was/src/main/java/com/ivucenter/cloud/api/openshift/connector/OpenshiftTest.java&apos;" element1="/iVuCenter_Cloud_Was/src/main/java/com/ivucenter/cloud/api/openshift/connector/OpenshiftTest.java" flags="7" id="org.eclipse.ltk.core.refactoring.delete.resources" resources="1" stamp="1647933784139"/>
+</session>

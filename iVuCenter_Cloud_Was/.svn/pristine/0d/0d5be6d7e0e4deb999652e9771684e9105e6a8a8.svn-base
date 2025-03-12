@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.batch.resources.BatchInsaSystemDAO">
+
+	<insert id="createUserTmp">
+		create table cmm_user_tmp (
+			user_id 			varchar(50) not null,
+			user_name 			varchar(50),
+			user_level 			varchar(40),
+			dept_code 			varchar(50),
+			user_phone 			varchar(255),
+			user_tel 			varchar(255),
+			user_tel_ex 		varchar(255),
+			user_mail 			varchar(255),
+			user_condition 		varchar(10) default '',
+			user_condition_text varchar(50) default '',
+			constraint pk_cmm_user_tmp_user_id primary key (user_id)
+		) REUSE_OID, collate utf8_bin
+	</insert>
+	
+	<delete id="deleteUserTmp">
+		truncate table cmm_user_tmp
+	</delete>
+			
+	<select id="selectUserTbl" resultType="CustomCmmUserVO">
+		SELECT * 
+		FROM 
+		(
+			SELECT
+				row_number() over (order by a.empno) AS RN
+				, TRIM(a.empno) AS user_id
+				, TRIM(a.name) AS user_name
+				, TRIM(a.levelnm) AS user_level
+				, TRIM(a.deptno) AS dept_code
+				, TRIM(a.cellno) AS user_phone
+				, TRIM(a.mailno) AS user_mail
+				, TRIM(a.out_telno) AS user_tel
+				, TRIM(a.telno) AS user_tel_ex
+				, NVL(TRIM(b.zcode), '00') as user_condition
+				, NVL(TRIM(b.atext), ' ') as user_condition_text
+			FROM		user_tbl a		 
+			LEFT JOIN	PSNLGTINFO b
+				ON a.empno = b.pernr
+			order by a.empno
+		) 
+		WHERE RN <![CDATA[>]]> (#{_page}*#{_pagesize}) AND RN <![CDATA[<=]]> ((#{_page}+1)*#{_pagesize})
+	</select>
+	
+	<insert id="insertUserTmp" parameterType="CustomCmmUserVO">
+		INSERT INTO cmm_user_tmp (
+			user_id, user_name, user_level, dept_code, user_phone
+			, user_tel, user_tel_ex, user_mail, user_condition, user_condition_text
+		) VALUES (
+			#{userId}, #{userName}, #{userLevel}, #{deptCode}, #{userPhone}
+			, #{userTel}, #{userTelEx}, #{userMail}, #{userCondition}, #{userConditionText} 
+		)
+	</insert>
+	
+	<select id="selectUserTmp" resultType="CustomCmmUserVO">
+		SELECT * 
+		FROM 
+		(
+			SELECT 	row_number() over (order by CUT.user_id) AS RN, CUT.*
+			FROM cmm_user_tmp CUT
+			INNER JOIN cmm_user CU
+				ON CUT.user_id = CU.user_id
+			ORDER BY CUT.user_id
+		) 
+		WHERE RN <![CDATA[>]]> (#{_page}*#{_pagesize}) AND RN <![CDATA[<=]]> ((#{_page}+1)*#{_pagesize})
+	</select>
+	
+	<update  id="updateInsaUser" parameterType="CustomCmmUserVO">
+		UPDATE cmm_user
+		SET 
+			user_name 	= #{userName}
+			, user_level= #{userLevel}
+			, dept_code = #{deptCode}
+			, user_phone= #{userPhone}			
+			, user_mail = #{userMail}
+			, user_tel = #{userTel}
+			, user_tel_ex = #{userTelEx}
+			, user_condition = #{userCondition}
+			, user_condition_text = #{userConditionText}
+			, mod_user_id = 'BATCH_SYSTEM'
+			, mod_datetime= NOW()			
+		WHERE user_id = #{userId}
+	</update>
+	
+	
+	
+<!-- 	<select id="selectListJoinedUser" parameterType="CustomCmmUserVO" resultType="CustomCmmUserVO"> -->
+<!-- 		SELECT  -->
+<!-- 			* -->
+<!-- 		FROM  -->
+<!-- 			cmm_user -->
+<!-- 		WHERE  -->
+<!-- 			del_flag = 'N' -->
+<!-- 	</select> -->
+	
+<!-- 	<select id="selectListInsaUser" resultType="CustomCmmUserVO"> -->
+<!-- 		SELECT  -->
+<!-- 			a.*, -->
+<!-- 			NVL(b.zcode, '00') as user_condition, -->
+<!-- 			NVL(b.atext, ' ') as user_condition_text -->
+<!-- 		FROM  -->
+<!-- 		( -->
+<!--         	SELECT  -->
+<!-- 				ROW_NUMBER() OVER (ORDER BY a.empno) NUM -->
+<!-- 				, TRIM(a.empno) AS user_id -->
+<!-- 				, TRIM(a.name) AS user_name -->
+<!-- 				, TRIM(a.levelnm) AS user_level -->
+<!-- 				, TRIM(a.deptno) AS dept_code -->
+<!-- 				, TRIM(a.cellno) AS user_phone -->
+<!-- 				, TRIM(a.mailno) AS user_mail -->
+<!-- 				, TRIM(a.out_telno) AS user_tel -->
+<!-- 				, TRIM(a.telno) AS user_tel_ex -->
+<!-- 			FROM  -->
+<!-- 				user_tbl a -->
+<!-- 			<choose> -->
+<!-- 			<when test="joinedList.size !=0"> -->
+<!-- 			WHERE  -->
+<!-- 				empno IN -->
+<!-- 					<foreach collection="joinedList" item="item" separator="," open="(" close=")"> -->
+<!-- 						#{item.userId} -->
+<!-- 					</foreach>  -->
+<!-- 			</when> -->
+<!-- 			</choose> -->
+<!-- 			ORDER BY  -->
+<!-- 				a.empno -->
+<!-- 		) a LEFT OUTER JOIN PSNLGTINFO b -->
+<!-- 		ON -->
+<!--         a.user_id = b.pernr -->
+<!-- 	</select> -->
+	
+	
+	
+	
+	
+	
+	
+	<select id="selectListInsaDept" parameterType="CmmDepartmentVO" resultType="CmmDepartmentVO">
+		SELECT 
+			*
+		FROM 
+		(
+			SELECT 
+				row_number() over (order by dept_code) AS RN
+				, TRIM(dept_code) AS dept_code
+				, TRIM(dept_name) AS dept_name
+				, TRIM(up_code) AS up_code
+				, TRIM(dept_order) AS dept_order
+				, TRIM(manager) AS manager
+				, CASE WHEN TRIM(del_flag)='N' THEN null ELSE del_flag END AS del_flag
+			FROM
+				dept_tbl
+			order by dept_code
+		) 
+		WHERE RN <![CDATA[>]]> (#{_page}*#{_pagesize}) AND RN <![CDATA[<=]]> ((#{_page}+1)*#{_pagesize})
+	</select>
+	
+	<update id="insertInsaDept" parameterType="CmmDepartmentVO">
+		INSERT INTO cmm_department(
+			dept_code, 
+			dept_name, 
+			up_code, 
+			dept_order, 
+			manager, 
+			del_flag
+		)VALUES(
+			#{deptCode},
+			#{deptName},
+			#{upCode},			
+			#{deptOrder},
+			#{manager},
+			#{delFlag}
+		)
+		ON DUPLICATE KEY 
+		UPDATE
+			dept_name  = #{deptName},
+			up_code    = #{upCode},
+			dept_order = #{deptOrder},
+			manager    = #{manager},
+			del_flag   = #{delFlag}			
+	</update>
+
+	<update id="updateInsaDeptSetNull">
+		UPDATE cmm_department 
+		SET 
+			up_code = NULL 
+		WHERE 
+			dept_code = up_code	
+	</update>
+
+	<delete id="deleteInsaDeptNotUse">
+		DELETE FROM 
+			cmm_department 
+		WHERE 
+			dept_name IN ('교육','휴직','관내이동대기','관내이동','관내 이동대기','군휴직','연수휴직','육아휴직','장기휴가(휴직)','장기휴직','출산휴가및육아휴직','휴직(교육,군복무)','휴직(교육,군복무)및 퇴직예정','휴직(연수)','휴직, 장기교육','휴직. 병역','휴직.병역', '휴직/파견/장기교육','휴직원','휴직자','고객지원부 인턴','인턴','인턴사원','전력공급부 인턴','청년인턴')
+	</delete>
+	
+</mapper>

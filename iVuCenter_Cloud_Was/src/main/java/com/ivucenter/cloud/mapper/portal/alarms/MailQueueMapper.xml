@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.mail.queue.MailQueueDAO">
+
+    <select id="list" resultType="CustomMailQueueVO" parameterType="CustomMailQueueVO">
+    	SELECT 
+			*
+    	FROM mail_queue
+    	ORDER BY mail_seq DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+
+	<select id="detail" resultType="CustomMailQueueVO" parameterType="java.lang.String">
+    	SELECT 
+			*
+    	FROM mail_queue
+    	WHERE mail_seq = #{mailSeq}    	
+    </select>
+    
+    <select id="templateviewDetail" resultType="CustomMailQueueVO" parameterType="CustomMailQueueVO">
+    	SELECT 
+			*
+    	FROM mail_template
+    	WHERE template_id = #{templateId}    	
+    </select>
+    
+    <insert id="insert" parameterType="CustomMailQueueVO">
+   		INSERT INTO mail_queue (
+			template_id
+			, mail_seq
+			, title
+			, content
+			, sender_name
+			, sender_mail
+			, receiver_flg
+			, receiver_id
+			, receiver_name
+			, receiver_mail
+			, retry_count
+			, reg_datetime
+			, reg_user_id
+			, result_flg
+			, redirect_url
+		) values (
+			 #{templateId}
+			 , #{mailSeq}
+			 , #{title}
+			 , #{content}
+			 , #{senderName}
+			 , #{senderMail}
+			 , #{receiverFlg}
+			 , #{receiverId}
+			 , #{receiverName}
+			 , #{receiverMail}
+			 , 0
+			 , now()
+			 , #{regUserId}
+			 , 'N'
+			 , #{redirectUrl}
+		)
+    </insert>
+    
+    <update id="updateRetryCount" parameterType="CustomMailQueueVO">
+        UPDATE mail_queue SET
+			retry_count = retry_count + 1
+        WHERE mail_seq = #{mailSeq}    	
+    </update>
+    
+    <update id="updateResultFlag" parameterType="CustomMailQueueVO">
+        UPDATE mail_queue SET
+			result_flg = #{resultFlg}
+        WHERE mail_seq = #{mailSeq}    	
+    </update>
+    
+    <delete id="delete" parameterType="CustomMailQueueVO">
+    	DELETE FROM mail_queue 
+    	WHERE mail_seq = #{mailSeq}    	
+    </delete>
+    
+	<!-- 배치방식 변경으로 사용하지 않음 (selectMailQueueList 변경) -->
+    <select id="batchSelectList" resultType="MailQueueVO">
+    	SELECT 
+			*
+    	FROM mail_queue
+		LIMIT #{_skiprows}, #{_pagesize}
+    </select>
+    
+	<!-- 배치로 메일을 발송하기 위한 목록 가져오기 -->
+    <select id="selectMailQueueList" resultType="MailQueueVO">
+    	SELECT 
+			*
+    	FROM mail_queue
+    </select>
+    
+    <!-- 배치발송이 완료된 후에 이력으로 이동하고 삭제한다. -->
+    <delete id="batchDelete" parameterType="MailQueueVO">
+    	DELETE FROM mail_queue 
+    	WHERE mail_seq = #{mailSeq}
+    </delete>
+</mapper>

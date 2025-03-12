@@ -1,0 +1,507 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.cmm.user.CmmUserDAO">
+    
+    <select id="listByCustomer" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+    	SELECT 
+			*
+    	FROM cmm_user      	
+    	where customer_id = #{customerId} 
+    </select>
+
+	
+	<select id="list" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+		SELECT * 
+		FROM (
+	    	SELECT  
+	    		CC.customer_name
+				, CD.dept_name
+				, CD.dept_name_only
+				, CU.*
+			FROM 	cmm_user CU
+			INNER JOIN cmm_customer CC
+					ON CU.customer_id = CC.customer_id
+			INNER JOIN (SELECT dept_code
+							   , SYS_CONNECT_BY_PATH(TRIM(dept_name), '<![CDATA[/]]>') AS dept_name
+							   , dept_name AS dept_name_only
+						FROM   cmm_department
+						WHERE del_flag != 'Y'
+						START WITH up_code IS null
+						CONNECT BY PRIOR dept_code=up_code
+						ORDER SIBLINGS BY dept_code) CD
+					on CU.dept_code = CD.dept_code
+			WHERE CU.del_flag = 'N'
+		) A
+		WHERE 	1=1
+		<if test="searchKind == 'user_id' and keyword != ''">
+			AND
+				A.user_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'user_name' and keyword != ''">
+			AND
+				A.user_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'dept_name_only' and keyword != ''">
+			AND
+				A.dept_name_only like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'customer_name' and keyword != ''">
+			AND
+				A.customer_name like CONCAT('%',#{keyword},'%')
+		</if>   	
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+				A.customer_name like CONCAT('%',#{keyword},'%')
+				or A.user_id like CONCAT('%',#{keyword},'%')
+				or A.user_name like CONCAT('%',#{keyword},'%')
+				or A.dept_name_only like CONCAT('%',#{keyword},'%')
+				
+			)
+		</if>		
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+	
+	
+	<select id="detail" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+    	SELECT 
+			*
+    	FROM cmm_user
+		WHERE user_id = #{userId}    	
+    </select>
+	
+	<!-- 
+	<select id="detail" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+    	SELECT 
+			b.customer_name
+			, c.company_name
+			, a.* 
+		FROM cmm_user a
+			, cmm_customer b
+			, cmm_company c
+		WHERE a.customer_id = b.customer_id
+		AND b.ref_company_id = c.company_id;   	
+    </select>
+	 -->
+	
+	<select id="loginChk" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+    	SELECT 
+			*
+    	FROM cmm_user
+		WHERE user_id = #{userId}    	
+    </select>    
+  
+	<select id="userRoleCheck" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+    	SELECT 
+    		project_member_role 
+    	FROM 
+    		oss_project_member 
+    	WHERE 
+    		user_id = #{userId}
+    </select>
+    
+    <select id="userPmCheck" resultType="int" parameterType="CustomCmmUserVo">
+    	SELECT 
+    		count(*) 
+    	FROM 
+    		oss_project 
+    	WHERE 
+    		project_manager_id = #{userId}
+    </select>    
+    
+    <select id="userPasswordCheck" resultType="int" parameterType="CustomCmmUserVo">
+    	SELECT 
+    		count(*) 
+    	FROM 
+    		cmm_user 
+    	WHERE 
+    		user_id = #{userId} AND
+    		user_password = #{userPassword}
+    </select>     
+    <!--   
+    <select id="userInfoDetail" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+		SELECT 
+			a.*
+			, b.customer_name
+		FROM cmm_user a 
+		LEFT JOIN (SELECT customer_name, customer_id FROM cmm_customer) b
+		ON a.customer_id = b.customer_id
+		WHERE a.user_id = #{userId}	   	
+    </select>
+     -->
+      
+    <select id="userInfoDetail" resultType="CustomCmmUserVo" parameterType="String">
+		SELECT 			
+				CC.customer_name		        
+	            , CD.dept_name
+	            , CD.dept_name_only
+	            , CD.dept_code		
+				, CU.*
+				, (select code_value from cmm_code where code_name = cu.user_level) as user_level_code
+		FROM 	cmm_user CU
+		INNER JOIN cmm_customer CC
+				ON CU.customer_id = CC.customer_id
+		LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD
+				ON CU.dept_code = CD.dept_code							
+		WHERE CU.user_id = #{value}	   	
+    </select>
+    
+    <insert id="insert" parameterType="CustomCmmUserVo">
+   		INSERT INTO cmm_user (
+			user_id
+			, user_name
+			, user_password			
+			, customer_id
+			, dept_code
+			, user_phone
+			, user_tel
+			, user_tel_ex
+			, user_mail
+			, sms_recv_flag
+			, mail_recv_flag			
+			, pwd_mod_datetime
+			, pwd_init_flag			
+			, reg_datetime
+			, reg_user_id			
+			, del_flag
+			, user_status 
+			, user_cloud_authority
+		) values (
+			#{userId, jdbcType=VARCHAR}
+			, #{userName, jdbcType=VARCHAR}
+			, #{userPassword, jdbcType=VARCHAR}			
+			, #{customerId, jdbcType=VARCHAR}
+			, #{deptCode, jdbcType=VARCHAR}
+			, #{userPhone, jdbcType=VARCHAR}
+			, #{userTel, jdbcType=VARCHAR}
+			, #{userTelEx, jdbcType=VARCHAR}
+			, #{userMail, jdbcType=VARCHAR}
+			, #{smsRecvFlag, jdbcType=VARCHAR}
+			, #{mailRecvFlag, jdbcType=VARCHAR}
+			, NOW()
+			, #{pwdInitFlag, jdbcType=VARCHAR}			
+			, NOW()
+			, #{regUserId, jdbcType=VARCHAR}			
+			, #{delFlag, jdbcType=VARCHAR}
+			, 'USER_USING' 
+			, '111'
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomCmmUserVo">
+        UPDATE cmm_user SET
+			user_name=#{userName, jdbcType=VARCHAR}
+			, user_password=#{userPassword, jdbcType=VARCHAR}			
+			, customer_id=#{customerId, jdbcType=VARCHAR}
+			, dept_code=#{deptCode, jdbcType=VARCHAR}
+			, user_phone=#{userPhone, jdbcType=VARCHAR}
+			, user_tel=#{userTel, jdbcType=VARCHAR}
+			, user_tel_ex=#{userTelEx, jdbcType=VARCHAR}
+			, user_mail=#{userMail, jdbcType=VARCHAR}
+			, sms_recv_flag=#{smsRecvFlag, jdbcType=VARCHAR}
+			, mail_recv_flag=#{mailRecvFlag, jdbcType=VARCHAR}
+			, pwd_mod_datetime=#{pwdModDatetime, jdbcType=VARCHAR}
+			, pwd_init_flag=#{pwdInitFlag, jdbcType=VARCHAR}
+			, user_status=#{userStatus, jdbcType=VARCHAR}
+			, reg_datetime=#{regDatetime, jdbcType=VARCHAR}
+			, reg_user_id=#{regUserId, jdbcType=VARCHAR}
+			, mod_datetime=#{modDatetime, jdbcType=VARCHAR}
+			, mod_user_id=#{modUserId, jdbcType=VARCHAR}
+			, del_flag=#{delFlag, jdbcType=VARCHAR}        
+        WHERE user_id=#{userId, jdbcType=VARCHAR}
+    </update>
+
+    <update id="userInfoUpdate" parameterType="CustomCmmUserVo">
+        UPDATE cmm_user SET			
+			user_phone=#{userPhone}
+			, user_tel=#{userTel}
+			, user_tel_ex=#{userTelEx}
+			, user_mail=#{userMail}
+			, dept_code=#{deptCode}
+			, user_level=#{userLevel}			
+			, sms_recv_flag=#{smsRecvFlag}
+			, mail_recv_flag=#{mailRecvFlag}
+			, mod_datetime=now()
+			, mod_user_id=#{modUserId}
+        WHERE user_id=#{userId}
+    </update>
+    
+    <update id="userInfoUpdatepw" parameterType="CustomCmmUserVo">
+        UPDATE cmm_user SET
+			user_password=#{userPassword}
+			, mod_user_id=#{userId}			
+			, mod_datetime=now()			
+			, pwd_mod_datetime=NOW()
+			, pwd_init_flag=#{pwdInitFlag}
+			, password_fail_cnt = 0
+        WHERE user_id=#{userId}
+    </update>
+    
+    <update id="blockUpdate" parameterType="CustomCmmUserVo">
+        UPDATE cmm_user SET
+			user_block=#{userBlock}
+        WHERE user_id=#{userId}
+    </update>
+    
+    <update id="setUserPasswordReset" parameterType="CustomCmmUserVo">
+    	UPDATE cmm_user SET
+			pwd_init_flag = 'Y',
+			user_password = #{userPassword},
+			pwd_mod_datetime = NOW(),
+			password_fail_cnt = 0,
+			user_status = 'USER_USING' 
+        WHERE user_id=#{userId}
+    </update>
+    
+    <delete id="delete" parameterType="CustomCmmUserVo">
+    	DELETE FROM cmm_user 
+        WHERE user_id=#{userId}
+    </delete>
+    
+    
+    <select id="getUserInfoByName" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+    	SELECT 
+    		*    		
+		FROM 
+			cmm_user
+		WHERE 
+			user_name = #{userName}
+		<if test="searchKind != '' and keyword != ''">
+		  AND 
+		    <choose>
+		      <when test="keyword2 != ''">
+		        (#{searchKind} = #{keyword} or #{searchKind} = #{keyword2})
+		      </when>
+		      <otherwise>
+		      	#{searchKind} = #{keyword} 
+		      </otherwise>
+		    </choose>
+		</if>			   	
+    </select>
+    
+     <select id="getUserInfoById" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+    	SELECT 
+    		*    		
+		FROM 
+			cmm_user
+		WHERE 
+			user_id = #{userId}
+		<if test="searchKind != '' and keyword != ''">
+		  AND 
+		  	<choose>
+		      <when test="keyword2 != ''">
+		        (#{searchKind} = #{keyword} or #{searchKind} = #{keyword2})
+		      </when>
+		      <otherwise>
+		      	#{searchKind} = #{keyword} 
+		      </otherwise>
+		    </choose>
+		</if>	   	
+    </select>
+    
+    
+    
+    
+    <!-- 사용자 신청  아이디 중복체크 -->
+    <select id="setMbrFormchk" parameterType="CustomCmmUserVo" resultType="int">
+		SELECT 	
+			COUNT(user_id)		 
+		FROM 
+			cmm_user 
+		where user_id=#{userId}	
+		  AND del_flag = 'N'  
+  	</select>
+    
+    <!-- 회원사 목록조회 -->
+  	<select id="selectCustomerList" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO" >
+  		SELECT
+			a.customer_id
+			, a.customer_name 
+		FROM 
+			cmm_customer a			
+		WHERE 1=1		
+		<if test="keyword != '' ">
+		AND 
+			customer_name LIKE CONCAT('%',#{keyword},'%')	
+		</if>		
+  	</select>
+  	
+  	<!-- 사용자 신청 내용입력 -->
+    <insert id="setMbrForminsert" parameterType="CustomCmmUserVO" >
+    	INSERT INTO  cmm_user 
+		(
+			user_id
+			, user_name
+			, user_password 
+			, customer_id 
+			, dept_code
+			, user_phone 
+			, user_tel
+			, user_tel_ex  
+			, user_mail
+			, sms_recv_flag
+			, mail_recv_flag
+			, reg_datetime
+			, user_authority				
+			, user_status
+		)
+		VALUES
+		(
+			#{userId}, 
+			#{userName}, 
+			#{userPassword},
+			#{customerId}, 
+			#{deptCode},
+			#{userPhone}, 
+			#{userTel}, 
+			#{userTelEx},
+			#{userMail}, 
+			#{smsRecvFlag},
+			#{mailRecvFlag} 
+			NOW(),
+			'0000000000000001',				
+			,'USER_USING'
+		)
+  	</insert>
+  	
+  	<select id="getTempPw" parameterType="String" resultType="String">
+  		SELECT content FROM mail_queue WHERE reg_user_id=#{userId}
+  	</select>
+ 	
+  	<!-- 사용자관리용 사용자 정보 수정-->
+    <select id="updateUserCustomer" parameterType="String" resultType="CustomCmmUserVO">
+		UPDATE cmm_user 
+		SET
+			customer_id =#{customerId}
+			, dept_code =#{deptCode}
+			, user_name = #{userName}
+			, user_phone= #{userPhone}
+			, user_tel  = #{userTel}
+			, user_tel_ex = #{userTelEx}
+			, sms_recv_flag = #{smsRecvFlag}
+			, mail_recv_flag = #{mailRecvFlag}
+			, nhwith_recv_flag = #{nhwithRecvFlag}
+			, mod_datetime = now()
+			, mod_user_id = #{modUserId}
+        WHERE 
+        	user_id=#{userId}
+  	</select>
+  	
+  	<update id="loginOk" parameterType="CustomCmmUserVo">
+    	UPDATE cmm_user 
+    	SET
+			last_login_datetime = NOW()
+			, password_fail_cnt = 0
+        WHERE 
+        	user_id=#{userId}
+    </update>
+  	
+  	<update id="failPassword" parameterType="CustomCmmUserVo">
+    	UPDATE cmm_user 
+    	SET
+			password_fail_cnt = password_fail_cnt+1
+        WHERE 
+        	user_id=#{userId}
+    </update>  	
+  	
+  	<select id="worklist" parameterType="CustomCmmUserVO" resultType="CustomCmmUserVO">
+		SELECT
+			*
+		FROM 
+			cmm_user
+		WHERE 
+			SUBSTRING(user_authority, 3, 1) = '1' 
+	</select> 
+	
+	<select id="loginAdminDetail" resultType="CustomCmmUserVO">
+		SELECT 
+			TRIM(CD.dept_name) AS dept_name
+			, CU.*
+		FROM  
+			cmm_user CU
+		INNER JOIN 
+			cmm_department CD
+		ON CU.dept_code = CD.dept_code
+		
+		WHERE 
+			SUBSTRING(user_authority, 6, 1) = '1' 
+	</select> 
+	
+	<select id="loginUserApproveYn" resultType="CustomCmmUserVo" parameterType="CustomCmmUserVo">
+		SELECT
+			IF(SUBSTRING(user_authority, 6, 1) = '1', 'Y', 'N') AS confirm_action
+		FROM 
+			cmm_user
+	  	WHERE 
+	  		user_id = #{userId}	   	
+    </select>
+  	
+  	<select id="searchUserInfo" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+	 	SELECT 
+			ROW_NUMBER() OVER (ORDER BY a.empno) NUM
+			, TRIM(a.empno) AS user_id
+			, TRIM(a.name) AS user_name
+			, TRIM(a.levelnm) AS user_level
+			, TRIM(a.deptno) AS dept_code
+			, (SELECT DEPT_NAME FROM dept_tbl WHERE DEPT_CODE = TRIM(a.deptno) ) AS dept_name
+			, TRIM(a.cellno) AS user_phone
+			, TRIM(a.mailno) AS user_mail
+			, TRIM(a.out_telno) AS user_tel
+			, TRIM(a.telno) AS user_tel_ex
+		FROM
+			user_tbl a
+		WHERE
+			1=1
+			<if test="searchKind == 'userId' and keyword != ''">
+			and empno like CONCAT('%' || #{keyword},'%')
+			</if>
+			<if test="searchKind == 'userName' and keyword != ''">
+			and name like CONCAT('%' || #{keyword},'%')
+			</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			and ( empno like '%' || #{keyword} || '%' OR name like '%' || #{keyword} || '%' )
+			</if>
+	</select>
+	
+  	<select id="selectUserCloudCuthority" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	 			 SELECT SUBSTRING(user_cloud_authority,#{cloudCountSeq},1), user_id AS user_id FROM cmm_user LIMIT 0, 1
+	 			 
+	</select>
+	
+	<select id="userCloudAuthupdate" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	 			 UPDATE cmm_user set
+                 user_cloud_authority = CONCAT(IF(user_cloud_authority = '', '' ,user_cloud_authority),#{userCloudAuths})
+	</select>
+	
+<!-- 	ip check 추가 -->
+	<select id="getUserInfo" parameterType="String" resultType="CustomCmmUserVO">
+		SELECT
+			*
+		FROM
+			cmm_user
+		WHERE
+			user_id = #{userId}
+	</select>	
+	
+	<select id="userIpCheck" parameterType="CustomCmmUserVO" resultType="Integer">
+		SELECT
+			COUNT(*)
+		FROM
+			cmm_user_ip
+		WHERE
+			user_id = #{userId}
+		AND 
+			ip = #{ip}
+	</select>	
+	
+</mapper>

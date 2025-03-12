@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bss.discount.BssDiscountDAO">
+ 	<!-- 
+     <select id="bssDiscountList" resultType="CustomMngBssDiscountVO" parameterType="CustomMngBssDiscountVO">
+    	SELECT 
+			discount_seq, 
+			FLOOR(discount_rate) discount_rate, 			
+			apply_date, 
+			reg_datetime, 
+			reg_user_id, 
+			mod_datetime, 
+			mod_user_id, 
+			del_flag, 
+			project_id 
+    	FROM bss_discount     
+    	where del_flag = 'N' and project_id = #{projectId}	
+    	order by apply_date desc 	
+    </select>
+   
+    <update id="setBssDiscount" parameterType="CustomMngBssDiscountVO" >
+		INSERT INTO bss_discount 
+			(
+				discount_seq, 
+				discount_rate, 
+				apply_date, 
+				reg_datetime, 
+				reg_user_id, 
+				mod_datetime, 
+				mod_user_id, 				
+				project_id
+			)
+		VALUES
+			(
+				#{discountSeq}, 
+				#{discountRate}, 
+				#{applyDate}, 
+				now(), 
+				#{regUserId}, 
+				now(), 
+				#{modUserId}, 
+				#{projectId}
+			)
+  	</update> 
+  	
+  	<select id="getBssDiscountCnt" resultType="int" parameterType="CustomMngBssDiscountVO">
+    	SELECT 
+			COUNT(*) 
+    	FROM bss_discount 
+    	WHERE apply_date = #{applyDate} 
+    	AND project_id = #{projectId}
+    	AND del_flag = 'N'
+    </select>
+    
+    <update id="setBssDiscountDel" parameterType="CustomMngBssDiscountVO" >
+		UPDATE bss_discount 
+		SET
+			mod_datetime = now(), 
+			mod_user_id = #{modUserId}, 
+			del_flag = #{delFlag} 		
+		WHERE 
+			discount_seq = #{discountSeq}
+  	</update>
+
+    <update id="setBssDiscountEdit" parameterType="CustomMngBssDiscountVO" >
+		UPDATE bss_discount 
+		SET
+			mod_datetime = now(), 
+			mod_user_id = #{modUserId}, 
+			discount_rate = #{discountRate},
+			apply_date  = #{applyDate}		
+		WHERE 
+			discount_seq = #{discountSeq}
+  	</update> -->
+  	
+  	<select id="list" resultType="CustomBssDiscountVO" parameterType="CustomBssDiscountVO">
+		SELECT
+			*
+		FROM(
+			SELECT
+				CC3.company_name AS company_name
+				, CC.customer_id AS customer_id
+				, CC.customer_name AS customer_name
+				, OP.project_id
+				, OP.project_name
+				, OP.project_alias	
+				, IFNULL(BD.discount_rate, '0') AS discount_rate
+			FROM (SELECT * FROM oss_project WHERE delete_flag = 'N') OP
+			LEFT JOIN cmm_customer CC
+			ON OP.customer_id=CC.customer_id
+			
+			LEFT JOIN cmm_company CC2
+			ON CC.ref_company_id = CC2.company_id
+			
+			LEFT JOIN cmm_company CC3
+			ON CC2.up_company_id = CC3.company_id
+			
+			LEFT JOIN (
+				SELECT 
+					* 
+				FROM(
+					SELECT 
+						* 
+					FROM bss_discount 
+					WHERE apply_date <![CDATA[<=]]> NOW() 
+					ORDER BY project_id, apply_date DESC 
+				)BD
+				GROUP BY BD.project_id
+			)BD
+			ON OP.project_id = BD.project_id
+		) A
+		WHERE 1=1
+		<if test="searchKind == 'company_name' and keyword != ''">
+			AND
+				A.company_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'customer_name' and keyword != ''">
+			AND
+				A.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				A.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND(
+				A.company_name LIKE  CONCAT('%',#{keyword},'%')
+				OR 
+				A.customer_name LIKE  CONCAT('%',#{keyword},'%')
+				OR
+				A.project_alias LIKE  CONCAT('%',#{keyword},'%')
+			)
+		</if> 		
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+				ORDER BY A.apply_date DESC
+			</if>
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 		
+    </select>
+    
+    <select id="detail" resultType="CustomBssDiscountVO" parameterType="CustomBssDiscountVO">
+		SELECT
+			a.* 
+			, (SELECT user_name FROM cmm_user WHERE user_id=a.reg_user_id) AS reg_user_name
+			, IFNULL(discount_rate, '0') AS discount_rate
+			, IF(apply_date <![CDATA[<=]]> NOW(), 'N', 'Y') AS gbn
+			, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2 
+		FROM bss_discount a
+		WHERE project_id = #{projectId}
+		<if test="applyDate != '' ">
+			AND apply_date = #{applyDate}	
+		</if>
+		<if test="discountSeq != '' ">
+			AND discount_seq <![CDATA[<>]]> #{discountSeq}	
+		</if>
+		ORDER BY project_id, apply_date DESC
+    </select>    
+    
+    <insert id="insert" parameterType="CustomBssDiscountVO" >
+		INSERT INTO bss_discount 
+			(
+				discount_seq, 
+				discount_rate, 
+				apply_date, 
+				reg_datetime, 
+				reg_user_id, 
+				project_id
+			)
+		VALUES
+			(
+				#{discountSeq}, 
+				#{discountRate}, 
+				#{applyDate}, 
+				now(), 
+				#{regUserId}, 
+				#{projectId}
+			)
+  	</insert>
+  	
+  	<delete id="delete" parameterType="CustomBssDiscountVO">
+    	delete from bss_discount
+    	WHERE discount_seq = #{discountSeq}
+		AND apply_date <![CDATA[>]]> NOW()  
+    </delete>    
+    
+    <update id="update" parameterType="CustomBssDiscountVO" >
+		UPDATE bss_discount 
+		SET
+			apply_date = #{applyDate},
+			discount_rate = #{discountRate},
+			mod_datetime = now(), 
+			mod_user_id = #{modUserId} 
+		WHERE discount_seq = #{discountSeq}
+  	</update>
+</mapper>

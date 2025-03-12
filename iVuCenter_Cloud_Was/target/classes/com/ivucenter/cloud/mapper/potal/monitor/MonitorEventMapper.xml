@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.monitor.event.MonitorEventDAO">
+
+	<select id="list" resultType="CustomMonitorEventVO" parameterType="CustomMonitorEventVO">
+		SELECT 
+			EA.event_id
+			, EA.vm_id
+			, EA.item_type
+			, EA.threadhold
+			, EA.event_cnt
+			, EA.reg_datetime
+			, DATE_FORMAT(EA.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2 
+			, OD.disk_alias
+		FROM (
+			SELECT
+				*
+			FROM event_alarm
+			WHERE state = #{state}
+		) EA
+		JOIN (
+			SELECT
+				*
+			FROM oss_disk
+			WHERE project_id = #{projectId}
+		)
+		OD
+		WHERE EA.vm_id = OD.vm_uuid
+
+    </select>
+
+</mapper>

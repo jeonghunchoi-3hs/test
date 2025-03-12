@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.sms.template.SmsTemplateDAO">
+
+    <select id="list" resultType="CustomSmsTemplateVO" parameterType="CustomSmsTemplateVO">
+    	SELECT 
+			*
+			, DATE_FORMAT(S.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2
+			, C.user_name
+		FROM sms_template S
+		
+		LEFT OUTER JOIN cmm_user C
+		ON S.mod_user_id = C.user_id
+		
+    	WHERE 1=1
+    	<if test="searchKind == 'tempId' and keyword != ''">
+    		AND S.template_id LIKE CONCAT('%',#{keyword},'%')
+    	</if>
+    	<if test="searchKind == 'title' and keyword != ''">
+    		AND S.title LIKE CONCAT('%',#{keyword},'%')
+    	</if>
+    	<if test="searchKind == 'searchAll' and keyword != ''">
+    		AND (
+    			S.template_id LIKE CONCAT('%',#{keyword},'%')
+    			OR
+    			S.title LIKE CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+    	ORDER BY S.template_id DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+
+	<select id="detail" resultType="CustomSmsTemplateVO" parameterType="CustomSmsTemplateVO">
+    	SELECT 
+			S.*
+			, DATE_FORMAT(S.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2
+			, C.user_name
+    	FROM sms_template S
+    	
+    	LEFT OUTER JOIN cmm_user C
+		ON S.mod_user_id = C.user_id    	
+
+    	WHERE S.template_id = #{templateId}
+    </select>
+    
+    <insert id="insert" parameterType="CustomSmsTemplateVO">
+   		INSERT INTO sms_template (
+			template_id
+			, title
+			, message
+			, reg_datetime
+			, reg_user_id
+			, mod_datetime
+			, mod_user_id
+			, del_flag
+		) values (
+			#{templateId}
+			, #{title}
+			, #{message}
+			, #{regDatetime}
+			, #{regUserId}
+			, #{modDatetime}
+			, #{modUserId}
+			, #{delFlag}
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomSmsTemplateVO">
+        UPDATE sms_template SET
+			title = #{title}
+			, message = #{message}
+			, mod_datetime = NOW()
+			, mod_user_id = #{modUserId}
+			, del_flag = #{delFlag}
+        WHERE template_id = #{templateId}	
+    </update>
+    
+</mapper>

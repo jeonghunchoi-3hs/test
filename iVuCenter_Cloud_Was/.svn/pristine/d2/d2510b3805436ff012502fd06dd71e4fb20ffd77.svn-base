@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bbs.notice.BbsNoticeDAO">
+ 	
+ 	<!-- 공지사항 리스트 -->
+    <select id="list" parameterType="CustomBbsNoticeVO" resultType="CustomBbsNoticeVO">
+    	select
+    		*
+    	from(
+			select 
+				a.notice_no
+				, a.notice_type
+				, a.title
+				, a.content
+				, a.hit_count
+				, a.disp_sdate
+				, a.disp_edate
+				, a.reg_datetime
+				, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2 /* 등록 일시*/
+				, a.reg_user_id
+				, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+				, a.mod_datetime
+				, a.mod_user_id
+				, a.del_flag
+				,(SELECT code_name FROM cmm_code WHERE  code_id=a.notice_type AND code_key_id='NOTICE_TYPE' ) AS code_name
+			from
+				bbs_notice a
+	    	where a.del_flag <![CDATA[<>]]> 'Y'
+	    	) b
+	    	where 1=1
+			<if test="searchKind == 'title' and keyword != ''">
+			and 
+				b.title like CONCAT('%',#{keyword},'%')	
+			</if>
+			<if test="searchKind == 'content' and keyword != ''">
+			and 
+				b.content like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			and (
+				b.title like CONCAT('%',#{keyword},'%')
+			or 
+				b.content like CONCAT('%',#{keyword},'%')
+				)	
+			</if>	    	
+	
+             ORDER BY b.code_name, b.notice_no desc
+
+	
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 			
+	</select>
+	
+	
+	<!-- 공지사항 상세조회 -->
+    <select id="detail" parameterType="CustomBbsNoticeVO" resultType="CustomBbsNoticeVO">
+		select 
+			a.notice_no
+			, a.notice_type
+			, a.title
+			, a.content
+			, a.hit_count
+			, a.disp_sdate
+			, a.disp_edate
+			, a.reg_datetime
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+			, a.reg_user_id
+			, a.mod_datetime
+			, a.mod_user_id
+			, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+			, a.del_flag
+			,(SELECT code_name FROM cmm_code WHERE  code_id=a.notice_type AND code_key_id='NOTICE_TYPE' ) AS code_name
+		from
+			bbs_notice a
+		where 
+			a.notice_no = #{noticeNo}
+		order by a.notice_no desc
+	</select>
+	
+	<!-- 공지사항 상세조회 변경전-->
+    <select id="detail_old" parameterType="CustomBbsNoticeVO" resultType="CustomBbsNoticeVO">
+		select 
+			a.notice_no
+			, a.notice_type
+			, a.title
+			, a.content
+			, a.hit_count
+			, disp_sdate
+			, disp_edate
+			, a.reg_datetime
+			, a.reg_user_id
+			, a.mod_datetime
+			, a.mod_user_id
+			, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+			, a.del_flag
+			,(SELECT code_name FROM cmm_code WHERE  code_id=a.notice_type AND code_key_id='NOTICE_TYPE' ) AS code_name
+		from
+			bbs_notice a
+		where 
+			a.notice_no = #{noticeNo}
+		order by a.notice_no desc
+	</select>
+
+	<!-- 대시보드 표시용 최근 공지사항조회 -->
+    <select id="getCurrentNotice" parameterType="CustomBbsNoticeVO" resultType="CustomBbsNoticeVO">
+		select 
+			notice_no
+			, notice_type
+			, title
+			, content
+			, hit_count
+			, disp_sdate
+			, disp_edate
+			, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+			, reg_user_id
+			, mod_datetime
+			, mod_user_id
+			, del_flag
+			,(SELECT code_name FROM cmm_code WHERE  code_id=notice_type AND code_key_id='NOTICE_TYPE' ) AS code_name
+		from
+			bbs_notice
+		order by notice_no desc
+		LIMIT 0, 1
+	</select>
+
+  	<!-- 공지사항 등록 -->
+  	<insert id="insert" parameterType="CustomBbsNoticeVO" >
+  		insert into bbs_notice(
+			notice_type             
+			, title                   
+			, content                
+			, disp_sdate              
+			, disp_edate              
+			, reg_datetime        
+			, reg_user_id         
+			, del_flag                
+  		)values(
+			#{noticeType} 
+			,#{title}      
+			,#{content}	  
+			,#{dispSdate}  
+			,#{dispEdate}  
+			,NOW()
+			,#{regUserId}  
+			,#{delFlag}    
+  		)
+  	</insert>
+  	
+  	<!-- 공지사항 수정 -->
+  	<update id="update" parameterType="CustomBbsNoticeVO" >
+  		update 
+  			bbs_notice 
+  		set
+			notice_type = #{noticeType} 
+			, title = #{title}      
+			, content = #{content}	   
+			, disp_sdate = #{dispSdate}  
+			, disp_edate = #{dispEdate}  
+			, mod_datetime = NOW()
+			, mod_user_id = #{modUserId}  
+			, del_flag = #{delFlag}    
+  		where
+  			notice_no = #{noticeNo}
+  	</update>
+  	
+  	<update id="delete" parameterType="CustomBbsNoticeVO">
+		UPDATE bbs_notice 
+		SET			
+			del_flag = 'Y' 
+		WHERE
+		notice_no = #{noticeNo}	
+  	</update>
+
+	<!-- 조회수 업데이트 -->
+	<update id="updateHitCount" parameterType="CustomBbsNoticeVO">
+		update 
+			bbs_notice 
+		set
+			hit_count = hit_count + 1
+		where
+			notice_no = #{noticeNo}		
+	</update>
+	
+	<!-- 타입 코드 리스트-->
+    <select id="bbsCodeList" parameterType="String" resultType="CustomBbsNoticeVO">
+	SELECT 	code_id, 
+		code_name 
+	FROM 
+		cmm_code 
+	where code_key_id=#{codeKeyId} and parent_code_id=#{codeKeyId}
+	order by code_id asc
+  	</select>
+
+</mapper>

@@ -1,0 +1,454 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" 	uri="http://java.sun.com/jsp/jstl/core"%>
+<%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt"%>
+<%@ taglib prefix="fn" 	uri="http://java.sun.com/jsp/jstl/functions"%>
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
+
+<sec:authorize access="isAuthenticated()">
+	<sec:authentication var="userId" 	property="principal.username" />
+	<sec:authentication var="userName" 	property="principal.nickname"/>
+</sec:authorize>
+<c:set var="contextPath" value="<%=request.getContextPath()%>"></c:set>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="ko">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=Edge">
+	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
+	<meta content="" name="description" />
+	<meta content="" name="author" />
+	<c:import url="/WEB-INF/views/mng/include/import.jsp" charEncoding="UTF-8"></c:import>
+	<title>KEPCO Cloud Service Platform</title>
+</head>
+<body>
+
+	<!-- begin #page-loader -->
+	<div id="page-loader" class="page-loader fade in"><span class="spinner"></span></div>
+	<!-- end #page-loader -->
+
+	<!-- begin #page-container -->
+	<div id="page-container" class="fade page-container page-header-fixed page-sidebar-fixed page-with-footer">
+
+		<!-- begin #header -->
+		<c:import url="/WEB-INF/views/mng/include/header.jsp" charEncoding="UTF-8"></c:import>
+		<!-- end #header -->
+
+		<!-- begin #sidebar -->
+		<c:import url="/WEB-INF/views/mng/include/sidebar.jsp" charEncoding="UTF-8"></c:import>
+		<!-- end #sidebar -->
+
+		<!-- begin #content -->
+		<div id="content" class="content">
+
+
+			<!-- begin header -->
+			<div class="page_header mb30">
+				<h1>클라우드 등록</h1>
+				<div class="pageNav">
+					<a href="/mng/mnghome/dashboard?loginFlag=Y" class="home"><i></i></a><a href="#">정책관리</a><a href="#" class="on">클라우드관리</a>
+				</div>
+			</div>
+			<!-- end header -->
+
+			<!-- begin page-body -->
+			<div class="row pb50">
+						<input type="hidden" id="hiddenCloudId" value="${cloudId}">
+						<table class="tableH">
+							<colgroup>
+								 <col width="200px">
+								 <col width="*">
+								 <col width="200px">
+								 <col width="*">
+
+							</colgroup>
+							<tbody>
+							
+							
+								<tr>
+									<th>calm_admin_user</th>
+									<td><input maxlength="30" type="text"  class="w100" name="calmAdminUser" id="calmAdminUser"></td>
+									<th>calm_admin_password</th>
+									<td><input maxlength="30" type="text"  class="w100" name="calmAdminPassword" id="calmAdminPassword"></td>
+								</tr>
+								
+								
+								<tr>
+									<th>admin_username</th>
+									<td><input maxlength="30" type="text"  class="w100" name="adminUsername" id="adminUsername"></td>
+									<th>admin_password</th>
+									<td><input maxlength="30" type="text"  class="w100" name="adminPassword" id="adminPassword"></td>
+								</tr>
+							
+								<tr>
+								    <th>cloud_name</th>
+									<td><input maxlength="60" type="text" class="w100" name="cloudName" id="cloudName"></td>
+									<th>api_identity_server</th>
+									<td><input maxlength="60" type="text" class="w100" name="apiIdentityServer" id="apiIdentityServer"></td>
+								</tr>
+								<tr>
+ 								    <th>cloud_type</th>
+									<td><input maxlength="60" type="text" class="w100" name="cloudType" id="cloudType"></td>
+									<th>api_network_server</th>
+									<td><input maxlength="60" type="text" class="w100" name="apiNetworkServer" id="apiNetworkServer"></td>
+								</tr>
+								<tr>
+									<th>api_metrics_server</th>
+									<td><input maxlength="60" type="text" class="w100" name="apiMetricsServer" id="apiMetricsServer"></td>
+									<th>api_volume_v3server</th>
+									<td><input maxlength="60" type="text" class="w100" name="apiVolumeV3server" id="apiVolumeV3server"></td>
+								</tr>
+								<tr>
+  								    <th>admin_domain</th>
+									<td><input maxlength="60" type="text" class="w100" name="adminDomain" id="adminDomain"></td>
+									<th>api_image_server</th>
+									<td><input maxlength="60" type="text" class="w100" name="apiImageServer" id="apiImageServer"></td>
+								</tr>
+								<tr>
+
+									<th>admin_project</th>
+									<td><input maxlength="60" type="text" class="w100" name="adminProject" id="adminProject"></td>
+									<th>api_alarm_server</th>
+									<td><input maxlength="60" type="text" class="w100" name="apiAlarmServer" id="apiAlarmServer"></td>
+								</tr>
+								<tr>
+                                    <th>project_username</th>
+									<td><input maxlength="60" type="text" class="w100" name="projectUsername" id="projectUsername"></td>
+									<th>alarm_ocurred_url</th>
+									<td><input maxlength="60" type="text" class="w100" name="alarmOcurredUrl" id="alarmOcurredUrl"></td>
+								</tr>
+								<tr>
+									<th>project_password</th>
+									<td><input maxlength="60" type="text" class="w100" name="projectPassword" id="projectPassword"></td>
+									<th>alarm_clear_url</th>
+									<td><input maxlength="60" type="text" class="w100" name="alarmClearUrl" id="alarmClearUrl"></td>
+								</tr>
+								<tr>
+									<th>api_compute_server</th>
+									<td><input maxlength="60" type="text" class="w100" name="apiComputeServer" id="apiComputeServer"></td>
+									<th>api_gateway_server</th>
+									<td><input maxlength="60" type="text" class="w100" name="apiGatewayServer" id="apiGatewayServer"></td>
+								</tr>
+							</tbody>
+						</table>
+
+				<div class="row tac m-t-60">
+				    <c:if test="${cloudId eq null}">
+		 			<a type='button' class="rbton bton_blue" id="noticeModify" name="noticeModify" onclick="ossCloudInsert()"><i class="fa fa-upload"></i>   등록</a>
+                    </c:if>
+		 			<c:if test="${cloudId ne null}">
+		 			<a type='button' id="noticeModify" class="rbton bton_blue" onclick="cloudUpdate()"><i class="fa fa-pencil"></i> 수정</a>
+		 			</c:if>
+		 			<a type='button' class="rbton bton_dgrey"  id="noticeList" onclick="moveListPage();"><i class="fa fa-close"></i> 취소</a>
+				</div>
+			</div>
+
+			<!-- begin #footer -->
+			<c:import url="/WEB-INF/views/mng/include/footer.jsp" charEncoding="UTF-8"></c:import>
+			<!-- end #footer -->
+
+		</div>
+		<!-- end #content -->
+	</div>
+	<!-- end page container -->
+
+<c:import url="/WEB-INF/views/mng/include/script.jsp" charEncoding="UTF-8"></c:import>
+<script type="text/javascript">
+
+	function bbsDetail(cloudId) {
+
+
+
+		$.ajax({
+			url : "${contextPath}/mng/cmm/cloud/detail",
+
+			dataType : "JSON",
+// 			type : "POST",
+			data : {
+				"cloudId" : cloudId
+			},
+			success : function(data) {
+				var result = data;
+				setData(result);
+			},
+			error : function(request, status, error) {
+				errorBox("code:" + request.status + "\n" + "error:" + error);
+			}
+		})
+
+	}
+
+
+	function validationCheck(){
+
+		var cloudId = $("#cloudId").val();
+
+
+		var cloudType = $("#cloudType").val();
+		var adminDomain = $("#adminDomain").val();
+		var adminProject = $("#adminProject").val();
+		var adminUsername = $("#adminUsername").val();
+		var adminPassword = $("#adminPassword").val();
+		var projectUsername = $("#projectUsername").val();
+		var projectPassword = $("#projectPassword").val();
+		var apiAlarmServer = $("#apiAlarmServer").val();
+		var apiGatewwayServer = $("#apiGatewwayServer").val();
+		var apiIdentityServer = $("#apiIdentityServer").val();
+		var apiNetworkServer = $("#apiNetworkServer").val();
+		var apiMetricsServer = $("#apiMetricsServer").val();
+		var apiVolumeV3server = $("#apiVolumeV3server").val();
+		var apiImageServer = $("#apiImageServer").val();
+		var apiComputeServer = $("#apiComputeServer").val();
+		var alarmOcurredUrl = $("#alarmOcurredUrl").val();
+		var alarmClearUrl = $("#alarmClearUrl").val();
+		
+		
+		var calmAdminUser = $("#calmAdminUser").val();
+		var calmAdminPassword = $("#calmAdminPassword").val();
+		
+		
+		
+		if(cloudId==""){
+			warningBox("cloudId를 입력해주세요");
+			$("#cloudId").focus();
+			return false;
+		}
+		if(cloudType==""){
+			warningBox("cloudType를 입력해주세요");
+			$("#cloudType").focus();
+			return false;
+		}
+		/*if(adminDomain==""){
+			warningBox("adminDomain를 입력해주세요");
+			$("#adminDomain").focus();
+			return false;
+		}
+		if(adminProject==""){
+			warningBox("adminProject를 입력해주세요");
+			$("#adminProject").focus();
+			return false;
+		}*/
+		/* if(adminUsername==""){
+			warningBox("adminUsername를 입력해주세요");
+			$("#adminUsername").focus();
+			return false;
+		}
+		if(adminPassword==""){
+			warningBox("adminPassword를 입력해주세요");
+			$("#adminPassword").focus();
+			return false;
+		}
+		if(projectUsername==""){
+			warningBox("projectUsername를 입력해주세요");
+			$("#projectUsername").focus();
+			return false;
+		}
+		if(projectPassword==""){
+			warningBox("projectPassword를 입력해주세요");
+			$("#projectPassword").focus();
+			return false;
+		} */
+		/*if(apiAlarmServer==""){
+			warningBox("apiAlarmServer를 입력해주세요");
+			$("#apiAlarmServer").focus();
+			return false;
+		}
+		if(apiGatewwayServer==""){
+			warningBox("apiGatewwayServer를 입력해주세요");
+			$("#apiGatewwayServer").focus();
+			return false;
+		}
+		if(apiIdentityServer==""){
+			warningBox("apiIdentityServer를 입력해주세요");
+			$("#apiIdentityServer").focus();
+			return false;
+		}
+		if(apiNetworkServer==""){
+			warningBox("apiNetworkServer를 입력해주세요");
+			$("#apiNetworkServer").focus();
+			return false;
+		}
+		if(apiMetricsServer==""){
+			warningBox("apiMetricsServer를 입력해주세요");
+			$("#apiMetricsServer").focus();
+			return false;
+		}
+		if(apiVolumeV3server==""){
+			warningBox("apiVolumeV3server를 입력해주세요");
+			$("#apiVolumeV3server").focus();
+			return false;
+		}
+		if(apiImageServer==""){
+			warningBox("apiImageServer를 입력해주세요");
+			$("#apiImageServer").focus();
+			return false;
+		}
+		if(apiComputeServer==""){
+			warningBox("apiComputeServer를 입력해주세요");
+			$("#apiComputeServer").focus();
+			return false;
+		}
+		if(alarmOcurredUrl==""){
+			warningBox("alarmOcurredUrl를 입력해주세요");
+			$("#alarmOcurredUrl").focus();
+			return false;
+		}
+		if(alarmClearUrl==""){
+			warningBox("alarmClearUrl를 입력해주세요");
+			$("#alarmClearUrl").focus();
+			return false;
+		}*/
+
+		var alarmOcurredUrl = $("#alarmOcurredUrl").val();
+		var alarmClearUrl = $("#alarmClearUrl").val();
+		return true;
+	}
+
+
+	function ossCloudInsert() {
+
+		if(!validationCheck()){
+			return;
+		}
+
+		var jsonData = setJsonData();
+
+		$.ajax({
+			url : "${contextPath}/mng/cmm/cloud/insert",
+			dataType : "JSON",
+			type : "POST",
+			data : jsonData,
+			success : function(data) {
+				var result = data;
+				if(result==1){
+					alertBox("등록되었습니다.", moveDetailPage);
+				}else{
+					errorBox("등록실패");
+				}
+			},
+			error : function(request, status, error) {
+				errorBox("code1:" + request.status + "\n" + "error:" + error);
+			}
+		})
+
+	}
+
+	function cloudUpdate() {
+
+		if(!validationCheck()){
+			return;
+		}
+
+		var jsonData = setJsonData();
+
+		$.ajax({
+			url : "${contextPath}/mng/cmm/cloud/update",
+			dataType : "JSON",
+			type : "POST",
+			data : jsonData,
+			success : function(data) {
+				var result = data;
+				if(result==1){
+					alertBox("수정되었습니다.", moveDetailPage);
+				}else{
+					errorBox("수정실패");
+				}
+			},
+			error : function(request, status, error) {
+				errorBox("code1:" + request.status + "\n" + "error:" + error);
+			}
+		})
+
+	}
+
+
+	function setJsonData(){
+
+		var jsonData = {
+
+ 				  "cloudId":$("#hiddenCloudId").val()
+				, "cloudName":$("#cloudName").val()
+				, "cloudType":$("#cloudType").val()
+				, "adminDomain":$("#adminDomain").val()
+				, "adminProject":$("#adminProject").val()
+				, "adminUsername":$("#adminUsername").val()
+				, "adminPassword":$("#adminPassword").val()
+				, "projectUsername":$("#projectUsername").val()
+				, "projectPassword":$("#projectPassword").val()
+				, "apiAlarmServer":$("#apiAlarmServer").val()
+				, "apiGatewayServer":$("#apiGatewayServer").val()
+				, "apiIdentityServer":$("#apiIdentityServer").val()
+				, "apiNetworkServer":$("#apiNetworkServer").val()
+				, "apiMetricsServer":$("#apiMetricsServer").val()
+				, "apiVolumeV3server":$("#apiVolumeV3server").val()
+				, "apiImageServer":$("#apiImageServer").val()
+				, "apiComputeServer":$("#apiComputeServer").val()
+				, "alarmOcurredUrl":$("#alarmOcurredUrl").val()
+				, "alarmClearUrl":$("#alarmClearUrl").val()
+				, "calmAdminUser":$("#calmAdminUser").val()
+				, "calmAdminPassword":$("#calmAdminPassword").val()
+				
+
+				};
+		return jsonData;
+	}
+
+
+	function setData(result){
+
+		$("#adminDomain").val(result.adminDomain);
+		$("#adminProject").val(result.adminProject);
+		$("#adminUsername").val(result.adminUsername);
+		$("#adminPassword").val(result.adminPassword);
+		$("#projectUsername").val(result.projectUsername);
+		$("#projectPassword").val(result.projectPassword);
+		$("#apiGatewayServer").val(result.apiGatewayServer);
+		$("#apiIdentityServer").val(result.apiIdentityServer);
+		$("#apiNetworkServer").val(result.apiNetworkServer);
+		$("#apiMetricsServer").val(result.apiMetricsServer);
+		$("#apiVolumeV3server").val(result.apiVolumeV3server);
+		$("#apiImageServer").val(result.apiImageServer);
+		$("#apiAlarmServer").val(result.apiAlarmServer);
+		$("#apiComputeServer").val(result.apiComputeServer);
+		$("#alarmOcurredUrl").val(result.alarmOcurredUrl);
+		$("#alarmClearUrl").val(result.alarmClearUrl);
+		$("#regDatetime").val(result.regDatetime);
+		$("#regUserId").val(result.regUserId);
+		$("#modUserId").val(result.modUserId);
+		$("#modDatetime").val(result.modDatetime);
+		$("#cloudType").val(result.cloudType);
+		$("#cloudId").val(result.cloudId);
+		$("#cloudName").val(result.cloudName);
+		
+		$("#calmAdminUser").val(result.calmAdminUser);
+		$("#calmAdminPassword").val(result.calmAdminPassword);
+
+	}
+
+	// 목록 페이지이동
+	function moveListPage(){
+		location.href = "${contextPath}/mng/cmm/cloud/";
+	}
+
+	// 상세 페이지이동
+	function moveDetailPage(){
+			location.href = "${contextPath}/mng/cmm/cloud/";
+ 	}
+
+
+	$(document).ready(function() {
+		App.init();
+
+		if($("#hiddenCloudId").val() != null ){
+			bbsDetail($("#hiddenCloudId").val());
+		}
+
+		//메뉴활성화
+		$("#operation").addClass("active");
+		$("#ossCloud").addClass("active");
+
+	});
+
+</script>
+
+</body>
+</html>

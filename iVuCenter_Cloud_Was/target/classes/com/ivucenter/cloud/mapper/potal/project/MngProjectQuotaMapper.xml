@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.project.quota.ProjectQuotaDAO">
+
+	<!-- 할당량 리스트 -->
+    <select id ="QuotaList"  parameterType="CustomQuotaVO" resultType="CustomQuotaVO">
+
+	           SELECT
+						op.project_box_id,
+						op.customer_id,
+						op.project_name AS project_name2,
+						op.project_alias,
+						op.description,
+						op.reg_datetime,
+						op.reg_user_id,
+						op.mod_datetime,
+						op.mod_user_id,
+						op.delete_flag,
+						op.program_seq AS req_project_seq,
+						op.dept_code,
+						cd.dept_name,
+						op.program_seq,
+						op.project_start_datetime,
+						op.project_end_datetime,
+						op.project_price,
+                        cu.customer_name,
+                        IFNULL(coa.vm_total,'0') AS vm_total,
+                        IFNULL(coa.vcpu_total,'0') AS vcpu_total,
+                        IFNULL(coa.mem_total,'0') AS mem_total,
+                        IFNULL(coa.disk_total,'0') AS disk_total,
+                        IFNULL(coa.nas_total,'0') AS nas_total,
+                        CD2.dept_name AS dept_name2
+
+
+			   FROM (SELECT * FROM oss_project_box WHERE delete_flag = 'N' AND project_name not in ('service', 'demo') ) op
+	     INNER JOIN cmm_customer cu
+	               ON op.customer_id = cu.customer_id
+	     INNER JOIN cmm_department cd
+	               ON op.dept_code = cd.dept_code
+	     INNER JOIN cmm_user cu2
+	     			ON op.project_manager_id = cu2.user_id
+	     LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = cu2.dept_code
+	     LEFT OUTER JOIN (
+	     SELECT
+			OA.project_id
+			, SUM(OA.vm_total) AS vm_total
+			, SUM(OA.vcpu_total) AS vcpu_total
+			, SUM(ROUND(OA.mem_total /1024,0)) AS mem_total
+			, SUM(OA.disk_total) AS disk_total
+			, SUM(OA.nas_total) AS nas_total
+			, B.project_box_id
+		FROM
+		oss_availability OA
+		LEFT JOIN
+			oss_project B
+		ON OA.project_id = B.project_id
+		GROUP BY B.project_box_id
+	     ) coa
+
+	     ON op.project_box_id = coa.project_box_id
+	     WHERE 1=1
+
+				 <if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			project_alias like CONCAT('%',#{keyword},'%')
+
+    			)
+    	</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+
+		<if test="cloudId != null ">
+			AND OP.cloud_id like CONCAT('%',#{cloudId},'%')
+		</if>
+
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+    <select id ="getDetail"  parameterType="CustomQuotaVO" resultType="CustomQuotaVO">
+
+                  SELECT
+						op.project_box_id,
+						op.customer_id,
+						op.project_name AS project_name2,
+						op.project_alias,
+						op.description,
+						op.reg_datetime,
+						op.reg_user_id,
+						op.mod_datetime,
+						op.mod_user_id,
+						op.delete_flag,
+						op.program_seq AS req_project_seq,
+						op.dept_code,
+						cd.dept_name,
+						op.program_seq,
+						op.project_start_datetime,
+						op.project_end_datetime,
+						op.project_price,
+                        cu.customer_name,
+                        cus.user_name,
+                        cus.user_tel
+			   FROM (SELECT * FROM oss_project_box WHERE delete_flag = 'N') op
+	     INNER JOIN cmm_customer cu
+	               ON op.customer_id = cu.customer_id
+	     INNER JOIN cmm_department cd
+	               ON op.dept_code = cd.dept_code
+	     INNER JOIN oss_project_manager OPM
+     	 		   ON op.project_box_id= OPM.project_id
+     	 INNER JOIN cmm_user cus
+     	  		   ON OPM.manager_id = cus.user_id
+     		  WHERE op.project_box_id =#{projectBoxId}
+		 GROUP BY project_box_id
+    </select>
+    <select id ="getCloudDetail"  parameterType="CustomQuotaVO" resultType="CustomQuotaVO">
+
+                  SELECT
+						op.project_id,
+						op.customer_id,
+						op.project_name AS project_name2,
+						op.project_alias,
+						op.description,
+						op.reg_datetime,
+						op.reg_user_id,
+						op.mod_datetime,
+						op.mod_user_id,
+						op.delete_flag,
+						op.program_seq AS req_project_seq,
+						op.dept_code,
+						cd.dept_name,
+						op.program_seq,
+						op.project_start_datetime,
+						op.project_end_datetime,
+						op.project_price,
+                        cu.customer_name
+			   FROM (SELECT * FROM oss_project WHERE delete_flag = 'N') op
+	     INNER JOIN cmm_customer cu
+	               ON op.customer_id = cu.customer_id
+	     INNER JOIN cmm_department cd
+	               ON op.dept_code = cd.dept_code
+     		  WHERE op.project_id =#{projectId}
+
+    </select>
+    <select id ="getQuota" parameterType="CustomQuotaVO" resultType="CustomQuotaVO">
+    	SELECT
+    		vm_avail AS vmAvail,
+    		vcpu_avail AS vcpuAvail,
+    		mem_avail AS memAvail,
+    		disk_avail AS diskAvail
+    		nas_avail AS nasAvail
+    	FROM
+    		oss_availability
+    	WHERE project_id = #{projectId}
+    </select>
+</mapper>

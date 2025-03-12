@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.cmm.cloud.OssCloudDAO">
+
+    <select id="list" resultType="CustomOssCloudVO" parameterType="CustomOssCloudVO">
+
+		SELECT
+			cloud_id
+			, cloud_name
+			, cloud_type
+			, admin_domain
+			, admin_project
+			, admin_username
+			, admin_password
+			, project_username
+			, project_password
+			, api_gateway_server
+			, api_identity_server
+			, api_network_server
+			, api_metrics_server
+			, api_volume_v3server
+			, api_image_server
+			, api_alarm_server
+			, alarm_ocurred_url
+			, alarm_clear_url
+			, reg_datetime
+			, reg_user_id
+			, mod_user_id
+			, mod_datetime
+		FROM		oss_cloud
+		WHERE del_flag = 'N'		
+		<if test="searchKind == 'cloudId' and keyword != ''">
+		and
+			cloud_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'cloudType' and keyword != ''">
+		and
+			cloud_type like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		and (
+			cloud_id like CONCAT('%',#{keyword},'%')
+			or
+			cloud_type like CONCAT('%',#{keyword},'%')
+			)
+		</if>
+		order by cloud_id desc
+        <if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+	    </if>
+	</select>
+
+    <select id="getCloudList" resultType="CustomOssCloudVO">
+		SELECT
+		      rownum
+			, cloud_id
+			, cloud_type				
+			, cloud_name
+			, cloud_img_path
+			, admin_domain
+			, admin_project
+			, admin_username
+			, admin_password
+		    , calm_admin_user
+			, calm_admin_password
+			, calm_server
+			, project_username
+			, project_password
+			, api_gateway_server
+			, api_identity_server
+			, api_network_server
+			, api_metrics_server
+			, api_volume_v3server
+			, api_image_server
+			, api_alarm_server
+			, api_compute_server
+			, alarm_ocurred_url
+			, alarm_clear_url
+			, reg_datetime				
+			, reg_user_id
+			, mod_user_id
+			, mod_datetime
+			, content				
+			, required_yn
+		FROM 
+			oss_cloud
+		WHERE 
+			del_flag = 'N'
+		ORDER BY sort_num asc
+			
+			
+	</select>
+	
+	<select id="getVmwareCloudList" resultType="CustomOssCloudVO">
+
+		SELECT
+			cloud_id
+			, cloud_type				
+			, cloud_name
+			, admin_domain
+			, admin_project
+			, admin_username
+			, admin_password
+			, project_username
+			, project_password
+			, api_gateway_server
+			, api_identity_server
+			, api_network_server
+			, api_metrics_server
+			, api_volume_v3server
+			, api_image_server
+			, api_alarm_server
+			, api_compute_server
+			, alarm_ocurred_url
+			, alarm_clear_url
+			, reg_datetime				
+			, reg_user_id
+			, mod_user_id
+			, mod_datetime				
+		FROM oss_cloud
+	  WHERE del_flag = 'N'
+		  AND cloud_type = 'vmware'
+	  
+	</select>
+	
+	<select id="detail" resultType="CustomOssCloudVO" parameterType="String">
+
+		SELECT
+			cloud_id
+			, cloud_name
+			, cloud_type
+			, admin_domain
+			, admin_project
+			, admin_username
+			, admin_password
+			, calm_admin_user
+			, calm_admin_password
+			, calm_server
+			, project_username
+			, project_password
+			, api_gateway_server
+			, api_identity_server
+			, api_compute_server
+			, api_network_server
+			, api_volume_v3server
+			, api_image_server
+			, api_metrics_server
+			, api_alarm_server
+			, alarm_ocurred_url
+			, alarm_clear_url
+			, reg_user_id
+			, reg_datetime
+			, mod_user_id
+			, mod_datetime
+		FROM oss_cloud
+		WHERE del_flag = 'N' AND cloud_id = #{cloudId}
+	</select>
+
+	<insert id="insert" parameterType="CustomOssCloudVO">
+
+		INSERT INTO OSS_CLOUD
+			(
+				cloud_id
+				, cloud_name
+				, cloud_type
+				, admin_domain
+				, admin_project
+				, admin_username
+				, admin_password
+				, project_username
+				, project_password
+				, api_gateway_server
+				, api_identity_server
+				, api_compute_server
+				, api_network_server
+				, api_volume_v3server
+				, api_image_server
+				, api_metrics_server
+				, api_alarm_server
+				, alarm_ocurred_url
+				, alarm_clear_url
+				
+				, calm_admin_user 
+                , calm_admin_password 
+				
+				, reg_datetime
+				, reg_user_id
+				, del_flag
+			)
+		VALUES
+			(
+				#{cloudId}
+				, #{cloudName}
+				, #{cloudType}
+				, #{adminDomain}
+				, #{adminProject}
+				, #{adminUsername}
+				, #{adminPassword}
+				, #{projectUsername}
+				, #{projectPassword}
+				, #{apiGatewayServer}
+				, #{apiIdentityServer}
+				, #{apiComputeServer}
+				, #{apiNetworkServer}
+				, #{apiVolumeV3server}
+				, #{apiImageServer}
+				, #{apiMetricsServer}
+				, #{apiAlarmServer}
+				, #{alarmOcurredUrl}
+				, #{alarmClearUrl}
+				
+				, #{calmAdminUser}
+                , #{calmAdminPassword}
+				
+				, NOW()
+				, #{regUserId}
+				, 'N'
+	       )
+
+	</insert>
+
+	<insert id="update" parameterType="CustomOssCloudVO">
+
+           UPDATE
+			oss_cloud
+		SET
+			cloud_name = #{cloudName}
+			, cloud_type = #{cloudType}
+			, admin_domain = #{adminDomain}
+			, admin_project = #{adminProject}
+			, admin_username = #{adminUsername}
+			, admin_password = #{adminPassword}
+			, project_username = #{projectUsername}
+			, project_password = #{projectPassword}
+			, api_gateway_server = #{apiGatewayServer}
+			, api_identity_server = #{apiIdentityServer}
+			, api_compute_server = #{apiComputeServer}
+			, api_network_server = #{apiNetworkServer}
+			, api_volume_v3server = #{apiVolumeV3server}
+			, api_image_server = #{apiImageServer}
+			, api_metrics_server = #{apiMetricsServer}
+			, api_alarm_server = #{apiAlarmServer}
+			, alarm_ocurred_url = #{alarmOcurredUrl}
+			, alarm_clear_url = #{alarmClearUrl}
+			, calm_admin_user = #{calmAdminUser}
+            , calm_admin_password = #{calmAdminPassword}
+		
+			
+			, mod_user_id = #{modUserId}
+			, mod_datetime = NOW()
+		WHERE
+			cloud_id = #{cloudId}
+
+	</insert>
+
+	<update id="delete" parameterType="CustomOssCloudVO">
+		UPDATE oss_cloud
+		SET
+			del_flag = 'Y'
+			, mod_datetime = NOW()
+			, mod_user_id = #{modUserId}
+		WHERE
+		    cloud_id = #{cloudId}
+	</update>
+	
+	
+	<select id="getCloudroles" parameterType="CustomOssCloudVO" resultType="CustomOssCloudVO">
+
+         SELECT GROUP_CONCAT(cloud_id) as cloudRoles FROM oss_cloud 
+
+	</select>
+	
+	
+	<select id="rownumCloudDetail" resultType="CustomOssCloudVO" parameterType="String">
+
+		SELECT
+			  cloud_id
+			, rownum
+		FROM oss_cloud
+	  WHERE rownum = #{rownum}
+	</select>
+	
+	
+	<select id="getOssProjectCloudListByReqProjectSeq" resultType="CustomOssCloudVO" parameterType="String">
+
+		SELECT
+			  a.cloud_id
+			, a.cloud_type				
+			, a.cloud_name
+			, a.cloud_img_path
+			, a.admin_domain
+			, a.admin_project
+			, a.admin_username
+			, a.admin_password
+			, a.project_username
+			, a.project_password
+			, a.api_gateway_server
+			, a.api_identity_server
+			, a.api_network_server
+			, a.api_metrics_server
+			, a.api_volume_v3server
+			, a.api_image_server
+			, a.api_alarm_server
+			, a.api_compute_server
+			, a.alarm_ocurred_url
+			, a.alarm_clear_url
+			, a.reg_datetime				
+			, a.reg_user_id
+			, a.mod_user_id
+			, a.mod_datetime
+			, a.content			
+			
+		FROM oss_cloud a
+INNER JOIN req_project_cloud b
+	        ON a.cloud_id =  b.cloud_id        
+  LEFT  JOIN oss_project_box c
+	        ON b.req_project_seq =  c.program_seq        
+  LEFT JOIN oss_project d 
+		    ON c.project_box_id =  d.project_box_id     
+	      AND a.cloud_id = d.cloud_id
+	  WHERE b.req_project_seq =  #{reqProjectSeq}
+	      AND d.cloud_id IS NULL
+	      AND a.del_flag = 'N' 
+  ORDER BY  a.sort_num ASC
+	</select>
+	
+	
+	<select id="getReqProjectCloudListByReqProjectSeq" resultType="CustomOssCloudVO" parameterType="String">
+
+		SELECT
+				  a.cloud_id
+				, a.cloud_type				
+				, a.cloud_name
+				, a.cloud_img_path
+				, a.admin_domain
+				, a.admin_project
+				, a.admin_username
+				, a.admin_password
+				, a.project_username
+				, a.project_password
+				, a.api_gateway_server
+				, a.api_identity_server
+				, a.api_network_server
+				, a.api_metrics_server
+				, a.api_volume_v3server
+				, a.api_image_server
+				, a.api_alarm_server
+				, a.api_compute_server
+				, a.alarm_ocurred_url
+				, a.alarm_clear_url
+				, a.reg_datetime				
+				, a.reg_user_id
+				, a.mod_user_id
+				, a.mod_datetime
+				, a.content			
+				
+			FROM oss_cloud a
+	INNER JOIN req_project_cloud b
+		        ON a.cloud_id =  b.cloud_id        
+	  LEFT  JOIN oss_project_box c
+		        ON b.req_project_seq =  c.program_seq        
+	  LEFT JOIN oss_project d 
+			    ON c.project_box_id =  d.project_box_id     
+		      AND a.cloud_id = d.cloud_id
+		  WHERE b.req_project_seq =  #{reqProjectSeq}
+		      AND a.del_flag = 'N' 
+	  ORDER BY  a.sort_num ASC
+	      
+	</select>
+	
+	
+	
+	
+	<select id="getOssProjectByProjectBoxId" resultType="CustomOssCloudVO" parameterType="String">
+
+			SELECT
+				a.cloud_id,
+				a.cloud_type,
+				a.cloud_name,
+				a.cloud_img_path,
+				a.admin_domain,
+				a.admin_project,
+				a.admin_username,
+				a.admin_password,
+				a.project_username,
+				a.project_password,
+				a.api_gateway_server,
+				a.api_identity_server,
+				a.api_network_server,
+				a.api_metrics_server,
+				a.api_volume_v3server,
+				a.api_image_server,
+				a.api_alarm_server,
+				a.api_compute_server,
+				a.alarm_ocurred_url,
+				a.alarm_clear_url,
+				a.reg_datetime,
+				a.reg_user_id,
+				a.mod_user_id,	
+				a.mod_datetime,
+				a.content
+		FROM oss_cloud a
+INNER JOIN (SELECT * FROM oss_project WHERE project_box_id = #{projectBoxId} AND del_flag = 'N') b 
+			ON a.cloud_id =b.cloud_id
+	  ORDER BY  a.sort_num ASC
+	      
+	</select>
+	
+	
+	
+	
+	
+		<select id="getReqProjectCloudListByReqProjectSeqReApprove" resultType="CustomOssCloudVO" parameterType="String">
+	
+			
+			     SELECT
+						  a.cloud_id
+						, a.cloud_type				
+						, a.cloud_name
+						, a.cloud_img_path
+						, a.admin_domain
+						, a.admin_project
+						, a.admin_username
+						, a.admin_password
+						, a.project_username
+						, a.project_password
+						, a.api_gateway_server
+						, a.api_identity_server
+						, a.api_network_server
+						, a.api_metrics_server
+						, a.api_volume_v3server
+						, a.api_image_server
+						, a.api_alarm_server
+						, a.api_compute_server
+						, a.alarm_ocurred_url
+						, a.alarm_clear_url
+						, a.reg_datetime				
+						, a.reg_user_id
+						, a.mod_user_id
+						, a.mod_datetime
+						, a.content		
+						, c.project_box_id	
+						, a.sort_num
+						
+					FROM oss_cloud a
+			INNER JOIN req_project_cloud b
+				        ON a.cloud_id =  b.cloud_id        
+			  LEFT  JOIN oss_project_box c
+				        ON b.req_project_seq =  c.program_seq        
+			  LEFT JOIN oss_project d 
+					    ON c.project_box_id =  d.project_box_id     
+				      AND a.cloud_id = d.cloud_id
+				  WHERE b.req_project_seq = #{reqProjectSeq}
+				      AND a.del_flag = 'N' 
+				      AND d.project_id IS  NULL 
+				      
+			  ORDER BY  a.sort_num ASC
+	
+	</select>
+	
+	
+	
+	
+	
+	
+	<select id="getCloudProjectList" resultType="CustomOssCloudVO">
+		
+        SELECT
+				 a.cloud_id
+				, a.cloud_type				
+				, a.cloud_name
+				, a.cloud_img_path
+				, a.admin_domain
+				, a.admin_project
+				, a.admin_username
+				, a.admin_password
+			    , a.calm_admin_user
+				, a.calm_admin_password
+				, a.calm_server
+				, a.project_username
+				, a.project_password
+				, a.api_gateway_server
+				, a.api_identity_server
+				, a.api_network_server
+				, a.api_metrics_server
+				, a.api_volume_v3server
+				, a.api_image_server
+				, a.api_alarm_server
+				, a.api_compute_server
+				, a.alarm_ocurred_url
+				, a.alarm_clear_url
+				, a.reg_datetime				
+				, a.reg_user_id
+				, a.mod_user_id
+				, a.mod_datetime
+				, a.content		
+				,CASE WHEN b.project_id IS NULL  THEN 'N' WHEN b.project_id IS NOT NULL THEN 'Y' END AS project_yn
+		 FROM oss_cloud a
+   LEFT JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N' AND  project_box_id = #{projectBoxId}) b
+			 ON a.cloud_id = b.cloud_id
+	    WHERE a.del_flag = 'N'
+    ORDER BY a.sort_num asc
+	    
+	 
+	</select>
+	
+	
+	<select id="getCloudSubnetList" resultType="CustomOssCloudVO">
+	
+			SELECT
+				cloud_id,
+				subnet_id,
+				subnet_name,
+				subnet_alias,
+				cluster_reference_id,
+				cluster_reference_name,
+				default_subnet_yn,
+				reg_datetime,
+				reg_user_id,
+				mod_datetime,
+				mod_user_id,
+				delete_flag
+			FROM oss_cloud_subnet
+		WHERE cloud_id = #{cloudId}
+	 
+	</select>
+	
+</mapper>

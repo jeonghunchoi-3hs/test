@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.bill.invoice.customer.BillInvoiceCustomerDAO">
+	
+	<select id="list" parameterType="CustomBillInvoiceCustomerVO" resultType="CustomBillInvoiceCustomerVO">
+		SELECT
+			*
+		FROM(
+			SELECT	
+				A.customer_name 
+				, A.customer_id 
+				, A.bill_yyyymm 
+				, C.company_no 
+				, C.up_company_name
+				, C.up_company_id
+				, C.company_name
+				, C.company_id
+				, (SELECT user_name FROM cmm_user WHERE user_id = C.manager_id) user_name
+				, (SELECT user_phone FROM cmm_user WHERE user_id = C.manager_id) user_phone
+				, (SELECT user_tel FROM cmm_user WHERE user_id = C.manager_id) user_tel
+				, FORMAT(SUM(CASE WHEN invoice_item = '0000' THEN amount ELSE 0 END), 0) AS amount
+				, FORMAT(SUM(CASE WHEN invoice_item = '0000' THEN amount ELSE 0 END) - SUM(CASE WHEN invoice_item = 'LA00' THEN amount ELSE 0 END), 0) AS A000_amount
+				/*, SUM(CASE WHEN invoice_item = 'A000' THEN amount ELSE 0 END) AS A000_amount*/
+				, FORMAT(SUM(CASE WHEN invoice_item = 'LA00' THEN amount ELSE 0 END), 0) AS LA00_amount
+			FROM	
+				bill_invoice_customer A 
+				, bill_invoice_customer_detail B
+				, (
+					SELECT 
+						CU.company_no
+						, CU.customer_name
+						, CU.customer_id
+						, CU.manager_id
+						, CC2.company_name AS up_company_name
+						, CC2.company_id AS up_company_id
+						, CC.company_name AS company_name
+						, CC.company_id AS company_id
+					FROM cmm_customer CU
+					INNER JOIN cmm_company CC
+					ON CU.ref_company_id = CC.company_id
+					
+					LEFT JOIN cmm_company CC2
+					ON CC.up_company_id = CC2.company_id
+				) C
+				, bill_master D 
+			WHERE A.bill_yyyymm = B.bill_yyyymm 
+			AND A.customer_id = B.customer_id
+			AND A.bill_yyyymm = D.bill_yyyymm
+			AND D.confirn_flag = 'Y' 
+			AND B.customer_id = C.customer_id	
+			GROUP BY 
+				A.customer_name 
+				, A.customer_id 
+				, A.bill_yyyymm 
+				, C.company_no		
+		)A
+		WHERE 1=1
+		<if test="keyword != '' ">
+			<if test="searchKind == 'All' ">
+				AND (
+					A.up_company_name like CONCAT('%',#{keyword},'%')
+					OR A.customer_name like CONCAT('%',#{keyword},'%')
+				)
+			</if>
+		<if test="searchKind == 'up_company_name' ">
+			AND
+				A.up_company_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'customer_name' ">
+			AND
+				A.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		</if> 		
+		<if test="searchKey0 != '' ">
+			AND A.up_company_name = #{searchKey0}
+		</if>
+		<if test="searchKey1 != '' ">
+			AND A.customer_name = #{searchKey1}		
+		</if>	
+		
+		<if test="billMonth1 != '' ">
+			<if test="billYear1 != '' ">
+				AND A.bill_yyyymm <![CDATA[>=]]> CONCAT(#{billYear1}, #{billMonth1})		
+			</if>
+			<if test="billYear1 == '' ">
+				AND substring(A.bill_yyyymm, 5,2) <![CDATA[>=]]> #{billMonth1}
+			</if>
+		</if>		
+		<if test="billMonth2 != '' ">
+			<if test="billYear2 != '' ">
+				AND A.bill_yyyymm <![CDATA[<=]]> CONCAT(#{billYear2}, #{billMonth2})		
+			</if>
+			<if test="billYear2 == '' ">
+				AND substring(A.bill_yyyymm, 5,2) <![CDATA[<=]]> #{billMonth2}
+			</if>		
+		</if>
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+				ORDER BY A.bill_yyyymm DESC
+			</if>
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+         
+</mapper>

@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.productUsageStatus.disk.ProductUsageStatusDiskDAO">
+
+    <select id="list" parameterType="CustomProductUsageStatusDiskVO" resultType="CustomProductUsageStatusDiskVO">
+    	SELECT
+    		*
+    	FROM
+    	(
+			SELECT
+				CC.customer_id AS customer_id
+				, CC.customer_name AS customer_name
+				, OP.cloud_id
+				, OC.cloud_name
+				, OC.cloud_type
+				, OP.project_id
+				, OP.project_name
+				, OP.project_alias
+				, OV.hostname
+				, OV.hostname_alias
+				, OD.disk_alias
+				, OD.size_gb
+				, OD.hourly_flag
+				, OD.reg_datetime
+			FROM
+			(
+				SELECT
+					project_id
+					, vm_uuid
+					, disk_alias
+					, size_gb
+					, IF(hourly_flag ='N', '월', '시간') AS hourly_flag
+					, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+				FROM
+					oss_disk
+				WHERE
+					del_flag = 'N'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+			) OD
+			LEFT JOIN oss_project OP
+			ON OP.project_id = OD.project_id
+			
+			LEFT JOIN oss_cloud OC
+			ON OP.cloud_id = OC.cloud_id
+			
+			LEFT JOIN OSS_VM OV
+			ON OV.vm_uuid = OD.vm_uuid
+
+			LEFT JOIN cmm_customer CC
+			ON OP.customer_id=CC.customer_id
+
+			WHERE 1=1
+			AND OP.project_id is not null
+			AND OP.delete_flag = 'N'
+    	) A
+		WHERE
+			1=1
+	    	<if test="searchKind == 'searchAll' and keyword != '' ">
+	    		AND
+	    		(
+	    			A.customer_name like CONCAT('%',#{keyword},'%')
+	    			OR A.project_name like CONCAT('%',#{keyword},'%')
+	    			OR A.project_alias like CONCAT('%',#{keyword},'%')
+	    			OR A.disk_alias like CONCAT('%',#{keyword},'%')
+	    			OR A.hostname_alias like CONCAT('%',#{keyword},'%')
+	    			OR A.hostname like CONCAT('%',#{keyword},'%')
+	    		)
+	    	</if>
+		<if test="searchKind == 'customer_name' and keyword != ''">
+			AND
+				A.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				A.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				A.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'disk_alias' and keyword != ''">
+			AND
+				A.disk_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'hostname_alias' and keyword != ''">
+			AND
+				A.hostname_alias like CONCAT('%',#{keyword},'%')
+		</if>		
+		<if test="searchKind == 'hostname' and keyword != ''">
+			AND
+				A.hostname like CONCAT('%',#{keyword},'%')
+		</if>			
+			<if test="cloudId != null ">
+			AND A.cloud_id like CONCAT('%',#{cloudId},'%')
+		   	</if>
+
+	    	<if test="!length.equals(0)">
+				LIMIT #{start}, #{length}
+			</if>
+	</select>
+
+    <select id="total" parameterType="CustomProductUsageStatusDiskVO" resultType="CustomProductUsageStatusDiskVO">
+    	SELECT
+			COUNT(*) AS length
+			, IFNULL(FORMAT(SUM(size_gb), 0), 0) AS size_gb
+    	FROM
+    	(
+			SELECT
+				*
+			FROM
+			(
+				SELECT
+					CC.customer_id AS customer_id
+					, CC.customer_name AS customer_name
+					, OP.cloud_id
+					, OP.project_id
+					, OP.project_name
+					, OP.project_alias
+					, OV.hostname
+					, OV.hostname_alias
+					, OD.disk_alias
+					, OD.size_gb
+					, OD.hourly_flag
+					, OD.reg_datetime
+				FROM
+				(
+					SELECT
+						project_id
+						, vm_uuid
+						, disk_alias
+						, size_gb
+						, IF(hourly_flag ='N', '월', '시간') AS hourly_flag
+						, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+					FROM
+						oss_disk
+					WHERE
+						del_flag = 'N'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				) OD
+				LEFT JOIN oss_project OP
+				ON OP.project_id = OD.project_id
+
+				LEFT JOIN OSS_VM OV
+				ON OV.vm_uuid = OD.vm_uuid
+
+				LEFT JOIN cmm_customer CC
+				ON OP.customer_id=CC.customer_id
+
+				WHERE
+					1=1
+					AND OP.project_id is not null
+					AND OP.delete_flag = 'N'
+			) A
+			WHERE
+				1=1
+		    	<if test="searchKind == 'searchAll' and keyword != '' ">
+		    		AND
+	    		(
+	    			A.customer_name like CONCAT('%',#{keyword},'%')
+	    			OR A.project_name like CONCAT('%',#{keyword},'%')
+	    			OR A.project_alias like CONCAT('%',#{keyword},'%')
+	    			OR A.disk_alias like CONCAT('%',#{keyword},'%')
+	    			OR A.hostname_alias like CONCAT('%',#{keyword},'%')
+	    			OR A.hostname like CONCAT('%',#{keyword},'%')
+	    		)
+		    	</if>
+				<if test="searchKind == 'customer_name' and keyword != ''">
+					AND
+						A.customer_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'project_name' and keyword != ''">
+					AND
+						A.project_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'project_alias' and keyword != ''">
+					AND
+						A.project_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'disk_alias' and keyword != ''">
+					AND
+						A.disk_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'hostname_alias' and keyword != ''">
+					AND
+						A.hostname_alias like CONCAT('%',#{keyword},'%')
+				</if>		
+				<if test="searchKind == 'hostname' and keyword != ''">
+					AND
+						A.hostname like CONCAT('%',#{keyword},'%')
+				</if>			
+
+				 <if test="cloudId != null  and cloudId !='cloudAll' ">
+					AND A.cloud_id like CONCAT('%',#{cloudId},'%')
+				</if>
+				<if test="cloudId != null  and cloudId =='cloudAll' ">
+					AND A.cloud_id in (select cloud_id  from oss_cloud where cloud_type = 'openstack')
+				</if>
+
+		) X
+		WHERE
+			1=1
+	</select>
+
+</mapper>

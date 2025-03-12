@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Copy element &apos;UserAccessDeniedHandler.java&apos; to &apos;iVuCenter_Cloud_Was/src/main/java/com.ivucenter.cloud.portal.login&apos;&#x0D;&#x0A;- Original project: &apos;iVuCenter_Cloud_Was&apos;&#x0D;&#x0A;- Destination element: &apos;iVuCenter_Cloud_Was/src/main/java/com.ivucenter.cloud.portal.login&apos;&#x0D;&#x0A;- Original element: &apos;com.ivucenter.cloud.portal.login.UserAccessDeniedHandler.java&apos;" description="Copy compilation unit" destination="/src\/main\/java=/optional=/true=/=/maven.pomderived=/true=/&lt;com.ivucenter.cloud.portal.login" element1="/src\/main\/java=/optional=/true=/=/maven.pomderived=/true=/&lt;com.ivucenter.cloud.portal.login{UserAccessDeniedHandler.java" files="0" flags="589830" folders="0" id="org.eclipse.jdt.ui.copy" policy="org.eclipse.jdt.ui.copyResources" stamp="1715840922960" units="1" version="1.0"/>
+</session>

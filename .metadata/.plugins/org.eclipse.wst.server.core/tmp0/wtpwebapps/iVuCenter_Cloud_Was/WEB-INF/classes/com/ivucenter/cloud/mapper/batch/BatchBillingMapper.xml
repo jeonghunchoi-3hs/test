@@ -1,0 +1,2139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.batch.billing.BatchBillingDAO">
+
+	<!-- =================================================================================== -->
+	<!-- BILL MASTER -->
+	<!-- =================================================================================== -->
+	<select id="selectOneBillMaster" parameterType="BatchBillMasterVO" resultType="BatchBillMasterVO">
+		SELECT	
+			*
+		FROM	
+			bill_master
+		WHERE	
+			bill_yyyymm = #{billYyyymm}
+			AND cloud_id = #{cloudId}
+	</select>
+
+	<update id="updateBillMaster" parameterType="BatchBillMasterVO">
+		UPDATE	bill_master
+		SET		bill_proc_stat = #{billProcStat},
+				proc_user_name = #{procUserName},
+				proc_datetime = #{procDatetime},
+				confirn_flag = #{confirnFlag},
+				comfirm_user_name = #{comfirmUserName},
+				confirm_datetime = #{confirmDatetime}
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</update>
+
+	<insert id="insertBillMaster" parameterType="BatchBillMasterVO">
+		INSERT INTO bill_master
+		(
+			bill_yyyymm,
+			cloud_id,
+			bill_proc_stat,
+			proc_user_name,
+			proc_datetime,
+			confirn_flag,
+			comfirm_user_name,
+			confirm_datetime
+		)
+		VALUES
+		(
+			#{billYyyymm},
+			#{cloudId},
+			#{billProcStat},
+			#{procUserName},
+			#{procDatetime},
+			#{confirnFlag},
+			#{comfirmUserName},
+			#{confirmDatetime}
+		)
+	    ON DUPLICATE KEY
+		UPDATE
+			bill_yyyymm = #{billYyyymm},
+			bill_proc_stat = #{billProcStat},
+			proc_user_name = #{procUserName},
+			proc_datetime = #{procDatetime},
+			confirn_flag = #{confirnFlag},
+			comfirm_user_name = #{comfirmUserName},
+			confirm_datetime = #{confirmDatetime}
+	</insert>
+
+	<!-- =================================================================================== -->
+	<!-- BILL INVOICE CUSTOMER -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectListCmmCustomer" parameterType="java.util.Map" resultType="BatchBillInvoiceCustomerVO">
+		SELECT	
+			customer_id,
+			customer_name,
+			cloud_id,
+			vat_rate
+		FROM	
+			cmm_customer, oss_cloud
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<insert id="insertBillInvoiceCustomer" parameterType="BatchBillInvoiceCustomerVO">
+		INSERT INTO bill_invoice_customer (
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			customer_name,
+			vat_rate,
+			bill_start_datetime,
+			bill_end_datetime
+		)VALUES(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{customerName},
+			#{vatRate},
+			#{billStartDatetime},
+			#{billEndDatetime}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			cloud_id = #{cloudId},
+			customer_id = #{customerId},
+			customer_name = #{customerName},
+			vat_rate = #{vatRate},
+			bill_start_datetime = #{billStartDatetime},
+			bill_end_datetime = #{billEndDatetime}
+	</insert>
+
+	<delete id="deleteBillInvoiceCustomer" parameterType="BatchBillInvoiceCustomerVO">
+		DELETE 	FROM bill_invoice_customer
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- =================================================================================== -->
+	<!-- INVOICE CUSTOMER DETAIL -->
+	<!-- =================================================================================== -->
+	<!-- 프로젝트에서 총금액을 제외한 모든 항목 복사하기 -->
+	<select id="batchSelectProjectDetailForBillInvoiceCustomerDetail" parameterType="java.util.Map" resultType="BatchBillInvoiceCustomerDetailVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.invoice_item,
+			A.invoice_item_sub,
+			A.invoice_item_name,
+			A.invoice_item_depth,
+			SUM(A.amount)			AS amount
+		FROM	
+			bill_invoice_project_detail A
+		
+		WHERE	
+			A.bill_yyyymm = #{billYM}
+			AND	A.invoice_item NOT IN ('0000')
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.invoice_item, A.invoice_item_name, A.invoice_item_depth
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- 부가가치세 : 클라우드상품(A000), 요금할인(E000), 보정(I000)을 합하여 부과가치세를 계산하기 -->
+	<select id="batchSelectBillInvoiceCustomerDetailForVat" parameterType="java.util.Map" resultType="BatchBillInvoiceCustomerDetailVO">
+		SELECT	
+			B.bill_yyyymm,
+			A.cloud_id,
+			B.customer_id,
+			A.vat_rate,
+			SUM(B.amount)		AS amount
+		FROM	
+			bill_invoice_customer A,
+			bill_invoice_customer_detail B
+		
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND A.customer_id = B.customer_id
+			AND	A.bill_yyyymm = #{billYM}
+			AND	B.invoice_item IN ('A000', 'E000', 'I000')
+		
+		GROUP BY 
+			B.bill_yyyymm, A.cloud_id, B.customer_id, A.vat_rate
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- 총 청구금액 : 클라우드상품(A000), 프로젝트 할인(EA00), 보정(I000), 부가가치세(L000)을 합하여 10원미만절사할인(EE00)과 총청구금액(0000)을 계산하기 -->
+	<select id="batchSelectBillInvoiceCustomerDetailForTotalAmount" parameterType="java.util.Map" resultType="BatchBillInvoiceCustomerDetailVO">
+		SELECT	
+			B.bill_yyyymm,
+			A.cloud_id,
+			B.customer_id,
+			SUM(B.amount)		AS amount
+		FROM	
+			bill_invoice_customer A,
+			bill_invoice_customer_detail B
+		
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND	A.customer_id = B.customer_id
+			AND	A.bill_yyyymm = #{billYM}
+			AND	B.invoice_item IN ('A000', 'EA00', 'I000', 'L000')
+		GROUP BY 
+			B.bill_yyyymm, B.customer_id
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<insert id="insertBillInvoiceCustomerDetail" parameterType="BatchBillInvoiceCustomerDetailVO">
+		INSERT INTO bill_invoice_customer_detail 
+		(
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			invoice_item,
+			invoice_item_sub,
+			invoice_item_name,
+			invoice_item_depth,
+			amount
+		)
+		VALUES
+		(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{invoiceItem},
+			#{invoiceItemSub},
+			#{invoiceItemName},
+			#{invoiceItemDepth},
+			#{amount}
+		)
+	</insert>
+
+	<!-- 프로젝트할인(EA00), 10원미만절사할인(EL00)의 합계를 계산하여 요금할인(E000)을 등록하거나 수정 -->
+	<select id="batchSelectBillInvoiceCustomerDetailForDiscountAmount" parameterType="java.util.Map" resultType="BatchBillInvoiceCustomerDetailVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			SUM(A.amount)		AS amount
+		FROM	
+			bill_invoice_customer_detail A
+		WHERE	
+			bill_yyyymm = #{billYM}
+			AND		invoice_item IN ('EA00', 'EL00')
+		GROUP BY 
+			A.bill_yyyymm, A.customer_id
+        
+        LIMIT 	#{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- 프로젝트할인(EA00), 10원미만절사할인(EL00)의 합계를 계산하여 요금할인(E000)을 등록하거나 수정 -->
+	<select id="selectCheckExistsForDiscount" parameterType="BatchBillInvoiceCustomerDetailVO" resultType="BatchBillInvoiceCustomerDetailVO">
+		SELECT	*
+		FROM	bill_invoice_customer_detail
+		WHERE	bill_yyyymm = #{billYyyymm}
+		AND		customer_id = #{customerId}
+		AND		invoice_item = 'E000'
+	</select>
+
+	<!-- 프로젝트할인(EA00), 10원미만절사할인(EL00)의 합계를 계산하여 요금할인(E000)을 등록하거나 수정 -->
+	<update id="updateDiscountAmountForBillInvoiceCustomerDetail" parameterType="BatchBillInvoiceCustomerDetailVO">
+		UPDATE	bill_invoice_customer_detail
+		SET		invoice_item = #{invoiceItem},
+				invoice_item_sub = #{invoiceItemSub},
+				invoice_item_name = #{invoiceItemName},
+				invoice_item_depth = #{invoiceItemDepth},
+				amount = #{amount}
+		WHERE	bill_yyyymm = #{billYyyymm}
+		AND		customer_id = #{customerId}
+		AND		invoice_item = 'E000'
+	</update>
+
+	<delete id="deleteBillInvoiceCustomerDetail" parameterType="BatchBillInvoiceCustomerDetailVO">
+		DELETE 	FROM bill_invoice_customer_detail
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- =================================================================================== -->
+	<!-- BILL INVOICE PROJECT -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectListOssProject" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectVO">
+		SELECT 	
+			A.bill_yyyymm,
+			B.customer_id,
+			B.cloud_id,
+			B.project_id,
+			B.project_name,
+			B.project_alias
+		FROM	
+			bill_invoice_customer A,
+			(SELECT * FROM oss_project WHERE delete_flag = 'N') B
+		WHERE	
+			A.customer_id = B.customer_id
+			AND A.cloud_id = B.cloud_id
+			AND A.bill_yyyymm = #{billYM}
+        
+        LIMIT
+        	#{_skiprows}, #{_pagesize}
+	</select>
+
+	<insert id="insertBillInvoiceProject" parameterType="BatchBillInvoiceProjectVO">
+		INSERT INTO bill_invoice_project 
+		(
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			project_name,
+			project_alias,
+			bill_start_datetime,
+			bill_end_datetime
+		)
+		VALUES
+		(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{projectId},
+			#{projectName},
+			#{projectAlias},
+			#{billStartDatetime},
+			#{billEndDatetime}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			cloud_id = #{cloudId},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			project_name = #{projectName},
+			project_alias = #{projectAlias},
+			bill_start_datetime = #{billStartDatetime},
+			bill_end_datetime = #{billEndDatetime}
+	</insert>
+
+	<delete id="deleteBillInvoiceProject" parameterType="BatchBillInvoiceProjectVO">
+		DELETE 	FROM bill_invoice_project
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- =================================================================================== -->
+	<!-- BILL INVOICE PROJECT DETAIL -->
+	<!-- =================================================================================== -->
+	<!-- AAA0 : 가상서버 -->
+	<select id="batchSelectBillInvoiceProjectDetailForVirtualMachine" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			SUM(B.amount)		AS amount
+		FROM	
+			bill_invoice_project A,
+			bill_charge_vm B
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.customer_id = B.customer_id
+			AND	A.project_id = B.project_id
+			AND	A.bill_yyyymm = #{billYM}
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- AA00 : 기본상품 -->
+	<select id="batchSelectBillInvoiceProjectDetailForBasicProduct" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			SUM(B.amount)		AS amount
+		FROM	
+			bill_invoice_project A,
+			bill_invoice_project_detail B
+		
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND	A.customer_id = B.customer_id
+			AND	A.project_id = B.project_id
+			AND	A.bill_yyyymm = #{billYM}
+			AND	B.invoice_item IN ('AAA0')
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+        
+	</select>
+
+	<!-- AEA0 : 블록디스크 -->
+	<select id="batchSelectBillInvoiceProjectDetailForDisk" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			SUM(B.amount)		AS amount
+		FROM
+			bill_invoice_project A,
+			bill_charge_disk B
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND	A.customer_id = B.customer_id
+			AND	A.project_id = B.project_id
+			AND	A.bill_yyyymm = #{billYM}
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- AE00 : 부가상품 -->
+	<select id="batchSelectBillInvoiceProjectDetailForAdditionalProduct" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			SUM(B.amount)		AS amount
+		FROM	
+			bill_invoice_project A,
+			bill_invoice_project_detail B
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND	A.customer_id = B.customer_id
+			AND	A.project_id = B.project_id
+			AND	A.bill_yyyymm = #{billYM}
+			AND	B.invoice_item IN ('AEA0', 'AEB0', 'AEC0', 'AED0')
+		GROUP BY 
+			A.bill_yyyymm, A.customer_id, A.project_id
+        
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- AI00 : 서비스 -->
+	<select id="batchSelectBillInvoiceProjectDetailForService" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			SUM(B.amount)		AS amount
+		FROM	
+			bill_invoice_project A,
+			bill_invoice_project_detail B
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND	A.customer_id = B.customer_id
+			AND	A.project_id = B.project_id
+			AND	A.bill_yyyymm = #{billYM}
+			<!-- AND		B.invoice_item IN ('AIA0', 'AIB0', 'AIC0', 'AID0') -->
+			AND	B.invoice_item = 'SVS0'
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- EA00 : 프로젝트 할인 -->
+	<select id="batchSelectListChargeDiscount" parameterType="java.util.Map" resultType="BatchBillChargeDiscountVO">
+		SELECT
+			A.discount_seq,
+			A.project_id,
+			B.apply_date,
+			(A.discount_rate /100) AS discount_rate
+
+		FROM
+			bss_discount A ,
+			(
+				SELECT
+					discount_seq,
+					project_id,
+					MAX(apply_date) AS apply_date
+				FROM bss_discount
+				WHERE apply_date <![CDATA[<=]]>  DATE_FORMAT(NOW(), '%Y-%m-%d')
+				AND del_flag ='N'
+				GROUP BY  project_id
+			) B
+		WHERE A.discount_seq = B.discount_seq
+		LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<select id="batchSelectBillInvoiceProjectDetailForDiscount" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	A.bill_yyyymm,
+				A.customer_id,
+				A.project_id,
+				SUM(B.amount)		AS amount
+		FROM	bill_invoice_project A,
+				bill_invoice_project_detail B
+		WHERE	A.bill_yyyymm = B.bill_yyyymm
+		AND		A.customer_id = B.customer_id
+		AND		A.project_id = B.project_id
+		AND		A.bill_yyyymm = #{billYyyymm}
+		AND		A.project_id = #{projectId}
+		AND		B.invoice_item IN ('AA00', 'AE00')
+		GROUP BY A.bill_yyyymm, A.customer_id, A.project_id
+
+	</select>
+
+	<!-- IA00 : 보정명칭 -->
+	<select id="batchSelectListChargeAdjustmentitem" parameterType="java.util.Map" resultType="BatchBillChargeAdjustmentVO">
+		SELECT
+				A.adjust_seq,
+				A.bill_yyyymm,
+				A.adjust_contents,
+				A.adjust_amount AS adjust_amount,
+				A.project_id,
+				B.customer_id,
+				A.bill_flag,
+				A.del_flag
+		FROM bss_adjustment A
+		LEFT OUTER JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') B
+		ON A.project_id = B.project_id
+		WHERE A.bill_yyyymm =  #{billYM}
+		AND A.del_flag='N'
+		LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<update id="updateAdjustmentitemBillFlag" parameterType="BatchBillChargeAdjustmentVO">
+		UPDATE	bss_adjustment
+		SET		bill_flag = 'Y'
+		WHERE	adjust_seq =  #{adjustSeq}
+	</update>
+
+	<select id="selectBillInvoiceProjectDetailCloudProduct" parameterType="BatchBillInvoiceProjectDetailVO" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	A.bill_yyyymm,
+				A.customer_id,
+				A.project_id,
+				SUM(B.amount)		AS amount
+		FROM	bill_invoice_project A,
+				bill_invoice_project_detail B
+		WHERE	A.bill_yyyymm = B.bill_yyyymm
+		AND		A.customer_id = B.customer_id
+		AND		A.project_id = B.project_id
+		AND		A.bill_yyyymm = #{billYyyymm}
+		AND 	A.project_id = #{projectId}
+		AND		B.invoice_item IN ('AA00', 'AE00')
+		GROUP BY A.bill_yyyymm, A.customer_id, A.project_id
+	</select>
+
+
+	<!-- I000 : 보정 -->
+	<select id="batchSelectListChargeAdjustmentsum" parameterType="java.util.Map" resultType="BatchBillChargeAdjustmentVO">
+		SELECT
+			A.bill_yyyymm,
+			A.project_id,
+			B.customer_id,
+			SUM(FLOOR(A.adjust_amount)) AS adjust_amount
+		FROM bss_adjustment A
+		LEFT OUTER JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') B
+		ON A.project_id = B.project_id
+		WHERE A.bill_yyyymm =  #{billYM}
+		AND A.del_flag='N'
+		GROUP BY A.bill_yyyymm,	A.project_id, B.customer_id
+		LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- A000 : 클라우드 상품 -->
+	<select id="batchSelectBillInvoiceProjectDetailForCloudProduct" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			SUM(B.amount)		AS amount
+		FROM	
+			bill_invoice_project A,
+			bill_invoice_project_detail B
+		
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND	A.customer_id = B.customer_id
+			AND	A.project_id = B.project_id
+			AND	A.bill_yyyymm = #{billYM}
+			AND	B.invoice_item IN ('AA00', 'AE00', 'AI00')
+		
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- 0000 : 총 청구금액 -->
+	<select id="batchSelectBillInvoiceProjectDetailForTotalAmount" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			SUM(B.amount)		AS amount
+		FROM
+			bill_invoice_project A,
+			bill_invoice_project_detail B
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND	A.customer_id = B.customer_id
+			AND	A.project_id = B.project_id
+			AND	A.bill_yyyymm = #{billYM}
+			AND	B.invoice_item IN ('A000', 'EA00', 'I000', 'L000')
+		
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+
+	<!-- SVS0 : 서비스 -->
+	<select id="batchSelectBillInvoiceProjectDetailForServiceInsert" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			B.service_type,
+			SUM(B.amount)		AS amount
+		FROM	
+			bill_invoice_project A,
+			bill_charge_service B
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND	A.customer_id = B.customer_id
+			AND	A.project_id = B.project_id
+			AND	A.bill_yyyymm = #{billYM}
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+
+	<insert id="insertBillInvoiceProjectDetailService" parameterType="BatchBillInvoiceProjectDetailVO">
+		INSERT INTO bill_invoice_project_detail (
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			invoice_item,
+			invoice_item_sub,
+			invoice_item_name,
+			invoice_item_depth,
+			amount,
+			service_type
+		)VALUES(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{projectId},
+			#{invoiceItem},
+			#{invoiceItemSub},
+			#{invoiceItemName},
+			#{invoiceItemDepth},
+			#{amount},
+			#{serviceType}
+		)
+		  ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			cloud_id = #{cloudId},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			invoice_item = #{invoiceItem},
+			invoice_item_sub = #{invoiceItemSub},
+			invoice_item_name = #{invoiceItemName},
+			invoice_item_depth = #{invoiceItemDepth},
+			amount = #{amount},
+			service_type = #{serviceType}
+	</insert>
+
+	<insert id="insertBillInvoiceProjectDetail" parameterType="BatchBillInvoiceProjectDetailVO">
+		INSERT INTO bill_invoice_project_detail (
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			invoice_item,
+			invoice_item_sub,
+			invoice_item_name,
+			invoice_item_depth,
+			amount
+		)VALUES(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{projectId},
+			#{invoiceItem},
+			#{invoiceItemSub},
+			#{invoiceItemName},
+			#{invoiceItemDepth},
+			#{amount}
+		)
+		  ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			cloud_id = #{cloudId},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			invoice_item = #{invoiceItem},
+			invoice_item_sub = #{invoiceItemSub},
+			invoice_item_name = #{invoiceItemName},
+			invoice_item_depth = #{invoiceItemDepth},
+			amount = #{amount}
+			
+	</insert>
+
+	<delete id="deleteBillInvoiceProjectDetail" parameterType="BatchBillInvoiceProjectDetailVO">
+		DELETE 	FROM bill_invoice_project_detail
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- 프로젝트할인(EA00), 10원미만절사할인(EL00)의 합계를 계산하여 요금할인(E000)을 등록하거나 수정 -->
+	<select id="batchSelectBillInvoiceProjectDetailForDiscountAmount" parameterType="java.util.Map" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	A.bill_yyyymm,
+				A.customer_id,
+				A.project_id,
+				SUM(A.amount)		AS amount
+		FROM	bill_invoice_project_detail A
+		WHERE	bill_yyyymm = #{billYM}
+		AND		invoice_item IN ('EA00', 'EL00')
+		GROUP BY A.bill_yyyymm, A.customer_id, A.project_id
+        LIMIT 	#{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- 프로젝트할인(EA00), 10원미만절사할인(EL00)의 합계를 계산하여 요금할인(E000)을 등록하거나 수정 -->
+	<select id="selectCheckExistsProjectForDiscount" parameterType="BatchBillInvoiceProjectDetailVO" resultType="BatchBillInvoiceProjectDetailVO">
+		SELECT	*
+		FROM	bill_invoice_project_detail
+		WHERE	bill_yyyymm = #{billYyyymm}
+		AND		customer_id = #{customerId}
+		AND 	project_id = #{projectId}
+		AND		invoice_item = 'E000'
+	</select>
+
+	<!-- 프로젝트할인(EA00), 10원미만절사할인(EL00)의 합계를 계산하여 요금할인(E000)을 등록하거나 수정 -->
+	<update id="updateDiscountAmountForBillInvoiceProjectDetail" parameterType="BatchBillInvoiceProjectDetailVO">
+		UPDATE	bill_invoice_customer_detail
+		SET		invoice_item = #{invoiceItem},
+				invoice_item_sub = #{invoiceItemSub},
+				invoice_item_name = #{invoiceItemName},
+				invoice_item_depth = #{invoiceItemDepth},
+				amount = #{amount}
+		WHERE	bill_yyyymm = #{billYyyymm}
+		AND		customer_id = #{customerId}
+		AND		project_id  = #{projectId}
+		AND		invoice_item = 'E000'
+	</update>
+
+	<!-- =================================================================================== -->
+	<!-- BILL CHARGE VM -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectListChargeVm" parameterType="java.util.Map" resultType="BatchBillChargeVmVO">
+		SELECT	
+			M.bill_yyyymm,
+			C.customer_id,
+			P.project_id,
+			(SELECT cloud_id FROM OSS_project WHERE project_id = V.project_id) cloud_id,
+			V.vm_uuid,
+			V.hostname,
+			V.hostname_alias,
+			'CHRGRESSTAT_CONT' 		AS charge_resource_status,
+			V.hourly_flag,
+			V.create_datetime,
+			V.expire_datetime,
+			V.create_datetime 		AS charge_start_datetime,
+			V.expire_datetime 		AS charge_end_datetime,
+			0						AS amount
+		FROM
+			bill_master M,
+			bill_invoice_customer C,
+			bill_invoice_project P,
+			oss_vm V
+		WHERE	
+			M.bill_yyyymm = C.bill_yyyymm
+			AND V.del_flag = 'N'
+			AND	C.bill_yyyymm = P.bill_yyyymm
+			AND	C.customer_id = P.customer_id
+			AND	P.project_id = V.project_id
+			AND	C.customer_id = P.customer_id
+			AND	C.customer_id = P.customer_id
+			AND	
+			(
+				(V.create_datetime <![CDATA[<]]> #{baseBillStartDate})
+				AND
+				(IFNULL(V.expire_datetime, #{baseBillEndDate}) <![CDATA[>=]]> #{baseBillEndDate})
+			)
+			AND	M.bill_yyyymm =  #{billYM}
+		
+		UNION ALL
+		
+		SELECT	
+			M.bill_yyyymm,
+			C.customer_id,
+			P.project_id,
+			(SELECT cloud_id FROM OSS_project WHERE project_id = V.project_id) cloud_id,
+			V.vm_uuid,
+			V.hostname,
+			V.hostname_alias,
+			'CHRGRESSTAT_EXPR' 		AS charge_resource_status,
+			V.hourly_flag,
+			V.create_datetime,
+			V.expire_datetime,
+			V.create_datetime 		AS charge_start_datetime,
+			V.expire_datetime 		AS charge_end_datetime,
+			0						AS amount
+		FROM	
+			bill_master M,
+			bill_invoice_customer C,
+			bill_invoice_project P,
+			oss_vm V
+		WHERE	
+			M.bill_yyyymm = C.bill_yyyymm
+			AND V.del_flag = 'N'
+			AND		C.bill_yyyymm = P.bill_yyyymm
+			AND	C.customer_id = P.customer_id
+			AND	P.project_id = V.project_id
+			AND	C.customer_id = P.customer_id
+			AND	C.customer_id = P.customer_id
+			AND		
+			(
+				(V.create_datetime <![CDATA[<]]> #{baseBillStartDate})
+				AND
+				((V.expire_datetime <![CDATA[>=]]> #{baseBillStartDate}) AND (IFNULL(V.expire_datetime, #{baseBillEndDate}) <![CDATA[<]]> #{baseBillEndDate}))
+			)
+			AND M.bill_yyyymm =  #{billYM}
+		
+		UNION ALL
+		
+		SELECT	
+			M.bill_yyyymm,
+			C.customer_id,
+			P.project_id,
+			(SELECT cloud_id FROM OSS_project WHERE project_id = V.project_id) cloud_id,
+			V.vm_uuid,
+			V.hostname,
+			V.hostname_alias,
+			'CHRGRESSTAT_NEWEXPR' 		AS charge_resource_status,
+			V.hourly_flag,
+			V.create_datetime,
+			V.expire_datetime,
+			V.create_datetime 		AS charge_start_datetime,
+			V.expire_datetime 		AS charge_end_datetime,
+			0						AS amount
+		FROM	
+			bill_master M,
+			bill_invoice_customer C,
+			bill_invoice_project P,
+			oss_vm V
+		WHERE
+			M.bill_yyyymm = C.bill_yyyymm
+			AND V.del_flag = 'N'
+			AND C.bill_yyyymm = P.bill_yyyymm
+			AND	C.customer_id = P.customer_id
+			AND	P.project_id = V.project_id
+			AND	C.customer_id = P.customer_id
+			AND	C.customer_id = P.customer_id
+			AND	
+			(
+				((V.create_datetime <![CDATA[>=]]> #{baseBillStartDate}) AND (V.create_datetime <![CDATA[<]]> #{baseBillEndDate}))
+				AND
+				(IFNULL(V.expire_datetime, #{baseBillEndDate}) <![CDATA[<]]> #{baseBillEndDate})
+			)
+			AND M.bill_yyyymm =  #{billYM}
+		
+		UNION ALL
+		
+		SELECT	
+			M.bill_yyyymm,
+			C.customer_id,
+			P.project_id,
+			(SELECT cloud_id FROM OSS_project WHERE project_id = V.project_id) cloud_id,
+			V.vm_uuid,
+			V.hostname,
+			V.hostname_alias,
+			'CHRGRESSTAT_NEW' 		AS charge_resource_status,
+			V.hourly_flag,
+			V.create_datetime,
+			V.expire_datetime,
+			V.create_datetime 		AS charge_start_datetime,
+			V.expire_datetime 		AS charge_end_datetime,
+			0						AS amount
+		FROM	
+			bill_master M,
+			bill_invoice_customer C,
+			bill_invoice_project P,
+			oss_vm V
+		WHERE	
+			M.bill_yyyymm = C.bill_yyyymm
+			AND V.del_flag = 'N'
+			AND	C.bill_yyyymm = P.bill_yyyymm
+			AND	C.customer_id = P.customer_id
+			AND	P.project_id = V.project_id
+			AND	C.customer_id = P.customer_id
+			AND	C.customer_id = P.customer_id
+			AND
+			(
+				((V.create_datetime <![CDATA[>=]]> #{baseBillStartDate}) AND (V.create_datetime <![CDATA[<]]> #{baseBillEndDate}))
+				AND
+				(IFNULL(V.expire_datetime, #{baseBillEndDate}) <![CDATA[>=]]> #{baseBillEndDate})
+			)
+			AND	M.bill_yyyymm =  #{billYM}
+        
+        LIMIT 
+        	#{_skiprows}, #{_pagesize}
+	</select>
+
+	<insert id="insertBillChargeVm" parameterType="BatchBillChargeVmVO">
+		INSERT INTO bill_charge_vm (
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			vm_uuid,
+			hostname,
+			hostname_alias,
+			charge_resource_status,
+			hourly_flag,
+			create_datetime,
+			expire_datetime,
+			charge_start_datetime,
+			charge_end_datetime,
+			amount
+		)VALUES(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{projectId},
+			#{vmUuid},
+			#{hostname},
+			#{hostnameAlias},
+			#{chargeResourceStatus},
+			#{hourlyFlag},
+			#{createDatetime},
+			#{expireDatetime},
+			#{chargeStartDatetime},
+			#{chargeEndDatetime},
+			#{amount}
+		)
+		ON DUPLICATE KEY
+		UPDATE
+			bill_yyyymm = #{billYyyymm},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			vm_uuid = #{vmUuid},
+			hostname = #{hostname},
+			hostname_alias = #{hostnameAlias},
+			charge_resource_status = #{chargeResourceStatus},
+			hourly_flag = #{hourlyFlag},
+			create_datetime = #{createDatetime},
+			expire_datetime = #{expireDatetime},
+			charge_start_datetime = #{chargeStartDatetime},
+			charge_end_datetime = #{chargeEndDatetime},
+			amount = #{amount}
+	</insert>
+
+	<!-- UPDATE AMOUNT FOR BILL_CHARGE_VM -->
+	<select id="batchSelectBillChargeVmForAmount" parameterType="java.util.Map" resultType="BatchBillChargeVmVO">
+		SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			A.resource_id		AS vm_uuid,
+			SUM(A.amount)		AS amount
+		FROM
+			bill_charge_vm_resource A
+		
+		WHERE
+			A.bill_yyyymm = #{billYM}
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id, A.resource_id
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<update id="updateAmountForBillChargeVm" parameterType="BatchBillChargeVmVO">
+		UPDATE	bill_charge_vm
+		SET		
+			amount = #{amount}
+		WHERE	
+			bill_yyyymm =  #{billYyyymm}
+			AND cloud_id = #{cloudId}
+			AND	customer_id = #{customerId}
+			AND	project_id = #{projectId}
+			AND	vm_uuid = #{vmUuid}
+	</update>
+
+	<!-- UPDATE BILL_CHARGE_VM_RESOUCE -->
+	<delete id="deleteBillChargeVm" parameterType="BatchBillChargeVmVO">
+		DELETE 	FROM bill_charge_vm
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- =================================================================================== -->
+	<!-- BILL CHARGE VM RESOURCE -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectListChargeVmResource" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			vm_uuid			AS resource_id,
+			NULL			AS resource_item,
+			charge_start_datetime,
+			charge_end_datetime,
+			0				AS amount
+		FROM
+			bill_charge_vm
+		WHERE
+			bill_yyyymm = #{billYM}
+        LIMIT 
+        	#{_skiprows}, #{_pagesize}
+	</select>
+
+	<insert id="insertBillChargeVmResource" parameterType="BatchBillChargeResourceVO">
+		INSERT INTO bill_charge_vm_resource 
+		(
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			resource_id,
+			resource_item,
+			charge_start_datetime,
+			charge_end_datetime,
+			amount
+		)
+		VALUES
+		(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{projectId},
+			#{resourceId},
+			#{resourceItem},
+			#{chargeStartDatetime},
+			#{chargeEndDatetime},
+			#{amount}
+		)
+	</insert>
+
+
+	<!-- UPDATE BILL_CHARGE_VM_RESOUCE FOR AMOUNT -->
+	<select id="batchSelectBillChargeVmResourceForAmount" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	
+			A.bill_yyyymm		AS bill_yyyymm,
+			A.cloud_id			AS cloud_id,
+			A.customer_id		AS customer_id,
+			A.project_id		AS project_id,
+			A.resource_id		AS resource_id,
+			A.resource_item		AS resource_item,
+			SUM(A.amount)		AS amount
+		FROM	
+			bill_charge_vm_resource_detail A
+		
+		WHERE	
+			A.bill_yyyymm = #{billYM}
+		
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id, A.resource_id, A.resource_item
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<update id="updateBillChargeVmResourceForAmount" parameterType="BatchBillChargeResourceVO">
+		UPDATE bill_charge_vm_resource
+		SET		
+			amount = #{amount}
+		WHERE	
+			bill_yyyymm = #{billYyyymm}
+			AND cloud_id = #{cloudId}
+			AND customer_id = #{customerId}
+			AND project_id = #{projectId}
+			AND resource_id = #{resourceId}
+			AND resource_item = #{resourceItem}
+	</update>
+
+	<!-- DELETE BILL_CHARGE_VM_RESOUCE -->
+	<delete id="deleteBillChargeVmResource" parameterType="BatchBillChargeResourceVO">
+		DELETE 	FROM bill_charge_vm_resource
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- =================================================================================== -->
+	<!-- BILL CHARGE VM RESOURCE DETAIL -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectListChargeVmResourceCpu" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	
+			B.bill_yyyymm,
+			A.cloud_id,
+			B.customer_id,
+			B.project_id,
+			B.resource_id,
+			B.resource_item,
+			B.charge_start_datetime,
+			B.charge_end_datetime,
+			B.amount,
+			A.hourly_flag
+		FROM
+			bill_charge_vm A,
+			bill_charge_vm_resource B
+		WHERE
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.cloud_id = B.cloud_id
+			AND A.customer_id = B.customer_id
+			AND	A.project_id = B.project_id
+			AND	A.vm_uuid = B.resource_id
+			AND	A.bill_yyyymm = #{billYM}
+			AND	B.resource_item = 'CPU'
+        LIMIT 
+        	#{_skiprows}, #{_pagesize}
+	</select>
+
+	<select id="selectListMeteringMeasureCpu" parameterType="BatchBillChargeResourceVO" resultType="BatchMeteringMeasureVO">
+		SELECT	
+			B.*
+		FROM	
+			metering_metric A,
+			metering_measure_vcpu B
+		WHERE	
+			A.metric_id = B.metric_id
+			AND	A.resource_id = #{resourceId}
+			AND	A.metric_item = 'vcpus'
+			AND	B.metering_datetime <![CDATA[>=]]> #{chargeStartDatetime}
+			AND	B.metering_datetime <![CDATA[<]]> #{chargeEndDatetime}
+		
+		ORDER BY 
+			B.metering_datetime
+	</select>
+
+	<select id="batchSelectListChargeVmResourceMem" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	
+			B.bill_yyyymm,
+			A.cloud_id,
+			B.customer_id,
+			B.project_id,
+			B.resource_id,
+			B.resource_item,
+			B.charge_start_datetime,
+			B.charge_end_datetime,
+			B.amount,
+			A.hourly_flag
+		FROM 	
+			bill_charge_vm A,
+			bill_charge_vm_resource B
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.customer_id = B.customer_id
+			AND A.project_id = B.project_id
+			AND A.vm_uuid = B.resource_id
+			AND A.bill_yyyymm = #{billYM}
+			AND B.resource_item = 'MEMORY'
+        
+        LIMIT 
+        	#{_skiprows}, #{_pagesize}
+	</select>
+
+	<select id="selectListMeteringMeasureMem" parameterType="BatchBillChargeResourceVO" resultType="BatchMeteringMeasureVO">
+		SELECT	B.*
+		FROM	metering_metric A,
+				metering_measure_mem B
+		WHERE	A.metric_id = B.metric_id
+		AND		A.resource_id = #{resourceId}
+		AND		A.metric_item = 'memory'
+		AND		B.metering_datetime <![CDATA[>=]]> #{chargeStartDatetime}
+		AND		B.metering_datetime <![CDATA[<]]> #{chargeEndDatetime}
+		ORDER BY B.metering_datetime
+	</select>
+
+	<select id="batchSelectBillChargeVmResourceDetailForOsDisk" parameterType="java.util.Map" resultType="BatchBillChargeResourceDetailVO">
+        SELECT	
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			A.vm_uuid			AS resource_id,
+			'DISK'				AS resource_item,
+			A.charge_start_datetime,
+			A.charge_end_datetime,
+			B.size_gb			AS measure_value,
+			A.hourly_flag,
+			B.volume_type,
+			IFNULL(B.image_item_id, '#') AS image_item_id,
+			B.disk_alias
+		FROM
+			bill_charge_vm A
+				INNER JOIN  
+			oss_disk B
+		    	ON A.vm_uuid = B.vm_uuid
+		WHERE
+			A.bill_yyyymm = #{billYM}
+	      	AND B.disk_alias LIKE '%_OS%'
+		
+		LIMIT 
+			#{_skiprows}, #{_pagesize}
+
+	</select>
+
+	<insert id="insertBillChargeVmResourceDetail" parameterType="BatchBillChargeResourceDetailVO">
+		INSERT INTO bill_charge_vm_resource_detail 
+		(
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			resource_id,
+			resource_item,
+			charge_start_datetime,
+			charge_end_datetime,
+			hourly_flag,
+			duration,
+			measure_value,
+			price,
+			amount,
+			volume_type,
+			image_type
+		)
+		VALUES
+		(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{projectId},
+			#{resourceId},
+			#{resourceItem},
+			#{chargeStartDatetime},
+			#{chargeEndDatetime},
+			#{hourlyFlag},
+			#{duration},
+			#{measureValue},
+			#{price},
+			#{amount},
+			#{volumeType},
+			#{imageItemId}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			cloud_id = #{cloudId},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			resource_id = #{resourceId},
+			resource_item = #{resourceItem},
+			charge_start_datetime = #{chargeStartDatetime},
+			charge_end_datetime = #{chargeEndDatetime},
+			hourly_flag = #{hourlyFlag},
+			duration = #{duration},
+			measure_value = #{measureValue},
+			price = #{price},
+			amount = #{amount},
+			volume_type = #{volumeType},
+			image_type = #{imageItemId}
+	</insert>
+
+	<delete id="deleteBillChargeVmResourceDetail" parameterType="BatchBillChargeResourceDetailVO">
+		DELETE 	FROM bill_charge_vm_resource_detail
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- =================================================================================== -->
+	<!-- BILL CHARGE DISK -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectListChargeDisk" parameterType="java.util.Map" resultType="BatchBillChargeDiskVO">
+		SELECT	
+			M.bill_yyyymm,
+			C.customer_id,
+			(SELECT cloud_id FROM oss_project where project_id = N.project_id) cloud_id,
+			P.project_id,
+			N.disk_id,
+			N.disk_alias,
+			'CHRGRESSTAT_CONT' 		AS charge_resource_status,
+			N.hourly_flag,
+			N.create_datetime,
+			N.expire_datetime,
+			N.create_datetime 		AS charge_start_datetime,
+			N.expire_datetime 		AS charge_end_datetime,
+			N.volume_type,
+			0				AS amount
+		FROM	
+			bill_master M,
+			bill_invoice_customer C,
+			bill_invoice_project P,
+			oss_disk N
+		WHERE	
+			M.bill_yyyymm = C.bill_yyyymm
+			AND	C.bill_yyyymm = P.bill_yyyymm
+			AND	C.customer_id = P.customer_id
+			AND	P.project_id  = N.project_id
+			AND del_flag = 'N'
+			AND	
+			(
+				(N.create_datetime <![CDATA[<]]> #{baseBillStartDate})
+				AND
+				(IFNULL(N.expire_datetime, #{baseBillEndDate}) <![CDATA[>=]]> #{baseBillEndDate})
+			)
+			AND M.bill_yyyymm =   #{billYM}
+		
+		UNION ALL
+		
+		SELECT	
+			M.bill_yyyymm,
+			C.customer_id,
+			(SELECT cloud_id FROM oss_project where project_id = N.project_id) cloud_id,
+			P.project_id,
+			N.disk_id,
+			N.disk_alias,
+			'CHRGRESSTAT_EXPR' 		AS charge_resource_status,
+			N.hourly_flag,
+			N.create_datetime,
+			N.expire_datetime,
+			N.create_datetime 		AS charge_start_datetime,
+			N.expire_datetime 		AS charge_end_datetime,
+			N.volume_type,
+			0				AS amount
+		FROM
+			bill_master M,
+			bill_invoice_customer C,
+			bill_invoice_project P,
+			oss_disk N
+		WHERE	
+			M.bill_yyyymm = C.bill_yyyymm
+			AND	C.bill_yyyymm = P.bill_yyyymm
+			AND	C.customer_id = P.customer_id
+			AND	P.project_id = 	N.project_id
+			AND  del_flag = 'N'
+			AND	
+			(
+				(N.create_datetime <![CDATA[<]]> #{baseBillStartDate})
+				AND
+				((N.expire_datetime <![CDATA[>=]]> #{baseBillStartDate}) AND (IFNULL(N.expire_datetime, #{baseBillEndDate}) <![CDATA[<]]> #{baseBillEndDate}))
+			)
+			AND	M.bill_yyyymm =  #{billYM}
+		
+		UNION ALL
+		
+		SELECT	
+			M.bill_yyyymm,
+			C.customer_id,
+			(SELECT cloud_id FROM oss_project where project_id = N.project_id) cloud_id,
+			P.project_id,
+			N.disk_id,
+			N.disk_alias,
+			'CHRGRESSTAT_NEWEXPR' 		AS charge_resource_status,
+			N.hourly_flag,
+			N.create_datetime,
+			N.expire_datetime,
+			N.create_datetime 		AS charge_start_datetime,
+			N.expire_datetime 		AS charge_end_datetime,
+			N.volume_type,
+			0						AS amount
+		FROM	
+			bill_master M,
+			bill_invoice_customer C,
+			bill_invoice_project P,
+			oss_disk N
+		WHERE	
+			M.bill_yyyymm = C.bill_yyyymm
+			AND	C.bill_yyyymm = P.bill_yyyymm
+			AND	C.customer_id = P.customer_id
+			AND	P.project_id  = N.project_id
+			AND  del_flag = 'N'
+			AND	
+			(
+				((N.create_datetime <![CDATA[>=]]> #{baseBillStartDate}) AND (N.create_datetime <![CDATA[<]]> #{baseBillEndDate}))
+				AND
+				(IFNULL(N.expire_datetime, #{baseBillEndDate}) <![CDATA[<]]> #{baseBillEndDate})
+			)
+			AND M.bill_yyyymm =  #{billYM}
+		
+		UNION ALL
+		
+		SELECT	
+			M.bill_yyyymm,
+			C.customer_id,
+			(SELECT cloud_id FROM oss_project where project_id = N.project_id) cloud_id,
+			P.project_id,
+			N.disk_id,
+			N.disk_alias,
+			'CHRGRESSTAT_NEW' 		AS charge_resource_status,
+			N.hourly_flag,
+			N.create_datetime,
+			N.expire_datetime,
+			N.create_datetime 		AS charge_start_datetime,
+			N.expire_datetime 		AS charge_end_datetime,
+			N.volume_type,
+			0						AS amount
+		FROM	
+			bill_master M,
+			bill_invoice_customer C,
+			bill_invoice_project P,
+			oss_disk N
+		WHERE	
+			M.bill_yyyymm = C.bill_yyyymm
+			AND	C.bill_yyyymm = P.bill_yyyymm
+			AND	C.customer_id = P.customer_id
+			AND	P.project_id  = N.project_id
+			AND  del_flag = 'N'
+			AND	
+			(
+				((N.create_datetime <![CDATA[>=]]> #{baseBillStartDate}) AND (N.create_datetime <![CDATA[<]]> #{baseBillEndDate}))
+				AND
+				(IFNULL(N.expire_datetime, #{baseBillEndDate}) <![CDATA[>=]]> #{baseBillEndDate})
+			)
+			AND M.bill_yyyymm =  #{billYM}
+		
+		
+		LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<insert id="insertBillChargeDisk" parameterType="BatchBillChargeDiskVO">
+		INSERT INTO bill_charge_disk 
+		(
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			disk_id,
+			disk_alias,
+			charge_resource_status,
+			hourly_flag,
+			create_datetime,
+			expire_datetime,
+			charge_start_datetime,
+			charge_end_datetime,
+			amount,
+			volume_type
+		)
+		VALUES
+		(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{projectId},
+			#{diskId},
+			#{diskAlias},
+			#{chargeResourceStatus},
+			#{hourlyFlag},
+			#{createDatetime},
+			#{expireDatetime},
+			#{chargeStartDatetime},
+			#{chargeEndDatetime},
+			#{amount},
+			#{volumeType}
+
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			disk_id = #{diskId},
+			disk_alias = #{diskAlias},
+			charge_resource_status = #{chargeResourceStatus},
+			hourly_flag = #{hourlyFlag},
+			create_datetime = #{createDatetime},
+			expire_datetime = #{expireDatetime},
+			charge_start_datetime = #{chargeStartDatetime},
+			charge_end_datetime = #{chargeEndDatetime},
+			amount = #{amount},
+			volume_type = #{volumeType}
+	</insert>
+
+	<!-- UPDATE AMOUNT FOR BILL_CHARGE_Disk -->
+	<select id="batchSelectBillChargeDiskForAmount" parameterType="java.util.Map" resultType="BatchBillChargeDiskVO">
+		SELECT
+			A.bill_yyyymm,
+			A.cloud_id,
+			A.customer_id,
+			A.project_id,
+			A.resource_id		AS disk_id,
+			A.volume_type     AS volume_type,
+			SUM(A.amount)		AS amount
+		FROM
+			bill_charge_disk_resource A
+		
+		WHERE	
+			A.bill_yyyymm = #{billYM}
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id, A.resource_id, A.volume_type
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<update id="updateAmountForBillChargeDisk" parameterType="BatchBillChargeDiskVO">
+		UPDATE	bill_charge_disk
+		SET		
+			amount = #{amount}
+		WHERE	
+			bill_yyyymm =  #{billYyyymm}
+			AND cloud_id = #{cloudId}
+			AND customer_id = #{customerId}
+			AND project_id = #{projectId}
+			AND disk_id = #{diskId}
+	</update>
+
+	<!-- DELETE BILL_CHARGE_DISK -->
+	<delete id="deleteBillChargeDisk" parameterType="BatchBillChargeDiskVO">
+		DELETE 	FROM bill_charge_disk
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- =================================================================================== -->
+	<!-- BILL CHARGE DISK RESOURCE -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectListChargeDiskResource" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			disk_id			AS resource_id,
+			NULL			AS resource_item,
+			charge_start_datetime,
+			charge_end_datetime,
+			0				AS amount,
+			volume_type
+		FROM
+			bill_charge_disk
+		WHERE
+			bill_yyyymm = #{billYM}
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<insert id="insertBillChargeDiskResource" parameterType="BatchBillChargeResourceVO">
+		INSERT INTO bill_charge_disk_resource 
+		(
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			resource_id,
+			resource_item,
+			charge_start_datetime,
+			charge_end_datetime,
+			amount,
+			volume_type
+		)
+		VALUES
+		(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{projectId},
+			#{resourceId},
+			#{resourceItem},
+			#{chargeStartDatetime},
+			#{chargeEndDatetime},
+			#{amount},
+			#{volumeType}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			cloud_id = #{cloudId},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			resource_id = #{resourceId},
+			resource_item = #{resourceItem},
+			charge_start_datetime = #{chargeStartDatetime},
+			charge_end_datetime = #{chargeEndDatetime},
+			amount = #{amount},
+			volume_type = #{volumeType}
+	</insert>
+
+	<!-- UPDATE BILL_CHARGE_DISK_RESOUCE FOR AMOUNT -->
+	<select id="batchSelectBillChargeDiskResourceForAmount" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	
+			A.bill_yyyymm		AS bill_yyyymm,
+			A.cloud_id			AS cloud_id,
+			A.customer_id		AS customer_id,
+			A.project_id		AS project_id,
+			A.resource_id		AS resource_id,
+			A.resource_item		AS resource_item,
+			A.volume_type  AS volume_type,
+			SUM(A.amount)		AS amount
+		FROM
+			bill_charge_disk_resource_detail A
+		WHERE
+			A.bill_yyyymm = #{billYM}
+		GROUP BY 
+			A.bill_yyyymm, A.cloud_id, A.customer_id, A.project_id, A.resource_id, A.resource_item, A.volume_type
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<update id="updateBillChargeDiskResourceForAmount" parameterType="BatchBillChargeResourceVO">
+		UPDATE 	bill_charge_disk_resource
+		SET		
+			amount = #{amount}
+		WHERE	
+			bill_yyyymm = #{billYyyymm}
+			AND cloud_id = #{cloudId}
+			AND customer_id = #{customerId}
+			AND project_id = #{projectId}
+			AND resource_id = #{resourceId}
+			AND resource_item = #{resourceItem}
+	</update>
+
+	<!-- DELETE BILL_CHARGE_DISK_RESOURCE -->
+	<delete id="deleteBillChargeDiskResource" parameterType="BatchBillChargeResourceVO">
+		DELETE 	FROM bill_charge_disk_resource
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- =================================================================================== -->
+	<!-- BILL CHARGE DISK RESOURCE DETAIL -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectListChargeDiskResourceGb" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	
+			B.bill_yyyymm,
+			A.cloud_id,
+			B.customer_id,
+			B.project_id,
+			B.resource_id,
+			B.resource_item,
+			B.charge_start_datetime,
+			B.charge_end_datetime,
+			B.volume_type,
+			B.amount,
+			A.hourly_flag
+		FROM 	
+			bill_charge_disk A,
+			bill_charge_disk_resource B
+		
+		WHERE	
+			A.bill_yyyymm = B.bill_yyyymm
+			AND A.customer_id = B.customer_id
+			AND A.project_id = B.project_id
+			AND	A.disk_id = B.resource_id
+			AND	A.bill_yyyymm = #{billYM}
+			AND	B.resource_item = 'volume.size'
+        
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<select id="selectListMeteringMeasureDisk" parameterType="BatchBillChargeResourceVO" resultType="BatchMeteringMeasureVO">
+		SELECT	
+			B.*
+		FROM	
+			metering_metric A,
+			metering_measure_disk B
+		
+		WHERE
+			A.metric_id = B.metric_id
+			AND A.resource_id = #{resourceId}
+			AND A.metric_item = 'volume.size'
+			AND B.metering_datetime <![CDATA[>=]]> #{chargeStartDatetime}
+			AND B.metering_datetime <![CDATA[<]]> #{chargeEndDatetime}
+		
+		ORDER BY
+			B.metering_datetime
+	</select>
+
+	<insert id="insertBillChargeDiskResourceDetail" parameterType="BatchBillChargeResourceDetailVO">
+		INSERT INTO bill_charge_disk_resource_detail 
+		(
+			bill_yyyymm,
+			cloud_id,
+			customer_id,
+			project_id,
+			resource_id,
+			resource_item,
+			charge_start_datetime,
+			charge_end_datetime,
+			hourly_flag,
+			duration,
+			measure_value,
+			price,
+			amount,
+			volume_type
+		)
+		VALUES
+		(
+			#{billYyyymm},
+			#{cloudId},
+			#{customerId},
+			#{projectId},
+			#{resourceId},
+			#{resourceItem},
+			#{chargeStartDatetime},
+			#{chargeEndDatetime},
+			#{hourlyFlag},
+			#{duration},
+			#{measureValue},
+			#{price},
+			#{amount},
+			#{volumeType}
+
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			cloud_id = #{cloudId},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			resource_id = #{resourceId},
+			resource_item = #{resourceItem},
+			charge_start_datetime = #{chargeStartDatetime},
+			charge_end_datetime = #{chargeEndDatetime},
+			hourly_flag = #{hourlyFlag},
+			duration = #{duration},
+			measure_value = #{measureValue},
+			price = #{price},
+			amount = #{amount},
+			volume_type = #{volumeType}
+	</insert>
+
+	<!-- DELETE BILL_CHARGE_DISK_RESOURCE_DETAIL -->
+	<delete id="deleteBillChargeDiskResourceDetail" parameterType="BatchBillChargeResourceVO">
+		DELETE 	FROM bill_charge_disk_resource_detail
+		WHERE	bill_yyyymm = #{billYyyymm}
+	</delete>
+
+	<!-- =================================================================================== -->
+	<!-- BILL CHARGE SERVICE RESOURCE -->
+	<!-- =================================================================================== -->
+
+	<select id="batchSelectListChargeService" parameterType="java.util.Map" resultType="BatchBillChargeServiceVO">
+		SELECT	M.bill_yyyymm,
+				C.customer_id,
+				P.project_id,
+				b.service_id,
+				'CHRGRESSTAT_CONT' 		AS charge_resource_status,
+				b.hourly_flag,
+				b.create_datetime,
+				b.expire_datetime,
+				b.create_datetime 		AS charge_start_datetime,
+				b.expire_datetime 		AS charge_end_datetime,
+				0						AS amount,
+				b.service_type,
+				p.cloud_id
+		FROM	bill_master M,
+				bill_invoice_customer C,
+				bill_invoice_project P,
+				oss_service b
+		WHERE	M.bill_yyyymm = C.bill_yyyymm
+		AND		C.bill_yyyymm = P.bill_yyyymm
+		AND		C.customer_id = P.customer_id
+		AND		P.project_id  = b.project_id
+		AND		C.customer_id = P.customer_id
+		AND		C.customer_id = P.customer_id
+		AND      B.del_flag = 'N'
+		AND	(
+					(b.create_datetime <![CDATA[<]]> #{baseBillStartDate})
+					AND
+					(IFNULL(b.expire_datetime, #{baseBillEndDate}) <![CDATA[>=]]> #{baseBillEndDate})
+				)
+		AND 	M.bill_yyyymm =   #{billYM}
+		UNION ALL
+		SELECT	M.bill_yyyymm,
+				C.customer_id,
+				P.project_id,
+				b.service_id,
+				'CHRGRESSTAT_EXPR' 		AS charge_resource_status,
+				b.hourly_flag,
+				b.create_datetime,
+				b.expire_datetime,
+				b.create_datetime 		AS charge_start_datetime,
+				b.expire_datetime 		AS charge_end_datetime,
+				0						AS amount,
+				b.service_type,
+				p.cloud_id
+		FROM	bill_master M,
+				bill_invoice_customer C,
+				bill_invoice_project P,
+				oss_service b
+		WHERE	M.bill_yyyymm = C.bill_yyyymm
+		AND		C.bill_yyyymm = P.bill_yyyymm
+		AND		C.customer_id = P.customer_id
+		AND		P.project_id = 	b.project_id
+		AND		C.customer_id = P.customer_id
+		AND		C.customer_id = P.customer_id
+		AND      B.del_flag = 'N'
+		AND	(
+					(b.create_datetime <![CDATA[<]]> #{baseBillStartDate})
+					AND
+					((b.expire_datetime <![CDATA[>=]]> #{baseBillStartDate}) AND (IFNULL(b.expire_datetime, #{baseBillEndDate}) <![CDATA[<]]> #{baseBillEndDate}))
+			)
+		AND 	M.bill_yyyymm =  #{billYM}
+		UNION ALL
+		SELECT	M.bill_yyyymm,
+				C.customer_id,
+				P.project_id,
+				b.service_id,
+				'CHRGRESSTAT_NEWEXPR' 		AS charge_resource_status,
+				b.hourly_flag,
+				b.create_datetime,
+				b.expire_datetime,
+				b.create_datetime 		AS charge_start_datetime,
+				b.expire_datetime 		AS charge_end_datetime,
+				0						AS amount,
+				b.service_type,
+				p.cloud_id
+		FROM	bill_master M,
+				bill_invoice_customer C,
+				bill_invoice_project P,
+				oss_service b
+		WHERE	M.bill_yyyymm = C.bill_yyyymm
+		AND		C.bill_yyyymm = P.bill_yyyymm
+		AND		C.customer_id = P.customer_id
+		AND		P.project_id  = b.project_id
+		AND		C.customer_id = P.customer_id
+		AND		C.customer_id = P.customer_id
+		AND      B.del_flag = 'N'
+		AND	(
+					((b.create_datetime <![CDATA[>=]]> #{baseBillStartDate}) AND (b.create_datetime <![CDATA[<]]> #{baseBillEndDate}))
+					AND
+					(IFNULL(b.expire_datetime, #{baseBillEndDate}) <![CDATA[<]]> #{baseBillEndDate})
+			)
+		AND 	M.bill_yyyymm =  #{billYM}
+		UNION ALL
+		SELECT	M.bill_yyyymm,
+				C.customer_id,
+				P.project_id,
+				b.service_id,
+				'CHRGRESSTAT_NEW' 		AS charge_resource_status,
+				b.hourly_flag,
+				b.create_datetime,
+				b.expire_datetime,
+				b.create_datetime 		AS charge_start_datetime,
+				b.expire_datetime 		AS charge_end_datetime,
+				0						AS amount,
+				b.service_type,
+				p.cloud_id
+		FROM	bill_master M,
+				bill_invoice_customer C,
+				bill_invoice_project P,
+				oss_service b
+		WHERE	M.bill_yyyymm = C.bill_yyyymm
+		AND		C.bill_yyyymm = P.bill_yyyymm
+		AND		C.customer_id = P.customer_id
+		AND		P.project_id  = b.project_id
+		AND		C.customer_id = P.customer_id
+		AND		C.customer_id = P.customer_id
+		AND      B.del_flag = 'N'
+		AND	(
+					((b.create_datetime <![CDATA[>=]]> #{baseBillStartDate}) AND (b.create_datetime <![CDATA[<]]> #{baseBillEndDate}))
+					AND
+					(IFNULL(b.expire_datetime, #{baseBillEndDate}) <![CDATA[>=]]> #{baseBillEndDate})
+			)
+		AND 	M.bill_yyyymm =  #{billYM}
+		LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+
+
+
+	<insert id="insertBillChargeService" parameterType="BatchBillChargeServiceVO">
+		INSERT  INTO bill_charge_service (
+			bill_yyyymm,
+			customer_id,
+			project_id,
+			service_id,
+			hourly_flag,
+			create_datetime,
+			expire_datetime,
+			charge_resource_status,
+			charge_start_datetime,
+			charge_end_datetime,
+			amount,
+			service_type,
+			cloud_id
+		)VALUES(
+			#{billYyyymm},
+			#{customerId},
+			#{projectId},
+			#{serviceId},
+			#{hourlyFlag},
+			#{createDatetime},
+			#{expireDatetime},
+			#{chargeResourceStatus},
+			#{chargeStartDatetime},
+			#{chargeEndDatetime},
+			#{amount},
+			#{serviceType},
+			#{cloudId}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			service_id = #{serviceId},
+			hourly_flag = #{hourlyFlag},
+			create_datetime = #{createDatetime},
+			expire_datetime = #{expireDatetime},
+			charge_resource_status = #{chargeResourceStatus},
+			charge_start_datetime = #{chargeStartDatetime},
+			charge_end_datetime = #{chargeEndDatetime},
+			amount = #{amount},
+			service_type = #{serviceType},
+			cloud_id = #{cloudId}
+	</insert>
+
+	<select id="batchSelectListChargeServiceResource" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	bill_yyyymm,
+					customer_id,
+					project_id,
+					service_id AS resource_id,
+					NULL AS resource_item,
+					charge_start_datetime,
+					charge_end_datetime,
+					0 AS amount,
+					service_type,
+					cloud_id
+
+		FROM bill_charge_service
+		WHERE	bill_yyyymm = #{billYM}
+        LIMIT #{_skiprows}, #{_pagesize}
+        </select>
+
+
+	<select id="batchSelectListChargeServiceResourceEa" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	B.bill_yyyymm,
+				B.customer_id,
+				B.project_id,
+				B.resource_id,
+				B.resource_item,
+				B.charge_start_datetime,
+				B.charge_end_datetime,
+				B.amount,
+				A.hourly_flag,
+				A.service_type,
+				A.cloud_id
+		FROM 	bill_charge_service A,
+				bill_charge_service_resource B
+		WHERE	A.bill_yyyymm = B.bill_yyyymm
+		AND	A.customer_id = B.customer_id
+		AND	A.project_id = B.project_id
+		AND	A.service_id = B.resource_id
+		AND	A.bill_yyyymm = #{billYM}
+		AND	B.resource_item = 'EA'
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+
+	<select id="selectListMeteringMeasureService" parameterType="BatchBillChargeResourceVO" resultType="BatchMeteringMeasureVO">
+		SELECT	B.*
+		FROM	metering_metric A,
+				metering_measure_service B
+		WHERE	A.metric_id = B.metric_id
+		AND		A.resource_id = #{resourceId}
+		AND		A.metric_item = 'service'
+		AND		B.metering_datetime <![CDATA[>=]]> #{chargeStartDatetime}
+		AND		B.metering_datetime <![CDATA[<]]> #{chargeEndDatetime}
+		ORDER BY B.metering_datetime
+	</select>
+
+
+	<insert id="insertBillChargeServiceResourceDetail" parameterType="BatchBillChargeResourceDetailVO">
+		INSERT  INTO bill_charge_service_resource_detail (
+			bill_yyyymm,
+			customer_id,
+			project_id,
+			resource_id,
+			resource_item,
+			charge_start_datetime,
+			charge_end_datetime,
+			hourly_flag,
+			duration,
+			measure_value,
+			price,
+			amount,
+			service_type,
+			cloud_id
+		)VALUES(
+			#{billYyyymm},
+			#{customerId},
+			#{projectId},
+			#{resourceId},
+			#{resourceItem},
+			#{chargeStartDatetime},
+			#{chargeEndDatetime},
+			#{hourlyFlag},
+			#{duration},
+			#{measureValue},
+			#{price},
+			#{amount},
+			#{serviceType},
+			#{cloudId}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			resource_id = #{resourceId},
+			resource_item = #{resourceItem},
+			charge_start_datetime = #{chargeStartDatetime},
+			charge_end_datetime = #{chargeEndDatetime},
+			hourly_flag = #{hourlyFlag},
+			duration = #{duration},
+			measure_value = #{measureValue},
+			price = #{price},
+			amount = #{amount},
+			service_type = #{serviceType},
+			cloud_id = #{cloudId}
+	</insert>
+
+
+	<!-- UPDATE BILL_CHARGE_SERVICE_RESOUCE FOR AMOUNT -->
+	<select id="batchSelectBillChargeServiceResourceForAmount" parameterType="java.util.Map" resultType="BatchBillChargeResourceVO">
+		SELECT	A.bill_yyyymm		AS bill_yyyymm,
+				A.customer_id		AS customer_id,
+				A.project_id		AS project_id,
+				A.resource_id		AS resource_id,
+				A.resource_item		AS resource_item,
+				SUM(A.amount)		AS amount
+		FROM	bill_charge_service_resource_detail A
+		WHERE	A.bill_yyyymm = #{billYM}
+		GROUP BY A.bill_yyyymm, A.customer_id, A.project_id, A.resource_id, A.resource_item
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<update id="updateBillChargeServiceResourceForAmount" parameterType="BatchBillChargeResourceVO">
+		UPDATE 	bill_charge_service_resource
+		SET		amount = #{amount}
+		WHERE	bill_yyyymm = #{billYyyymm}
+		AND		customer_id = #{customerId}
+		AND		project_id = #{projectId}
+		AND		resource_id = #{resourceId}
+		AND		resource_item = #{resourceItem}
+	</update>
+
+
+     <!-- UPDATE AMOUNT FOR BILL_CHARGE_SERVICE -->
+	<select id="batchSelectBillChargeServiceForAmount" parameterType="java.util.Map" resultType="BatchBillChargeServiceVO">
+		SELECT	A.bill_yyyymm,
+				A.customer_id,
+				A.project_id,
+				A.resource_id		AS service_id,
+				SUM(A.amount)		AS amount
+		FROM	bill_charge_service_resource A
+		WHERE	A.bill_yyyymm = #{billYM}
+		GROUP BY A.bill_yyyymm, A.customer_id, A.project_id, A.resource_id
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+
+	<update id="updateAmountForBillChargeService" parameterType="BatchBillChargeServiceVO">
+		UPDATE	bill_charge_service
+		SET		amount = #{amount}
+		WHERE	bill_yyyymm =  #{billYyyymm}
+		AND		customer_id = #{customerId}
+		AND		project_id = #{projectId}
+		AND		service_id = #{serviceId}
+	</update>
+
+
+	<insert id="insertBillChargeServiceResource" parameterType="BatchBillChargeResourceVO">
+		INSERT  INTO bill_charge_service_resource (
+			bill_yyyymm,
+			customer_id,
+			project_id,
+			resource_id,
+			resource_item,
+			charge_start_datetime,
+			charge_end_datetime,
+			amount,
+			service_type,
+			cloud_id
+
+		)VALUES(
+			#{billYyyymm},
+			#{customerId},
+			#{projectId},
+			#{resourceId},
+			#{resourceItem},
+			#{chargeStartDatetime},
+			#{chargeEndDatetime},
+			#{amount},
+			#{serviceType},
+			#{cloudId}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			bill_yyyymm = #{billYyyymm},
+			customer_id = #{customerId},
+			project_id = #{projectId},
+			resource_id = #{resourceId},
+			resource_item = #{resourceItem},
+			charge_start_datetime = #{chargeStartDatetime},
+			charge_end_datetime = #{chargeEndDatetime},
+			amount = #{amount},
+			service_type = #{serviceType},
+			cloud_id = #{cloudId}
+	</insert>
+	<!-- =================================================================================== -->
+	<!-- BILL CHARGE SERVICE RESOURCE -->
+	<!-- =================================================================================== -->
+
+	<!-- =================================================================================== -->
+	<!-- BILL POLICY ITEM PRICE -->
+	<!-- =================================================================================== -->
+	<select id="selectListBillPolicyItemPrice" parameterType="java.util.Map" resultType="BatchBillPolicyItemPriceVO">
+		SELECT
+			A.cloud_id,
+			B.item_id,
+			C.unit,
+			C.quantity,
+			D.start_range,
+			D.end_range,
+			D.hourly_price,
+			D.monthly_price
+		FROM
+			bill_product_catalog A,
+			bill_policy_item B,
+			bill_product C,
+			bill_product_catalog_item D
+		WHERE
+			A.cloud_id = #{cloudId}
+			AND A.apply_date = (
+					SELECT	MAX(A.apply_date)
+					FROM	bill_product_catalog A
+					WHERE	A.apply_date <![CDATA[<=]]> #{applyDate}
+					AND	A.del_flag = 'N'
+					AND A.cloud_id = #{cloudId}
+				)
+			AND		A.policy_seq = B.policy_seq
+			AND		B.item_id = C.item_id
+			AND		C.item_id = #{itemId}
+			AND		B.policy_seq = D.policy_seq
+			AND		B.item_id = D.item_id
+			AND		A.del_flag = 'N'
+	</select>
+
+
+	<select id="selectVolumType" parameterType="java.util.Map" resultType="BatchBillPolicyItemPriceVO">
+         SELECT
+			code_value1 AS volumPriceCode
+		FROM
+			cmm_code
+		WHERE
+			parent_code_id = 'ITEMCATE_DISK'
+			AND code_value = #{volumType}
+	</select>
+
+<!-- 
+ 
+	<select id="selectImageType" parameterType="java.util.Map" resultType="BatchBillPolicyItemPriceVO">
+         SELECT
+			code_value1 AS volumPriceCode
+		FROM
+			cmm_code
+		WHERE
+			parent_code_id = 'ITEMCATE_VMIMAGE'
+			AND code_id = #{imageType}
+	</select>
+-->
+
+</mapper>

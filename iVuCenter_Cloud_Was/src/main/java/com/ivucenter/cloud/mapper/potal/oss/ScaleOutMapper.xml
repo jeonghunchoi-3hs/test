@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.scaleOut.ScaleOutDAO">
+
+    <select id="list" resultType="CustomScaleOutVO" parameterType="CustomScaleOutVO">
+
+
+           SELECT *
+           FROM (
+			   SELECT
+						a.scale_out_uid,
+						a.scale_out_name,
+						a.project_id,
+						a.hpa_division,
+						a.hpa_min,
+						a.hpa_max,
+						CASE WHEN a.hpa_division != 'memory'
+							 THEN concat(a.hpa_min,'/', a.hpa_max) else '0/0'
+						END AS cpu_min_max,
+						CASE WHEN a.hpa_division != 'cpu'
+							 THEN concat(a.hpa_min,'/', a.hpa_max) else '0/0'
+						END AS mem_min_max,
+						a.hpa_incre_pod,
+						a.hpa_min_pod,
+						a.hpa_max_pod,
+						a.hpa_continue,
+						a.hourly_flag,
+						a.reg_datetime,
+						a.reg_user_id,
+						a.mod_datetime,
+						a.mod_user_id,
+						a.del_flag,
+						b.project_name,
+						b.project_alias,
+						c.cloud_name
+				FROM oss_scale_out a
+		INNER JOIN oss_project b
+				    ON a.project_id = b.project_id
+		INNER JOIN oss_cloud c
+				    ON b.cloud_id = c.cloud_id
+			  WHERE 1=1	
+			  and c.cloud_id != 'eac2cb70-2293-48be-b131-8c5a3035e610'
+			   AND a.del_flag = 'N' ) LL
+			WHERE 1=1
+<!-- 			AND a.del_flag != 'Y' -->
+			<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				LL.project_alias like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				LL.project_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'scale_out_name' and keyword != ''">
+			AND
+				LL.scale_out_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+				LL.project_alias like CONCAT('%',#{keyword},'%')
+				OR
+				LL.project_name like CONCAT('%',#{keyword},'%')
+				OR
+				LL.scale_out_name like CONCAT('%',#{keyword},'%')
+				)
+			</if>
+			<if test="searchKind != 'searchAll' and keyword != '' ">
+				AND LL.${searchKind} like CONCAT('%',#{keyword},'%')
+			</if>
+	    	<if test="!length.equals(0)">
+				LIMIT #{start}, #{length}
+			</if>
+    </select>
+
+    <select id ="detail"  parameterType="CustomScaleOutVO" resultType="CustomScaleOutVO">
+
+			SELECT *
+			FROM (
+					 SELECT
+						      OP.*
+						    , OPJ.cloud_id
+						    , OPJ.project_id
+							, OSO.scale_out_uid
+							, OSO.service_id
+							, OSO.scale_out_name
+							, OSO.hpa_min
+							, OSO.hpa_max
+							, OSO.hpa_min_pod
+							, OSO.hpa_max_pod
+							, OSO.hpa_incre_pod
+							, OSO.hpa_continue
+							, OSO.hpa_division
+						    , OC.cloud_name
+						    , OAPP.app_alias
+						    , OAPP.app_name
+						    , OAPP.app_name_space as name_space
+						    , PRD.product_name AS app_image_name
+			      FROM oss_project_box OP
+			INNER JOIN oss_project OPJ
+			 	    ON OP.project_box_id = OPJ.project_box_id
+			INNER JOIN oss_scale_out OSO
+			 	    ON OPJ.project_id = OSO.project_id
+			INNER JOIN oss_service OSS
+					ON OSO.service_id = OSS.service_id
+			INNER JOIN oss_app OAPP
+					ON OPJ.project_id = OAPP.project_id
+				   AND OAPP.app_uid = OSO.app_uid
+			INNER JOIN bss_product PRD
+					ON PRD.product_seq = OAPP.os_product_seq
+			INNER JOIN oss_cloud OC
+				 	    ON OPJ.cloud_id = OC.cloud_id
+			 WHERE 1=1
+			   AND OSO.scale_out_uid = #{scaleOutUid}
+			   and oc.cloud_id != 'eac2cb70-2293-48be-b131-8c5a3035e610'
+			) TOT
+    </select>
+
+	<update id="update" parameterType="CustomScaleOutVO">
+			UPDATE	oss_scale_out SET
+					scale_out_name = #{scaleOutName},
+					hpa_min = #{hpaMin},
+					hpa_max = #{hpaMax},
+					hpa_min_pod   = #{hpaMinPod},
+					hpa_max_pod   = #{hpaMaxPod},
+					mod_datetime  = now(),
+					mod_user_id   = #{userId},
+					hpa_continue  = #{hpaContinue},
+					hpa_incre_pod = #{hpaIncrePod},
+					hpa_division  = #{hpaDivision}
+	       WHERE scale_out_uid = #{scaleOutUid}
+	</update>
+
+	<update id="delete" parameterType="CustomScaleOutVO">
+			UPDATE	oss_scale_out SET
+				expire_datetime = now(),
+				delete_datetime = now(),
+				mod_datetime = now(),
+				mod_user_id = #{modUserId},
+				del_flag = 'Y'
+	       WHERE scale_out_uid = #{scaleOutUid}
+	</update>
+
+</mapper>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring accessors="true" comment="Delete 2 elements from project &apos;iVuCenter_Cloud_Was&apos;&#x0D;&#x0A;- Original project: &apos;iVuCenter_Cloud_Was&apos;&#x0D;&#x0A;- Original elements:&#x0D;&#x0A;     index.html&#x0D;&#x0A;     json.php" description="Delete elements" element1="WebContent/resources/assets/plugins/bootstrap-calendar/example/json.php" element2="WebContent/resources/assets/plugins/bootstrap-calendar/example/index.html" elements="0" flags="589830" id="org.eclipse.jdt.ui.delete" resources="2" stamp="1718615767340" subPackages="false" version="1.0"/>
+</session>

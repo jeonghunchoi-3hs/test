@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.loadbalancer.OssLbDAO">
+ 	
+    <select id="getLbList" parameterType="CustomOssLbVO" resultType="CustomOssLbVO">
+		SELECT *
+			FROM (
+					 SELECT  CU2.user_name AS reg_user_name
+					    , CC.customer_name AS project_customer_name
+					    , TRIM(CD.dept_name) AS dept_name
+					    , CU.user_id AS manager_id
+					    , CU.user_name AS manager_name
+					    , CU.user_tel AS manager_tel
+					    , CU.user_tel_ex AS manager_tel_ex
+					    , CU.user_phone AS manager_phone
+					    , IFNULL(OV.vm_cn, 0) AS vm_cnt
+					    , IFNULL(OD.disk_cn, 0) AS disk_cnt
+					    , IFNULL(OD.disk_gb, 0) AS disk_gb
+					    , OP.*
+					    , (SELECT count(*) from oss_loadbalancer where project_id = OP.project_box_id) as loadbalancer_ea
+					    , CD2.dept_name AS dept_name2
+			 	   FROM oss_project_box OP
+		   INNER JOIN oss_project_manager OPM  ON OP.project_box_id = OPM.project_id AND manager_type = '01'
+			 LEFT JOIN cmm_user CU ON OPM.manager_id=CU.user_id
+			 LEFT JOIN cmm_user CU2 ON OP.reg_user_id=CU2.user_id
+			 LEFT JOIN cmm_customer CC ON OP.customer_id = CC.customer_id
+			 LEFT JOIN cmm_department CD ON OP.dept_code = CD.dept_code
+			 LEFT JOIN (SELECT project_box_id, COUNT(*) AS disk_cn , SUM (size_gb) AS disk_gb FROM oss_disk A LEFT JOIN oss_project B ON A.project_id = B.project_id 
+			 			WHERE IFNULL(expire_datetime, '9999-12-31') >= NOW() AND del_flag != 'Y'
+			 			GROUP BY project_box_id ) OD ON OP.project_box_id = OD.project_box_id
+			 LEFT JOIN (SELECT project_box_id, COUNT(*) AS vm_cn FROM oss_vm A LEFT JOIN oss_project B ON A.project_id = B.project_id
+			 			WHERE IFNULL(expire_datetime, '9999-12-31') >= NOW() AND del_flag != 'Y'
+			 			GROUP BY project_box_id ) OV ON OP.project_box_id = OV.project_box_id
+			 LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+			 WHERE
+				OP.project_name not in ('service', 'demo')
+			) TOT
+			WHERE 1=1
+			AND TOT.delete_flag != 'Y'
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			TOT.project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_alias like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.manager_name like CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				TOT.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				TOT.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'manager_name' and keyword != ''">
+			AND
+				TOT.manager_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+			</if>
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+    
+    <select id="getLb" parameterType="CustomOssLbVO" resultType="CustomOssLbVO">
+		SELECT *,(SELECT COUNT(*) FROM oss_loadbalancer_vm OLV WHERE OL.loadbalancer_id = OLV.loadbalancer_id and del_flag = 'N') AS vm_cnt FROM oss_loadbalancer OL
+		LEFT JOIN oss_project_box OPB ON OL.project_id = OPB.project_box_id
+		WHERE OL.project_id = #{projectId}
+		<if test="loadbalancerId != null  and loadbalancerId != '' ">
+			AND OL.loadbalancer_id = #{loadbalancerId}
+		</if>
+		AND OL.del_flag = 'N'
+    </select>
+    
+    <select id="getVmList" parameterType="CustomOssLbVO" resultType="CustomOssVmVO">
+		SELECT *
+			FROM
+		oss_loadbalancer_vm OLV
+			LEFT JOIN oss_vm OV ON OLV.vm_uuid = OV.vm_uuid
+			LEFT JOIN oss_port OP ON OV.vm_uuid = OP.device_id 
+			LEFT JOIN oss_zone_network OZN ON OZN.network_id = OP.network_id 
+			LEFT JOIN oss_network OSN ON OP.network_id = OSN.network_id
+			LEFT JOIN oss_cloud OC ON OZN.cloud_id = OC.cloud_id
+		WHERE
+		OLV.del_flag = 'N'
+		AND OZN.is_available = 'Y'
+		AND OZN.is_backup = 'N'
+		AND OLV.loadbalancer_id = #{loadbalancerId}
+		
+    </select>
+    
+    <update id="deleteVm" parameterType="CustomOssLbVO">
+		UPDATE
+			oss_loadbalancer_vm
+		SET del_flag = 'Y'
+		WHERE
+			loadbalancer_id = #{loadbalancerId}
+		AND vm_uuid = #{vmUuid}
+		
+    </update>
+
+</mapper>

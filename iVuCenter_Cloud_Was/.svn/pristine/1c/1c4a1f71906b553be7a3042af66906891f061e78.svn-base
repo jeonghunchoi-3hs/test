@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.cmm.code.CmmCodeDAO">
+
+    <select id="list" resultType="CustomCmmCodeVO" parameterType="CustomCmmCodeVO">
+    	SELECT 
+			*
+    	FROM cmm_code
+		WHERE 1=1
+    	<if test="delFlag != 'all'">
+    	and
+    		del_flag = #{delFlag}
+    	</if>
+		<if test="codeKeyId!=null">  
+			AND code_key_id = #{codeKeyId}
+		</if>    	
+		<if test="parentCodeId!=null">
+			AND parent_code_id = #{parentCodeId}
+		</if>     	
+    	ORDER BY code_sort_num ASC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+
+	<select id="detail" resultType="CustomCmmCodeVO" parameterType="CustomCmmCodeVO">
+    	SELECT 
+			* 
+    	FROM cmm_code
+		WHERE 1=1
+		<if test="codeKeyId!=null">  
+			AND code_key_id = #{codeKeyId}
+		</if>    	
+		<if test="parentCodeId!=null">
+			AND parent_code_id = #{parentCodeId}
+		</if>    	
+    </select>
+   
+   <!-- 가상머신 상품 신청 공유 네트워크 코드 -->
+   <select id="getSharedNetwork" resultType="CustomCmmCodeVO" parameterType="CustomCmmCodeVO">
+    	SELECT 
+			* 
+    	FROM cmm_code
+		WHERE 1=1 
+		AND code_key_id = 'SHARED_NETWORK'
+		AND parent_code_id = 'SHARED_NETWORK' order by 	code_sort_num asc	 	
+    </select>
+    
+    <insert id="insert" parameterType="CustomCmmCodeVO">
+   		INSERT INTO cmm_code (
+			code_key_id
+			, code_id
+			, code_name
+			, code_type
+			, code_level
+			, parent_code_id
+			, code_hide_flag
+			, code_sort_num
+			, reg_datetime
+			, reg_user_id
+			, mod_datetime
+			, mod_user_id
+			, del_flag
+		) values (
+			#{codeKeyId, jdbcType=VARCHAR}
+			, #{codeId, jdbcType=VARCHAR}
+			, #{codeName, jdbcType=VARCHAR}
+			, #{codeType, jdbcType=VARCHAR}
+			, #{codeLevel, jdbcType=INTEGER}
+			, #{parentCodeId, jdbcType=VARCHAR}
+			, #{codeHideFlag, jdbcType=VARCHAR}
+			, #{codeSortNum, jdbcType=INTEGER}
+			, #{regDatetime, jdbcType=VARCHAR}
+			, #{regUserId, jdbcType=VARCHAR}
+			, #{modDatetime, jdbcType=VARCHAR}
+			, #{modUserId, jdbcType=VARCHAR}
+			, #{delFlag, jdbcType=VARCHAR}		
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomCmmCodeVO">
+        UPDATE cmm_code SET
+			code_key_id	= #{codeKeyId, jdbcType=VARCHAR}
+			, code_id = #{codeId, jdbcType=VARCHAR}
+		    , code_name = #{codeName, jdbcType=VARCHAR}
+		    , code_type = #{codeType, jdbcType=VARCHAR}
+		    , code_level = #{codeLevel, jdbcType=INTEGER}
+		    , parent_code_id = #{parentCodeId, jdbcType=VARCHAR}
+		    , code_hide_flag = #{codeHideFlag, jdbcType=VARCHAR}
+		    , code_sort_num = #{codeSortNum, jdbcType=INTEGER}
+		    , reg_datetime = #{regDatetime, jdbcType=VARCHAR}
+		    , reg_user_id = #{regUserId, jdbcType=VARCHAR}
+		    , mod_datetime = #{modDatetime, jdbcType=VARCHAR}
+		    , mod_user_id = #{modUserId, jdbcType=VARCHAR}
+		    , del_flag = #{delFlag, jdbcType=VARCHAR}
+        WHERE code_key_id=#{codeKeyId}
+    </update>
+    
+    <update id="delete" parameterType="CustomCmmCodeVO">
+    	 UPDATE cmm_code SET
+    	 	del_flag = 'Y'
+    	 WHERE code_key_id=#{codeKeyId}
+    </update>
+   <!-- 부가상품 신청 로드밸런서 PROTOCOL 코드 -->
+   <select id="getLoadProtocol" resultType="CustomCmmCodeVO" parameterType="CustomCmmCodeVO">
+    	SELECT 
+			* 
+    	FROM cmm_code
+		WHERE 1=1 
+		AND code_key_id = 'PROTOCOL'
+		AND parent_code_id = 'PROTOCOL' order by 	code_sort_num asc	 	
+    </select>
+    <!-- 부가상품 신청 로드밸런서 METHOD 코드 -->
+   <select id="getLoadMethod" resultType="CustomCmmCodeVO" parameterType="CustomCmmCodeVO">
+    	SELECT 
+			* 
+    	FROM cmm_code
+		WHERE 1=1 
+		AND code_key_id = 'METHOD'
+		AND parent_code_id = 'METHOD' order by 	code_sort_num asc	 	
+    </select>
+   <!-- 부가상품 신청 로드밸런서 MONITOR_TYPE 코드 -->
+   <select id="getLoadMonitorType" resultType="CustomCmmCodeVO" parameterType="CustomCmmCodeVO">
+    	SELECT 
+			* 
+    	FROM cmm_code
+		WHERE 1=1 
+		AND code_key_id = 'MONITOR_TYPE'
+		AND parent_code_id = 'MONITOR_TYPE' order by 	code_sort_num asc	 	
+    </select>   
+    
+    <select id="getCmmCode" resultType="CustomCmmCodeVO" parameterType="String">
+		SELECT
+			*
+    	FROM 
+    		cmm_code
+		WHERE 
+			code_key_id = #{value}
+			AND parent_code_id = #{value}
+			AND del_flag = 'N'
+		ORDER BY 
+			code_sort_num ASC	 	
+    </select>
+    
+    <select id="getCmmCodeByList" resultType="CustomCmmCodeVO" parameterType="java.util.Map">
+		SELECT
+			*
+    	FROM 
+    		cmm_code
+		WHERE
+			del_flag = 'N'
+		<foreach collection='list' item='parentKey' open='AND (' close=')' separator='OR'>
+			parent_code_id = #{parentKey} 
+		</foreach>
+		ORDER BY 
+			code_sort_num ASC	 	
+    </select>  
+    
+    <select id="getBlockDisk" resultType="CustomCmmCodeVO" parameterType="CustomBssProductVO">
+		SELECT
+			*
+    	FROM 
+    		cmm_code
+		WHERE
+			del_flag = 'N'
+		AND parent_code_id = 'ITEMCATE_DISK'
+		AND code_value3 = #{cloudType}
+		ORDER BY 
+			code_sort_num ASC	 	
+    </select>       
+            
+</mapper>

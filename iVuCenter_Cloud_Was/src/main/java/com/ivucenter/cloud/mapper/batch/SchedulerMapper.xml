@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.batch.scheduler.SchedulerDAO">
+
+	<select id="list" parameterType="CustomSchedulerVO" resultType="CustomSchedulerVO">
+		SELECT	A.SCHED_NAME,
+				A.JOB_NAME,
+				A.JOB_GROUP,
+				A.JOB_CLASS_NAME,
+				B.TRIGGER_NAME,
+				B.TRIGGER_GROUP,
+				B.NEXT_FIRE_TIME,
+				B.TRIGGER_STATE,
+				C.CRON_EXPRESSION
+		FROM	QRTZ_JOB_DETAILS A,
+				QRTZ_TRIGGERS B,
+				QRTZ_CRON_TRIGGERS C
+		WHERE	A.SCHED_NAME = B.SCHED_NAME
+		AND	A.JOB_NAME = B.JOB_NAME
+		AND	A.JOB_GROUP = B.JOB_GROUP
+		AND	B.SCHED_NAME = C.SCHED_NAME
+		AND	B.TRIGGER_NAME = C.TRIGGER_NAME
+		AND	B.TRIGGER_GROUP = C.TRIGGER_GROUP
+		AND     A.SCHED_NAME = #{schedName}
+	</select>
+	
+	<select id="detail" parameterType="CustomSchedulerVO" resultType="CustomSchedulerVO">
+		SELECT	A.SCHED_NAME,
+				A.JOB_NAME,
+				A.JOB_GROUP,
+				A.JOB_CLASS_NAME,
+				B.TRIGGER_NAME,
+				B.TRIGGER_GROUP,
+				B.NEXT_FIRE_TIME,
+				B.TRIGGER_STATE,
+				C.CRON_EXPRESSION
+		FROM	QRTZ_JOB_DETAILS A,
+				QRTZ_TRIGGERS B,
+				QRTZ_CRON_TRIGGERS C
+		WHERE	A.SCHED_NAME = B.SCHED_NAME
+		AND	A.JOB_NAME = B.JOB_NAME
+		AND	A.JOB_GROUP = B.JOB_GROUP
+		AND	B.SCHED_NAME = C.SCHED_NAME
+		AND	B.TRIGGER_NAME = C.TRIGGER_NAME
+		AND	B.TRIGGER_GROUP = C.TRIGGER_GROUP
+		AND A.JOB_NAME = #{jobName}
+	</select>
+
+</mapper>

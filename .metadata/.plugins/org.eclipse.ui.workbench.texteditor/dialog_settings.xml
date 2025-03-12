@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
+		<item key="selection" value="moveInsertPage"/>
+		<item key="wrap" value="true"/>
+		<item key="casesensitive" value="false"/>
+		<item key="wholeword" value="false"/>
+		<item key="incremental" value="false"/>
+		<item key="isRegEx" value="false"/>
+		<list key="findhistory">
+			<item value="moveInsertPage"/>
+			<item value="ROLE_CLOUD_ADMIN"/>
+			<item value="actUpdate"/>
+			<item value="회원사"/>
+			<item value="updateRole"/>
+			<item value="updateAdmin"/>
+			<item value="Z.new"/>
+			<item value="SBO"/>
+		</list>
+		<list key="replacehistory">
+			<item value="throws NutanixException"/>
+			<item value="text : sanitizeHTML(text)"/>
+			<item value=""/>
+			<item value="Quota"/>
+			<item value="quota_paramPod"/>
+			<item value="quota_paramPv"/>
+			<item value="quota_paramLimitMemory"/>
+			<item value="quota_paramRequestMemory"/>
+			<item value="quota_paramLimitCpu"/>
+			<item value="quota_paramRequestCpu"/>
+			<item value="Container"/>
+			<item value="Pod"/>
+			<item value=";"/>
+			<item value="limitRangePodMemMax"/>
+			<item value="limitRangePodMemMin"/>
+		</list>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="105"/>
+		<item key="DIALOG_Y_ORIGIN" value="208"/>
+		<item key="DIALOG_WIDTH" value="322"/>
+		<item key="DIALOG_HEIGHT" value="389"/>
+		<item key="DIALOG_FONT_NAME" value="1|맑은 고딕|9.0|0|WINDOWS|1|-12|0|0|0|400|0|0|0|1|0|0|0|0|맑은 고딕"/>
+	</section>
+	<section name="org.eclipse.ui.texteditor.GotoLineAction$GotoLineDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="1044"/>
+		<item key="DIALOG_Y_ORIGIN" value="572"/>
+	</section>
+</section>

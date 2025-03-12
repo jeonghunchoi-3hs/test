@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bbs.qna.BbsQnaDAO">
+
+    <select id="list" resultType="CustomBbsQnaVO" parameterType="CustomBbsQnaVO">
+		
+		select 
+			* 
+		from(
+			select 
+				a.qna_no
+				, a.qna_type
+				, a.title
+				, a.content			
+				, a.reg_datetime
+				, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, a.reg_user_id
+				, a.mod_datetime
+				, a.mod_user_id
+				, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+				, a.del_flag
+				, a.secret_flag
+				,(SELECT count(*) FROM bbs_qna WHERE parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS reply_cnt
+				,(SELECT code_name FROM cmm_code WHERE  code_id=a.qna_type AND code_key_id='QNA_TYPE' ) AS code_name
+				, (SELECT b.qna_no FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_qna_no
+				, (SELECT b.content FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_content
+				, (SELECT b.reg_user_id FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_reg_user_id
+				, (SELECT (SELECT d.user_name FROM cmm_user d WHERE user_id=b.reg_user_id) AS re_user_name FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_user_name
+				, (SELECT DATE_FORMAT(b.reg_datetime, '%Y-%m-%d %H:%i') AS re_reg_datetime2 FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_reg_datetime2
+			from
+				bbs_qna a
+			where 
+				(a.parent_qna_no IS NULL or a.parent_qna_no=0)
+			and
+				a.del_flag <![CDATA[<>]]> 'Y'
+			and
+				(a.secret_flag <![CDATA[<>]]> 'Y' or a.reg_user_id=#{userId}	)	 
+	    	<if test="searchKind == 'title' and keyword != ''">
+			and 
+				a.title like CONCAT('%',#{keyword},'%')	
+			</if>
+			<if test="searchKind == 'content' and keyword != ''">
+			and 
+				a.content like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			and (
+				a.title like CONCAT('%',#{keyword},'%')
+			or 
+				a.content like CONCAT('%',#{keyword},'%')
+				)	
+			</if>
+			<if test="category != null and category != ''">
+			and 
+				a.qna_type = #{category}
+			</if>
+		) c where 1=1
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+				ORDER BY c.reply_cnt ASC, c.qna_no DESC
+			</if>
+		</if>		
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+    
+   <select id="list_bak" resultType="CustomBbsQnaVO" parameterType="CustomBbsQnaVO">
+		
+		select * from(
+		
+		select 
+			a.qna_no
+			, a.qna_type
+			, a.title
+			, a.content			
+			, a.reg_datetime
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+			, a.reg_user_id
+			, a.mod_datetime
+			, a.mod_user_id
+			, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+			, a.del_flag
+			, a.secret_flag
+			,(SELECT count(*) FROM bbs_qna WHERE parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS replyCnt
+			,(SELECT code_name FROM cmm_code WHERE  code_id=a.qna_type AND code_key_id='QNA_TYPE' ) AS code_name
+		from
+			bbs_qna a
+		where 
+			(a.parent_qna_no IS NULL or a.parent_qna_no=0)
+		and
+			a.del_flag <![CDATA[<>]]> 'Y'
+		and
+			a.secret_flag <![CDATA[<>]]> 'Y'	 
+    	<if test="searchKind == 'title' and keyword != ''">
+		and 
+			a.title like CONCAT('%',#{keyword},'%')	
+		</if>
+		<if test="searchKind == 'content' and keyword != ''">
+		and 
+			a.content like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		and (
+			a.title like CONCAT('%',#{keyword},'%')
+		or 
+			a.content like CONCAT('%',#{keyword},'%')
+			)	
+		</if>
+		
+		union	
+    	
+    	select 
+			b.qna_no
+			, b.qna_type
+			, b.title
+			, b.content			
+			, b.reg_datetime
+			, DATE_FORMAT(b.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+			, b.reg_user_id
+			, b.mod_datetime
+			, b.mod_user_id
+			, (select user_name from cmm_user where user_id=b.reg_user_id) AS user_name
+			, b.del_flag
+			, b.secret_flag
+			,(SELECT count(*) FROM bbs_qna WHERE parent_qna_no = b.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS replyCnt
+			,(SELECT code_name FROM cmm_code WHERE  code_id=b.qna_type AND code_key_id='QNA_TYPE' ) AS code_name
+		from
+			bbs_qna b
+		where 
+			(b.parent_qna_no IS NULL or b.parent_qna_no=0)
+		and
+			b.del_flag <![CDATA[<>]]> 'Y'
+		and
+			b.reg_user_id=#{userId}	
+		<if test="searchKind == 'title' and keyword != ''">
+		and 
+			b.title like CONCAT('%',#{keyword},'%')	
+		</if>
+		<if test="searchKind == 'content' and keyword != ''">
+		and 
+			b.content like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		and (
+			b.title like CONCAT('%',#{keyword},'%')
+		or 
+			b.content like CONCAT('%',#{keyword},'%')
+			)	
+		</if>
+		order by 
+			qna_no
+		desc
+		) c
+		where
+			1=1
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>    
+    
+    
+    <select id="mngList" resultType="CustomBbsQnaVO" parameterType="CustomBbsQnaVO">
+	    SELECT * FROM (
+			select 
+				a.qna_no
+				, a.qna_type
+				, a.title
+				, a.content			
+				, a.reg_datetime
+				, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, a.reg_user_id
+				, a.mod_datetime
+				, a.mod_user_id
+				, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+				, a.del_flag
+				, a.secret_flag
+				,(SELECT count(*) FROM bbs_qna WHERE parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS replyCnt
+				,(SELECT code_name FROM cmm_code WHERE  code_id=a.qna_type AND code_key_id='QNA_TYPE' ) AS code_name
+			from
+				bbs_qna a
+			where 
+				(a.parent_qna_no IS NULL or a.parent_qna_no=0)
+			and
+				a.del_flag <![CDATA[<>]]> 'Y'
+		) b
+		where 1=1
+		<if test="searchKind == 'title' and keyword != ''">
+		and 
+			b.title like CONCAT('%',#{keyword},'%')	
+		</if>
+		<if test="searchKind == 'content' and keyword != ''">
+		and 
+			b.content like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		and (
+			b.title like CONCAT('%',#{keyword},'%')
+		or 
+			b.content like CONCAT('%',#{keyword},'%')
+			)		
+		</if>
+		ORDER BY b.reg_datetime2 DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+    
+
+	<select id="detail" resultType="CustomBbsQnaVO" parameterType="CustomBbsQnaVO">
+		select 
+			a.qna_no
+			, a.qna_type
+			, a.title
+			, a.content			
+			, a.reg_datetime
+			, a.reg_user_id
+			, a.mod_datetime
+			, a.mod_user_id
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+			, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+			, a.del_flag
+			, a.secret_flag
+			, a.parent_qna_no
+			,(SELECT code_name FROM cmm_code WHERE  code_id=a.qna_type AND code_key_id='QNA_TYPE' ) AS code_name
+		from bbs_qna a where a.qna_no = #{qnaNo} 
+    </select>
+      
+
+
+  	<!--qna 답글 내용 -->
+    <select id="detailReply" resultType="CustomBbsQnaVO" parameterType="CustomBbsQnaVO">
+		select 
+			a.qna_no
+			, a.qna_type
+			, a.title
+			, a.content			
+			, a.reg_datetime
+			, a.reg_user_id
+			, a.mod_datetime
+			, a.mod_user_id
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+			, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+			, a.del_flag
+			, a.secret_flag
+			, a.parent_qna_no
+		from bbs_qna a where a.parent_qna_no = #{parentQnaNo} 
+		and
+			a.del_flag <![CDATA[<>]]> 'Y'
+  	</select>
+
+    
+    <insert id="insert" parameterType="CustomBbsQnaVO">
+		INSERT INTO bbs_qna (
+			qna_type,  
+			parent_qna_no,
+			title,  
+			content,			
+			reg_datetime, 
+			reg_user_id,
+			secret_flag
+		)VALUES(
+			#{qnaType}, 
+			#{parentQnaNo}, 
+			#{title}, 
+			#{content},			
+			NOW(), 
+			#{regUserId},
+			#{secretFlag}
+		)
+    </insert>
+    
+   
+    <update id="update" parameterType="CustomBbsQnaVO">
+		UPDATE bbs_qna 
+		SET			
+			qna_type = #{qnaType}, 
+			title = #{title}, 
+			content = #{content},
+			secret_flag =#{secretFlag},  			
+			mod_datetime = NOW(), 
+			mod_user_id = #{modUserId}
+		WHERE
+		qna_no = #{qnaNo}		
+    </update>
+   
+    <delete id="delete" parameterType="CustomBbsQnaVO">
+    	DELETE FROM bbs_qna  
+		WHERE qna_no = #{qnaNo}
+    </delete>
+   	
+   	<!-- 공지사항 타입 리스트-->
+    <select id="getNoticeBbscodeList" resultType="CustomBbsQnaVO">
+	SELECT 	
+		code_id, 
+		code_name 
+	FROM 
+		cmm_code 
+	where 
+		code_key_id = #{codeKeyId} 
+		and parent_code_id = #{codeKeyId}
+		AND del_flag = 'N'
+	order by 
+		code_id asc
+  	</select>
+
+  	<!-- 미답변 카운트 -->
+    <select id="getNoReplyCount" resultType="CustomBbsQnaVO">
+	SELECT COUNT(*) AS reply_cnt 
+	FROM 
+	(
+		SELECT 
+		(SELECT COUNT(*) FROM bbs_qna WHERE parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS replyCnt
+		FROM
+			bbs_qna a
+		WHERE 
+			(a.parent_qna_no IS NULL OR a.parent_qna_no=0)
+		AND
+			a.del_flag <![CDATA[<>]]> 'Y'
+	) b
+	WHERE b.replyCnt = 0	
+  	</select>
+</mapper>

@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bss.adjustment.BssAdjustmentDAO">
+ 	
+     <select id="list" resultType="CustomBssAdjustmentVO" parameterType="CustomBssAdjustmentVO">
+		SELECT
+			*
+		FROM(
+			SELECT 
+					BA.adjust_seq, 
+					CONCAT(SUBSTRING(BA.bill_yyyymm,1,4),'-', SUBSTRING(BA.bill_yyyymm,5,2)) AS bill_yyyymm,
+					BA.adjust_contents, 
+					BA.adjust_amount,
+					IF(BA.adjust_amount > 0 ,'+' ,'-') AS signtxt, 
+					IF(INSTR(BA.adjust_amount,'%') = 0, BA.adjust_amount,'') AS absamount,
+					IF(INSTR(BA.adjust_amount,'%') > 0, BA.adjust_amount,'') AS absrate,
+					BA.description,
+					IF(BA.bill_flag = 'N' ,'미반영' ,'반영') AS bill_flag, 			
+					DATE_FORMAT(BA.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime, 
+					BA.reg_user_id, 
+					CU.user_name AS reg_user_name,
+					BA.mod_datetime, 
+					BA.mod_user_id, 
+					BA.del_flag, 
+					BA.project_id,
+					OP.project_name,
+					OP.project_alias,
+					CC.customer_name,
+					IF(BM.confirn_flag = 'N' ,'미확정' ,'확정')  confirn_flag
+			FROM (
+				SELECT 
+					* 
+				FROM bss_adjustment 
+				WHERE del_flag = 'N'
+			)BA
+		
+			LEFT JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') OP
+			ON BA.project_id = OP.project_id
+		
+			LEFT JOIN cmm_customer CC
+			ON OP.customer_id = CC.customer_id
+		
+			LEFT JOIN cmm_user CU
+			ON BA.reg_user_id = CU.user_id
+			 
+			LEFT JOIN bill_master BM
+			ON BA.bill_yyyymm = BM.bill_yyyymm
+		
+		) A 
+    	WHERE 1=1 
+		<if test="searchBillYyyyMm != ''">
+		and 
+			A.bill_yyyymm like CONCAT('%',#{searchBillYyyyMm},'%') 
+		</if>
+		<if test="searchKind == 'customer_name' and keyword != ''">
+			AND
+				A.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'user_name' and keyword != ''">
+			AND
+				A.user_name like CONCAT('%',#{keyword},'%')
+		</if>	
+		
+		<if test="searchKind == 'searchAll' and keyword != '' ">
+		and (
+				A.customer_name like CONCAT('%',#{keyword},'%')
+				OR	
+				A.user_name like CONCAT('%',#{keyword},'%')
+			)
+		</if>		
+		order by A.bill_yyyymm desc , A.project_name asc
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+    
+    <insert id="insert" parameterType="CustomBssAdjustmentVO" >
+		INSERT INTO bss_adjustment 
+			(
+				adjust_seq, 
+				bill_yyyymm, 
+				adjust_contents, 
+				adjust_amount, 
+				description, 				
+				reg_datetime, 
+				reg_user_id, 
+				project_id
+			)
+		VALUES
+			(
+				#{adjustSeq}, 
+				#{billYyyymm}, 
+				#{adjustContents}, 
+				#{adjustAmount}, 
+				#{description},				
+				now(), 
+				#{regUserId}, 
+				#{projectId}
+			)
+  	</insert> 
+  	
+  	<select id="detail" resultType="CustomBssAdjustmentVO" parameterType="CustomBssAdjustmentVO">
+		SELECT 
+			BA.adjust_seq, 
+			CONCAT(SUBSTRING(BA.bill_yyyymm,1,4),'-', SUBSTRING(BA.bill_yyyymm,5,2)) AS bill_yyyymm,
+			BA.adjust_contents, 
+			IF(BA.adjust_amount LIKE '%\%%', REPLACE(BA.adjust_amount,'%',' %'), CONCAT(BA.signtxt, BA.absamount,' 원')) AS adjust_amount,
+		<!-- 	IF(BA.adjust_amount LIKE '%\%%', BA.adjust_amount, CONCAT(BA.signtxt, BA.absamount)) AS adjust_amount, -->
+			BA.signtxt, 
+			BA.absamount,
+			BA.description, 
+			BA.bill_flag, 
+			BA.reg_datetime, 
+			BA.reg_user_id, 
+			BA.mod_datetime, 
+			BA.mod_user_id, 
+			BA.del_flag, 
+			BA.project_id,
+			BM.confirn_flag,
+			BM.apprv_stat,	
+			OP.project_id,
+			OP.project_name,
+			OP.project_alias,
+			IFNULL(BIPD.use_amount,0) AS use_amount,
+			IFNULL(BIPD.total_amount,0) AS total_amount,
+			CC3.company_name AS up_company_name,
+			CC3.company_id AS up_company_id,
+			CC2.company_name AS company_name,
+			CC2.company_id AS company_id,
+			CC.customer_name AS customer_name
+		FROM (
+			SELECT
+				*
+				, IF(adjust_amount > 0 ,'+' ,'-') AS signtxt
+				, FORMAT(ABS(FLOOR(TRANSLATE(adjust_amount,'+%-',''))),0) AS absamount
+			FROM bss_adjustment
+			WHERE del_flag = 'N' 
+			AND adjust_seq = #{adjustSeq}
+		)BA
+		
+		LEFT JOIN bill_master BM
+		ON BM.bill_yyyymm = BA.bill_yyyymm
+		
+		LEFT JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') OP
+		ON OP.project_id = BA.project_id
+		
+		LEFT JOIN cmm_customer CC
+		ON OP.customer_id=CC.customer_id
+		
+		LEFT JOIN (
+				SELECT  
+					*
+				FROM cmm_company
+				WHERE up_company_id <![CDATA[<>]]> '*'
+		) CC2
+		ON CC.ref_company_id = CC2.company_id
+		
+		LEFT JOIN (
+				SELECT 
+					*
+				FROM cmm_company
+				WHERE up_company_id = '*'
+		) CC3
+		ON CC2.up_company_id = CC3.company_id
+		
+		LEFT JOIN (
+			SELECT
+				project_id,
+				bill_yyyymm,
+				FORMAT(SUM(IF(BIPD.invoice_item ='A000', BIPD.amount, '0')),0) AS use_amount,
+				FORMAT(SUM(IF(BIPD.invoice_item ='0000', BIPD.amount, '0')),0) AS total_amount
+			FROM bill_invoice_project_detail BIPD
+			GROUP BY project_id, bill_yyyymm
+		) BIPD
+		ON BA.project_id = BIPD.project_id
+		AND BA.bill_yyyymm = BIPD.bill_yyyymm
+   </select>  	
+  	
+   	<!--bss_adjustment 삭제 처리 -->
+    <update id="delete" parameterType="CustomBssAdjustmentVO" >
+		UPDATE bss_adjustment SET
+			mod_datetime = now(), 
+			mod_user_id = #{modUserId}, 
+			del_flag = 'Y',
+			bill_flag = 'Y' 		
+		WHERE adjust_seq = #{adjustSeq}
+  	</update>  	
+  	
+    <update id="update" parameterType="CustomBssAdjustmentVO" >
+		UPDATE bss_adjustment SET 
+			mod_datetime = now(), 
+			mod_user_id = #{modUserId}, 
+			adjust_contents = #{adjustContents}, 	
+			adjust_amount = #{adjustAmount},	
+			description = #{description},
+			bill_flag = 'N'
+		WHERE adjust_seq = #{adjustSeq}
+  	</update>  	
+  	
+  	<select id="getProjectName" resultType="CustomBssAdjustmentVO">
+		SELECT 	
+			a.project_id, 
+			a.customer_id, 
+			a.project_manager_id, 
+			a.project_name, 
+			a.project_alias,
+			a.reg_datetime, 
+			a.reg_user_id, 
+			a.mod_datetime, 
+			a.mod_user_id, 
+			a.delete_flag			 
+		FROM oss_project a 
+		where a.delete_flag <![CDATA[<>]]> 'Y'
+		AND a.project_name like CONCAT('%',#{keyword},'%') 
+  	</select>
+  	
+  	<select id="getBillYyyy" resultType="CustomBssAdjustmentVO">
+		SELECT 	
+			LEFT(bill_yyyymm,'4') bill_yyyy 
+		FROM 
+			bill_master  
+		GROUP BY bill_yyyy
+  	</select>  	
+  	
+    <select id="getBillMasterYyyymmList" resultType="CustomBssAdjustmentVO">
+		SELECT 	
+			bill_yyyymm,
+			confirn_flag			 
+		FROM bill_master
+		WHERE confirn_flag = 'N'
+		AND apprv_stat IS NULL
+		OR apprv_stat = 'APPRV_REJECTED'					
+  	</select>
+  	
+  	
+  	
+  	<!-- 쿼리 사용여부 확인 필요 -->
+    <select id="getProjectList" resultType="CustomBssAdjustmentVO">
+		SELECT 	
+			a.project_id, 
+			a.customer_id, 
+			a.project_manager_id, 
+			a.project_name, 
+			a.project_alias,
+			a.reg_datetime, 
+			a.reg_user_id, 
+			a.mod_datetime, 
+			a.mod_user_id, 
+			a.delete_flag			 
+		FROM 
+			oss_project a 
+		where 
+			a.delete_flag <![CDATA[<>]]> 'Y'
+		AND 
+			(
+			a.project_name like CONCAT('%',#{searchValue},'%') 
+			OR 
+			a.project_alias like CONCAT('%',#{searchValue},'%')
+			)
+		GROUP BY a.project_id			
+  	</select>
+  	
+  	<!-- 쿼리 사용여부 확인 필요 -->
+  	<select id="getApprovalCheck" parameterType="CustomBssAdjustmentVO" resultType="CustomBssAdjustmentVO">
+		SELECT 
+			apprv_stat 
+		FROM 
+			bill_master
+		WHERE 
+			request_seq = #{billYyyymm}				
+  	</select>
+  	
+
+</mapper>

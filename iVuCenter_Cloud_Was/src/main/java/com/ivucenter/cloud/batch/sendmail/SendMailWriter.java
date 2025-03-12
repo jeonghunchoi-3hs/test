@@ -1,0 +1,114 @@
+package com.ivucenter.cloud.batch.sendmail;
+
+import java.io.IOException;
+import java.sql.SQLDataException;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+import javax.mail.Message;
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeUtility;
+
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.springframework.batch.item.ItemWriter;
+
+import com.ivucenter.cloud.portal.alarms.mail.history.CustomMailQueueHistoryVO;
+import com.ivucenter.cloud.portal.alarms.mail.queue.CustomMailQueueVO;
+
+import lombok.Setter;
+
+public class SendMailWriter implements ItemWriter<CustomMailQueueVO> {
+	
+	private final String updateRetryCount 	= "com.ivucenter.cloud.portal.mail.queue.MailQueueDAO.updateRetryCount";
+	private final String deleteComplete 	= "com.ivucenter.cloud.portal.mail.queue.MailQueueDAO.batchDelete";
+	private final String insertMailHistory 	= "com.ivucenter.cloud.portal.mail.queue.history.MailQueueHistoryDAO.insert";
+
+	@Setter
+   	private SqlSessionFactory sqlSessionFactory;
+    
+    @Setter
+   	private Map<String, Object> parameterValues;
+   	
+    private SqlSessionTemplate sqlSessionTemplate; 
+    
+   	/* local variable */
+	private String mailFrom;
+	private String mailSmtpHost;
+
+
+	@Override
+	public void write(List<? extends CustomMailQueueVO> items) throws Exception {
+        this.sqlSessionTemplate = new SqlSessionTemplate(sqlSessionFactory, ExecutorType.SIMPLE);
+
+		this.mailFrom = (String) this.parameterValues.get("mailFrom");
+		this.mailSmtpHost = (String) this.parameterValues.get("mailSmtpHost");
+		
+		for (CustomMailQueueVO item : items) {
+			//String from = this.mailFrom;
+			String from = item.getSenderMailDec();
+			// String to = item.getReceiverMail();
+			String to = item.getReceiverMailDec();	
+			String host = this.mailSmtpHost;
+			String subject = item.getTitle();
+			String content = item.getContent();
+			
+			try {
+				sendEmail(from, to, host, subject, content);
+				
+				/**************************************/
+				// 메일 이력에 발송 내역 저장
+				/**************************************/
+				CustomMailQueueHistoryVO his = new CustomMailQueueHistoryVO();
+				his.setMailSeq(item.getMailSeq());
+				his.setTemplateId(item.getTemplateId());
+				his.setTitle(item.getTitle());
+				his.setContent(item.getContent());
+				his.setSenderName(item.getSenderName());
+				his.setSenderMail(item.getSenderMail());
+				his.setReceiverId(item.getReceiverId());
+				his.setReceiverName(item.getReceiverName());
+				his.setReceiverMail(item.getReceiverMail());
+				his.setRetryCount(item.getRetryCount());
+				his.setRedirectUrl(item.getRedirectUrl());
+				
+				this.sqlSessionTemplate.insert(insertMailHistory, his);
+				
+				/**************************************/
+				// 발송 메일 Queue에서 제거하기
+				/**************************************/
+				this.sqlSessionTemplate.delete(deleteComplete, item);
+				
+			} catch (RuntimeException | SQLDataException | IOException e) {
+				/**************************************/
+				// 메일 발송 실패에 대해 retry 횟수 증가 
+				/**************************************/
+				this.sqlSessionTemplate.update(updateRetryCount, item);
+			}
+		}
+	}
+
+	private void sendEmail(String from, String to, String host, String subject, String content) throws Exception {
+		Properties properties = System.getProperties();
+		properties.setProperty("mail.smtp.host", host);
+		
+		Session session = Session.getDefaultInstance(properties);
+		
+		MimeMessage message = new MimeMessage(session);
+		
+		message.setFrom(new InternetAddress(from));
+		message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
+		
+		//message.setSubject(subject);
+		message.setSubject(MimeUtility.encodeText(subject, "UTF-8", "B"));
+		//message.setContent(content, "text/html");
+		message.setContent(content, "text/html;charset=UTF-8");
+		
+		Transport.send(message);
+	}
+}

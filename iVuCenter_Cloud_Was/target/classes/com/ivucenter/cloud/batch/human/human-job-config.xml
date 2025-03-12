@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+     xmlns="http://www.springframework.org/schema/beans"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:aop="http://www.springframework.org/schema/aop"
+     xmlns:tx="http://www.springframework.org/schema/tx"
+     xmlns:batch="http://www.springframework.org/schema/batch"
+     xmlns:context="http://www.springframework.org/schema/context"
+     xmlns:util="http://www.springframework.org/schema/util"
+    
+     xsi:schemaLocation="
+         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+         http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+         http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch-2.2.xsd
+         http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd
+     http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+    ">
+    
+
+     <!-- *********************************************************** -->
+     <!-- ********** Job 선언 ********** -->
+     <!-- *********************************************************** -->
+    <batch:job id="humanJob">
+     
+    	<batch:step id="humanJobContextStep" next="humanFileReadStep">
+			<batch:tasklet ref="humanJobContextTasklet" />
+		</batch:step>
+		
+		<batch:step id="humanFileReadStep">
+			<batch:tasklet>
+				<batch:chunk reader="humanFileReadReader" 
+							writer="humanFileReadWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+     	</batch:step>
+
+    </batch:job>
+   
+	
+	<!-- *********************************************************** -->
+	<!-- ********** 변수 선언 ********** -->
+	<!-- *********************************************************** -->
+
+	<!-- 입력변수 -->
+	<util:map id="humanJobParams" key-type="java.lang.String" scope="step" >
+		<entry key="runtime" value="#{jobParameters['runtime']}" />
+	</util:map>
+	
+	<!-- 스텝간 동적 변수 -->
+	<util:map id="humanStepParams" key-type="java.lang.String" scope="step">
+		<entry key="inputFile" value="#{jobExecutionContext['inputFile']}" />
+	</util:map>
+	
+	
+     <!-- *********************************************************** -->
+     <!-- ********** Bean 선언 ********** -->
+     <!-- *********************************************************** -->
+     
+     
+    <bean id="humanJobContextTasklet" class="com.ivucenter.cloud.batch.human.JobContextTasklet" scope="step">  	
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />	
+	    <property name="parameterValues" ref="humanJobParams"/>	
+    </bean> 
+    
+	<bean id="humanVO" class="com.ivucenter.cloud.batch.human.HumanVO" scope="prototype" />
+    
+    <bean id="humanFileReadReader" class="org.springframework.batch.item.file.FlatFileItemReader" scope="step">
+	    <property name="resource" value="#{jobExecutionContext['inputFile']}"/>	
+    	<property name="strict" value="false" />
+    	<property name="encoding" value="EUC-KR" />
+    	<property name="linesToSkip" value="1" />
+    	<property name="lineMapper">
+    		<bean class="org.springframework.batch.item.file.mapping.DefaultLineMapper">
+    			<property name="lineTokenizer">
+    				<bean class="org.springframework.batch.item.file.transform.DelimitedLineTokenizer">
+    					<property name="delimiter" value="|" />
+    					<property name="names" value="userId,userName,deptCode,dutyCode,dutyName,rankCode,rankName" />
+					</bean>
+    			</property>
+    			<property name="fieldSetMapper">
+    				<bean class="org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper">
+    					<property name="prototypeBeanName" value="humanVO" />
+    				</bean>
+    			</property> 
+    		</bean>
+    	</property>
+    </bean>
+    
+    <bean id="humanFileReadWriter" class="com.ivucenter.cloud.batch.human.FileWriter">	  	
+    </bean>
+</beans>

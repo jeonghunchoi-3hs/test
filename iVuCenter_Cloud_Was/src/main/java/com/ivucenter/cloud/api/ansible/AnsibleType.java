@@ -1,0 +1,5 @@
+package com.ivucenter.cloud.api.ansible;
+
+public enum AnsibleType {
+	PROJECT_LIST, PROJECT, PROPERTIES, RESULT, JOB_TEMPLATE_LIST, JOB_TEMPLATE, INVENTORY_LIST, INVENTORY, JOB_TEMPLATE_LAUNCH
+}

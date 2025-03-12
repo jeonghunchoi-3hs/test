@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans 
+	xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation=
+    	"http://www.springframework.org/schema/beans 
+    	 http://www.springframework.org/schema/beans/spring-beans.xsd
+         http://www.springframework.org/schema/context 
+         http://www.springframework.org/schema/context/spring-context.xsd"
+    default-autowire="byName" 
+    default-init-method="init">
+ 
+    <bean id="applicationContextUtil" class="com.ivucenter.cloud.batch.common.ApplicationContextUtil" />
+    
+    <!-- Quartz Job Bean -->
+    <bean id="BillingJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean" >
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.billing.BillingJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+
+    <bean id="LoginCheckJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean" >
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.logincheck.LogincheckJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	<bean id="MeteringJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean" >
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.metering.MeteringJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	<bean id="MeteringRealtimeJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean" >
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.metering.realtime.MeteringJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	<bean id="ProvisioningJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean" >
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.provisioning.ProvisioningJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	<bean id="ReosurcesDayJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean" >
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.resources.day.ResourcesDayJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	<bean id="ReosurcesMonthJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean" >
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.resources.month.ResourcesMonthJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	<bean id="SendMailJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean" >
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.sendmail.SendMailJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+
+	<bean id="SendSmsJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.sendsms.SendSmsJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	<bean id="InsaSystemJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.InsaSystem.InsaSystemJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	<bean id="InsaUserSystemJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.InsaSystem.realtime.InsaUserSystemJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	<bean id="sendKepcoJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
+		<property name="jobClass" value="com.ivucenter.cloud.batch.sendKepco.SendKepcoJobLauncherDetails" />
+		<property name="durability" value="true" />
+	</bean>
+	
+	<bean id="sendStatusJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
+		<property name="jobClass" value="com.ivucenter.cloud.batch.sendStatus.SendStatusJobLauncherDetails" />
+		<property name="durability" value="true" />
+	</bean>
+	
+	
+	 <bean id="syncNutanixJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean" >
+		<property name="jobClass"	value="com.ivucenter.cloud.batch.metering.nutanix.MeteringJobLauncherDetails" />
+		<property name="durability"	value="true" />
+	</bean>
+	
+	
+	
+	<!-- Quartz Trigger Bean -->
+	<bean id="cronTr_billingJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="BillingJobDetail" />
+		<property name="cronExpression"	value="0 5 0 * * ?" />
+	</bean>
+	
+	<bean id="cronTr_logincheckJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="LoginCheckJobDetail" />
+		<property name="cronExpression"	value="0 0 0/1 * * ?" />
+	</bean>
+	
+	<bean id="cronTr_meteringJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="MeteringJobDetail" />
+		<property name="cronExpression"	value="0 0 0/6 * * ?" />
+	</bean>
+	
+	<bean id="cronTr_meteringRealtimeJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="MeteringRealtimeJobDetail" />
+		<property name="cronExpression"	value="0 0/10 * * * ?" />
+	</bean>
+	
+	<bean id="cronTr_provisioningJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="ProvisioningJobDetail" />
+		<property name="cronExpression"	value="0 0/3 * * * ?" />
+	</bean>
+	
+	<bean id="cronTr_resourcesDayJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="ReosurcesDayJobDetail" />
+		<property name="cronExpression"	value="0 0 1 * * ?" />
+	</bean>
+	
+	<bean id="cronTr_resourcesMonthJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="ReosurcesMonthJobDetail" />
+		<property name="cronExpression"	value="0 0 1 * * ?" />
+	</bean>
+	
+	<bean id="cronTr_sendMailJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="SendMailJobDetail" />
+		<property name="cronExpression"	value="0 0/1 * * * ?" />
+	</bean>
+	
+	<bean id="cronTr_sendSmsJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="SendSmsJobDetail" />
+		<property name="cronExpression"	value="0 0/1 * * * ?" />
+	</bean>
+	
+	<bean id="cronTr_InsaSystemJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="InsaSystemJobDetail" />
+		<property name="cronExpression"	value="0 0 2 * * ?" />
+	</bean>
+	
+	<bean id="cronTr_InsaUserSystemJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="InsaUserSystemJobDetail" />
+		<property name="cronExpression"	value="0 0 0/1 * * ?" />
+	</bean>			
+	
+	<bean id="cronTr_sendKepcoJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="sendKepcoJobDetail" />
+		<property name="cronExpression"	value="0 0/1 * * * ?" />
+	</bean>
+    
+    <bean id="cronTr_sendStatus" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+    	<property name="jobDetail" ref="sendStatusJobDetail" />
+    	<property name="cronExpression"	value="0 0 9 ? * 2" />
+    </bean>
+    
+	<bean id="cronTr_syncNutanixJob" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail"	ref="syncNutanixJobDetail" />
+		<property name="cronExpression"	value="0 0/3 * * * ?" />
+	</bean>
+    
+    <!-- Quartz Run -->
+    <!-- 
+				<ref bean="cronTr_billingJob" />  
+				<ref bean="cronTr_meteringJob" /> 
+				<ref bean="cronTr_meteringRealtimeJob" /> 
+				<ref bean="cronTr_logincheckJob" /> 
+				<ref bean="cronTr_provisioningJob" />  
+				<ref bean="cronTr_resourcesDayJob" /> 
+				<ref bean="cronTr_resourcesMonthJob" />
+				<ref bean="cronTr_sendMailJob" /> 
+				<ref bean="cronTr_sendSmsJob" />
+				<ref bean="cronTr_InsaSystemJob" />
+     -->
+     
+	<!-- 테스트 하는데 방해 되서 로컬 개발에서는 주석 처리하는게 편함 -->
+
+   <bean id="DefaultScheduler" class="org.springframework.scheduling.quartz.SchedulerFactoryBean" scope="singleton" lazy-init="false" autowire="no">
+        <property name="configLocation" value="classpath:quartz.properties" />
+        <property name="triggers"> 
+ 			<list> 
+  				 <ref bean="cronTr_sendKepcoJob" />
+ 				<ref bean="cronTr_meteringJob" />
+ 				<ref bean="cronTr_meteringRealtimeJob" /> 
+ 				<ref bean="cronTr_provisioningJob" />
+ 			    <ref bean="cronTr_resourcesDayJob" />
+ 				<ref bean="cronTr_resourcesMonthJob" />
+ 				<ref bean="cronTr_logincheckJob" />
+ 				<ref bean="cronTr_sendSmsJob" />
+				<ref bean="cronTr_sendMailJob" />
+  				<ref bean="cronTr_InsaSystemJob" />  	
+  				<ref bean="cronTr_InsaUserSystemJob" /> 
+ 				<ref bean="cronTr_sendStatus" /> 
+ 			    <ref bean="cronTr_syncNutanixJob" />    
+ 				
+ 			</list> 
+ 		</property>
+	</bean>          
+</beans>

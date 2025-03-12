@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.cmm.network.CmmNetworkDAO">
+	
+    <select id="list" parameterType="CustomCmmNetworkVO" resultType="CustomCmmNetworkVO">
+		SELECT
+			z.*
+		FROM
+		(
+			SELECT
+				a.network_id AS networkId
+				, upcm.company_name AS customerHeardName
+				, cm.company_name AS affiliateName
+				, d.code_name AS workKindName
+				, e.code_name AS workNetKindName
+				, CONCAT(a.a_class,'.',a.b_class,'.',a.c_class,'.0',a.cidr) AS ipAddr
+				, CONCAT(a.a_class,'.',a.b_class,'.',a.c_class,'.1') AS gateway
+				, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+				, b.user_name AS regUserName
+				, a.a_class
+				, a.b_class
+				, a.c_class
+			FROM cmm_network a
+			LEFT JOIN (SELECT user_id, user_name FROM cmm_user ) b
+			ON a.reg_user_id = b.user_id
+			
+			INNER JOIN cmm_company cm 
+			ON cm.company_id = a.company_id
+			
+			INNER JOIN cmm_company upcm
+			ON upcm.company_id = cm.up_company_id
+
+			LEFT JOIN (SELECT code_id, code_name FROM cmm_code ) d
+			ON a.work_kind = d.code_id
+			
+			LEFT JOIN (SELECT code_id, code_name FROM cmm_code ) e
+			ON a.work_net_kind = e.code_id
+		)z
+		WHERE 1=1
+		<if test="searchKind == 'affiliateName' and keyword != ''">
+			AND
+				z.affiliateName like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+					z.affiliateName like CONCAT('%',#{keyword},'%')
+			)
+		</if>
+		ORDER BY z.customerHeardName ASC, z.affiliateName ASC, CAST(IFNULL(z.a_class, '0') AS INT) ASC , CAST(IFNULL(z.b_class, '0') AS INT) ASC, CAST(IFNULL(z.c_class, '0') AS INT) ASC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+	</select>
+
+
+	<select id="detail" parameterType="CustomCmmNetworkVO" resultType="CustomCmmNetworkVO">
+		SELECT
+			a.network_id AS networkId
+			, a.company_id AS customerHeard
+			, upcm.company_name AS customerHeardName
+			, cm.company_name AS affiliateName
+			, a.a_class
+			, a.b_class
+			, a.work_kind AS workKind
+			, d.code_name AS workKindName
+			, a.work_net_kind AS workNetKind
+			, e.code_name AS workNetKindName
+			, a.c_class
+			, a.cidr
+			, a.use_flag
+		FROM cmm_network a
+		LEFT JOIN (SELECT user_id, user_name FROM cmm_user ) b
+		ON a.reg_user_id = b.user_id
+
+		INNER JOIN cmm_company cm
+		ON cm.company_id = a.company_id
+			
+		INNER JOIN cmm_company upcm
+		ON upcm.company_id = cm.up_company_id
+		
+		LEFT JOIN (SELECT code_id, code_name FROM cmm_code ) d
+		ON a.work_kind = d.code_id
+		
+		LEFT JOIN (SELECT code_id, code_name FROM cmm_code ) e
+		ON a.work_net_kind = e.code_id
+			
+		WHERE network_id=#{networkId}
+	</select>
+	
+	<insert id="insert" parameterType="CustomCmmNetworkVO">
+   		INSERT INTO cmm_network (
+   			network_id
+			, company_id
+			, a_class
+			, b_class
+			, work_kind
+			, work_net_kind
+			, c_class
+			, cidr
+			, reg_datetime
+			, reg_user_id
+			, use_flag
+		) values (
+			#{networkId}
+			, #{companyId}
+			, #{aClass}
+			, #{bClass}
+			, #{workKind}
+			, #{workNetKind}
+			, #{cClass}
+			, #{cidr}
+			, NOW()
+			, #{regUserId}
+			, #{useFlag}
+		)
+    </insert>
+	
+    <update id="update" parameterType="CustomCmmNetworkVO">
+        UPDATE cmm_network SET
+			a_class = #{aClass}
+			, b_class = #{bClass}
+			, c_class = #{cClass}
+			, cidr = #{cidr}
+			, mod_datetime = NOW()
+			, mod_user_id = #{modUserId}
+        WHERE network_id=#{networkId}
+    </update>	
+	
+	<delete id="delete" parameterType="CustomCmmNetworkVO">
+		DELETE FROM cmm_network
+		WHERE network_id=#{networkId}
+	</delete>
+	
+	<select id="customerlist" parameterType="CustomCmmNetworkVO" resultType="CustomCmmNetworkVO">
+		SELECT 
+			z.* 
+		FROM (
+					SELECT
+						a.network_id AS networkId
+						, upcm.company_name AS customerHeardName
+						, cm.company_name AS affiliateName
+						, d.code_name AS workKindName
+						, a.work_kind AS workKind
+						, e.code_name AS workNetKindName
+						, a.work_net_kind AS workNetKind
+						, CONCAT(a.a_class,'.',a.b_class,'.',a.c_class,'.0',a.cidr) AS ipAddr
+						, CONCAT(a.a_class,'.',a.b_class,'.',a.c_class,'.1') AS gateway
+						, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+						, b.user_name AS regUserName
+						, a.c_class
+					FROM cmm_network a
+						LEFT JOIN (SELECT user_id, user_name FROM cmm_user ) b
+						ON a.reg_user_id = b.user_id
+						
+						INNER JOIN cmm_company cm
+						ON cm.company_id = a.company_id
+						
+						INNER JOIN cmm_company upcm
+						ON upcm.company_id = cm.up_company_id
+						
+						LEFT JOIN (SELECT code_id, code_name FROM cmm_code ) d
+						ON a.work_kind = d.code_id
+						
+						LEFT JOIN (SELECT code_id, code_name FROM cmm_code ) e
+						ON a.work_net_kind = e.code_id
+						
+						INNER JOIN cmm_customer f
+							ON	cm.company_id = f.ref_company_id
+					WHERE	1 = 1
+					<if test="customerId != '' ">
+						AND f.customer_id = #{customerId}
+					</if> 
+		)z
+		WHERE 1=1
+		<if test="searchKind == 'customerHeardName' and keyword != ''">
+			AND
+				z.customerHeardName like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND 
+				z.customerHeardName like CONCAT('%',#{keyword},'%')
+		</if>		
+		ORDER BY z.customerHeardName, z.affiliateName, z.c_class * 1
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+	</select>
+	
+	
+	<select id="customerPopList" parameterType="CustomCmmNetworkVO" resultType="CustomCmmNetworkVO">
+		SELECT 
+			z.* 
+		FROM 
+			(
+			SELECT
+				a.network_id AS networkId
+				, upcm.company_name AS customerHeardName
+				, cm.company_name AS affiliateName
+				, d.code_name AS workKindName
+				, a.work_kind AS workKind
+				, e.code_name AS workNetKindName
+				, a.work_net_kind AS workNetKind
+				, CONCAT(a.a_class,'.',a.b_class,'.',a.c_class,'.0',a.cidr) AS ipAddr
+				, CONCAT(a.a_class,'.',a.b_class,'.',a.c_class,'.1') AS gateway
+				, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+				, b.user_name AS regUserName
+			FROM cmm_network a
+			LEFT JOIN (SELECT user_id, user_name FROM cmm_user ) b
+			ON a.reg_user_id = b.user_id
+			
+			INNER JOIN cmm_company cm
+			ON cm.company_id = a.company_id
+			
+			INNER JOIN cmm_company upcm
+			ON upcm.company_id = cm.up_company_id
+			
+			LEFT JOIN (SELECT code_id, code_name FROM cmm_code ) d
+			ON a.work_kind = d.code_id
+			
+			LEFT JOIN (SELECT code_id, code_name FROM cmm_code ) e
+			ON a.work_net_kind = e.code_id
+		)z
+		LEFT JOIN (
+			SELECT
+				* 
+			 FROM cmm_customer_network
+			 WHERE customer_id=#{customerId}
+		) zz
+		ON zz.network_id = z.networkId
+		WHERE 1=1
+		AND zz.customer_id IS NULL
+		<if test="searchKind == 'customerHeardName' and keyword != ''">
+			AND
+				z.customerHeardName like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND 
+				z.customerHeardName like CONCAT('%',#{keyword},'%')
+		</if>		
+		ORDER BY z.customerHeardName, z.affiliateName DESC
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+	</select>
+	
+	<select id="customerChk" parameterType="CustomCmmNetworkVO" resultType="Integer">
+		SELECT 
+			count(*)
+		FROM(
+			SELECT
+				* 
+			FROM cmm_customer_network
+			WHERE customer_id=#{customerId}
+		)CCN
+		LEFT JOIN cmm_network CN
+		ON CCN.network_id = CN.network_id
+		WHERE CN.work_kind = (SELECT work_kind FROM cmm_network WHERE network_id=#{networkId})
+		AND CN.work_net_kind = (SELECT work_net_kind FROM cmm_network WHERE network_id=#{networkId})
+	</select>
+	
+	<insert id="customerInsert" parameterType="CustomCmmNetworkVO">
+   		INSERT INTO cmm_customer_network (
+   			customer_id
+			, network_id
+		) values (
+			#{customerId}
+			, #{networkId}
+		)
+    </insert>
+    
+    <delete id="customerDelete" parameterType="CustomCmmFileVO">
+    	delete from cmm_customer_network
+    	WHERE 1=1
+		AND customer_id = #{customerId}
+		AND network_id = #{networkId} 
+    </delete>
+	
+	
+	<select id="listAffiliateName" parameterType="CustomCmmNetworkVO" resultType="CustomCmmNetworkVO">
+		SELECT
+			a.affiliate_name AS affiliateName
+			, b.code_name AS customerHeardName
+		FROM cmm_network a
+		LEFT JOIN (SELECT code_id, code_name FROM cmm_code ) b
+		ON a.customer_heard = b.code_id
+		<if test="customerHeardName != '' ">
+			WHERE b.code_name = #{customerHeardName}
+		</if>
+		GROUP BY a.affiliate_name
+	</select>
+	
+</mapper>

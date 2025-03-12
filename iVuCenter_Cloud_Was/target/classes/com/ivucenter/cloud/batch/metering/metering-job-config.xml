@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+     xmlns="http://www.springframework.org/schema/beans"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:aop="http://www.springframework.org/schema/aop"
+     xmlns:tx="http://www.springframework.org/schema/tx"
+     xmlns:batch="http://www.springframework.org/schema/batch"
+     xmlns:context="http://www.springframework.org/schema/context"
+     xmlns:util="http://www.springframework.org/schema/util"
+
+     xsi:schemaLocation="
+         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+         http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+         http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch-2.2.xsd
+         http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd
+     http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+    ">
+
+
+     <!-- *********************************************************** -->
+     <!-- ********** Job 선언 ********** -->
+     <!-- *********************************************************** -->
+     <batch:job id="meteringJob">
+
+     	<!-- jobContextStep -->
+    	<batch:step id="meteringJobContextStep" next="insertMeteringServiceStep">
+			<batch:tasklet ref="meteringJobContextTasklet" />
+		</batch:step>
+
+     	<!-- #################################################### -->
+     	<!-- ###### 동기화 -->
+     	<!-- #################################################### -->
+
+     	<batch:step id="insertMeteringServiceStep" next="syncProjectStep">
+			<batch:tasklet>
+				<batch:chunk reader="meteringServiceReader"
+							writer="meteringServiceWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+     	<!-- 프로젝트의 영문이름과 네트워크 정보를 동기화한다. -->
+		<batch:step id="syncProjectStep" next="syncAlivedVmStep">
+			<batch:tasklet>
+				<batch:chunk reader="syncProjectReader"
+							processor="syncProjectProcessor"
+							writer="syncProjectWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+     	<!-- 오픈스택에서 살아 있는 가상서버의 이름, CPU, MEM, DISK, 신청일자 정보를 동기화한다. -->
+     	<batch:step id="syncAlivedVmStep" next="syncDeletedVmStep">
+			<batch:tasklet>
+				<batch:chunk reader="syncAlivedVmReader"
+							writer="syncAlivedVmWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- 오픈스택에서 삭제되어 있는 가상서버의 이름, CPU, MEM, DISK, 해지일자 정보를 동기화한다. -->
+		<batch:step id="syncDeletedVmStep" next="syncBlockDiskStep">
+			<batch:tasklet>
+				<batch:chunk reader="syncDeletedVmReader"
+							writer="syncDeletedVmWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<batch:step id="syncBlockDiskStep" next="insertMeteringStep">
+			<batch:tasklet>
+				<batch:chunk reader="syncBlockDiskReader"
+							writer="syncBlockDiskWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- 오픈스택 가용량 동기화 -->
+  		<!-- <batch:step id="syncOpenStackAvailStep" next="insertMeteringStep">
+			<batch:tasklet>
+				<batch:chunk reader="syncOpenStackAvailReader"
+							writer="syncOpenStackAvailWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step> -->
+
+     	<!-- #################################################### -->
+     	<!-- ###### 미터링 -->
+     	<!-- #################################################### -->
+
+		<!-- vcpus, memory 미터링 -->
+		<batch:step id="insertMeteringStep" next="insertMeteringDiskStep">
+			<batch:tasklet>
+				<batch:chunk reader="batchSelectOssVmReader"
+							processor="metricProcessor"
+							writer="compositeWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- volume.size 미터링 -->
+		<batch:step id="insertMeteringDiskStep" next="deleteMeasureDateStep">
+			<batch:tasklet>
+				<batch:chunk reader="meteringDiskReader"
+							writer="meteringDiskWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- NAS GB 미터링 -->
+		<!--
+		<batch:step id="insertMeteringNasStep" next="insertMeteringLoadbalancerStep" >
+			<batch:tasklet>
+				<batch:chunk reader="meteringNasReader"
+							writer="meteringNasWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		-->
+
+		<!-- 로드밸런서  미터링 -->
+		<!--
+		<batch:step id="insertMeteringLoadbalancerStep" next="insertMeteringPublicipStep">
+			<batch:tasklet>
+				<batch:chunk reader="meteringLoadbalancerReader"
+							writer="meteringLoadbalancerWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		-->
+
+		<!-- 공인IP  미터링 -->
+		<!--
+		<batch:step id="insertMeteringPublicipStep" next="insertMeteringMcaStep">
+			<batch:tasklet>
+				<batch:chunk reader="meteringPublicipReader"
+							writer="meteringPublicipWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		-->
+
+		<!-- 백업  미터링 -->
+		<!--
+		<batch:step id="insertMeteringBackupStep" next="insertMeteringMcaStep">
+			<batch:tasklet>
+				<batch:chunk reader="meteringBackupReader"
+							writer="meteringBackupWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		-->
+
+		<!-- 대외계  미터링 -->
+		<!--
+		<batch:step id="insertMeteringMcaStep" next="insertMeteringScmStep">
+			<batch:tasklet>
+				<batch:chunk reader="meteringMcaReader"
+							writer="meteringMcaWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		-->
+
+		<!-- 형상관리  미터링 -->
+		<!--
+		<batch:step id="insertMeteringScmStep" next="insertMeteringSecurityStep" >
+			<batch:tasklet>
+				<batch:chunk reader="meteringScmReader"
+							writer="meteringScmWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		-->
+
+		<!-- 보안관제 미터링 -->
+		<!--
+		<batch:step id="insertMeteringSecurityStep" next="deleteMeasureDateStep" >
+			<batch:tasklet>
+				<batch:chunk reader="meteringSecurityReader"
+							writer="meteringSecurityWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		-->
+		<!-- ++++++++ 미터링 삭제  +++++++++ -->
+    	<batch:step id="deleteMeasureDateStep" >
+			<batch:tasklet ref="deleteMeasureDateTasklet" />
+		</batch:step>
+
+     </batch:job>
+
+
+
+	<!-- *********************************************************** -->
+	<!-- ********** 변수 선언 ********** -->
+	<!-- *********************************************************** -->
+
+	<!-- 입력변수 -->
+	<util:map id="meteringJobParams" key-type="java.lang.String" scope="step" >
+		<entry key="runtime" value="#{jobParameters['runtime']}" />
+		<entry key="meteringDay" value="#{jobParameters['meteringDay']}" />
+	</util:map>
+
+	<!-- 스텝간 동적 변수 -->
+	<util:map id="meteringStepParams" key-type="java.lang.String" scope="step">
+		<entry key="meteringStartDatetime" value="#{jobExecutionContext['meteringStartDatetime']}" />
+		<entry key="meteringEndDatetime" value="#{jobExecutionContext['meteringEndDatetime']}" />
+	</util:map>
+
+
+     <!-- *********************************************************** -->
+     <!-- ********** Bean 선언 ********** -->
+     <!-- *********************************************************** -->
+
+    <bean id="meteringJobContextTasklet" class="com.ivucenter.cloud.batch.metering.JobContextTasklet">
+	    <property name="parameterValues" ref="meteringJobParams"/>
+    </bean>
+
+    <!-- +++++ OSS_SERVICE 정보 동기화 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="meteringServiceReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.metering.BatchMeteringDAO.batchSelectService"/>
+	    <property name="parameterValues" ref="meteringStepParams"/>
+    </bean>
+
+    <bean id="meteringServiceWriter" class="com.ivucenter.cloud.batch.metering.MeasureServiceWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+	    <property name="parameterValues" ref="meteringStepParams"/>
+    </bean>
+
+
+	<!-- +++++ OSS_PROJECT 정보 동기화 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="syncProjectReader" class="com.ivucenter.cloud.batch.metering.SyncProjectReader">
+    </bean>
+
+    <bean id="syncProjectProcessor" class="com.ivucenter.cloud.batch.metering.SyncProjectProcessor">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+<!-- 	    <property name="parameterValues" ref="meteringStepParams"/> -->
+    </bean>
+
+    <bean id="syncProjectWriter" class="com.ivucenter.cloud.batch.metering.SyncNetworkWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+<!-- 	    <property name="parameterValues" ref="meteringStepParams"/> -->
+    </bean>
+
+
+	<!-- +++++ ALIVED VM 정보 동기화 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="syncAlivedVmReader" class="com.ivucenter.cloud.batch.metering.SyncAlivedVmReader">
+    </bean>
+
+    <bean id="syncAlivedVmWriter" class="com.ivucenter.cloud.batch.metering.SyncAlivedVmWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+<!-- 	    <property name="parameterValues" ref="meteringStepParams"/> -->
+    </bean>
+
+
+	<!-- +++++ DELETED VM 정보 동기화 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="syncDeletedVmReader" class="com.ivucenter.cloud.batch.metering.SyncDeletedVmReader">
+    </bean>
+
+    <bean id="syncDeletedVmWriter" class="com.ivucenter.cloud.batch.metering.SyncDeletedVmWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+<!-- 	    <property name="parameterValues" ref="meteringStepParams"/> -->
+    </bean>
+
+
+	<!-- +++++ BLOCK DISK 정보 동기화 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="syncBlockDiskReader" class="com.ivucenter.cloud.batch.metering.SyncBlockDiskReader">
+    </bean>
+
+    <bean id="syncBlockDiskWriter" class="com.ivucenter.cloud.batch.metering.SyncBlockDiskWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+	    <property name="parameterValues" ref="meteringStepParams"/>
+    </bean>
+
+
+	<!-- 오픈스택 가용량 동기화 -->
+    <bean id="syncOpenStackAvailReader" class="com.ivucenter.cloud.batch.metering.SyncOpenStackAvailReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+    </bean>
+
+    <bean id="syncOpenStackAvailWriter" class="com.ivucenter.cloud.batch.metering.SyncOpenStackAvailWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+    </bean>
+
+
+	<!-- +++++++++++++++++++++++++++++++++++++++ -->
+	<bean id="batchSelectOssVmReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.metering.BatchMeteringDAO.batchSelectOssVm"/>
+	    <property name="parameterValues" ref="meteringStepParams"/>
+    </bean>
+
+	<bean id="metricProcessor" class="com.ivucenter.cloud.batch.metering.MetricProcessor">
+<!-- 		<property name="sqlSessionFactory" ref="sqlSessionFactory4" /> -->
+<!-- 	    <property name="parameterValues" ref="meteringStepParams"/> -->
+    </bean>
+
+    <bean id="compositeWriter" class="org.springframework.batch.item.support.CompositeItemWriter">
+    	<property name="delegates">
+    		<list>
+			  	<bean class="com.ivucenter.cloud.batch.metering.MeasureVcpusWriter">
+					<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+				    <property name="parameterValues" ref="meteringStepParams"/>
+			    </bean>
+			  	<bean class="com.ivucenter.cloud.batch.metering.MeasureMemoryWriter">
+					<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+				    <property name="parameterValues" ref="meteringStepParams"/>
+			    </bean>
+    		</list>
+    	</property>
+    </bean>
+
+
+	<!-- +++++++++++++++++++++++++++++++++++++++ -->
+    <bean id="meteringDiskReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.metering.BatchMeteringDAO.batchSelectDisk"/>
+	    <property name="parameterValues" ref="meteringStepParams"/>
+    </bean>
+
+    <bean id="meteringDiskWriter" class="com.ivucenter.cloud.batch.metering.MeasureDiskWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+	    <property name="parameterValues" ref="meteringStepParams"/>
+    </bean>
+
+    <bean id="deleteMeasureDateTasklet" class="com.ivucenter.cloud.batch.metering.MeasureDateDeleteTasklet">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+<!-- 	    <property name="parameterValues" ref="meteringStepParams"/> -->
+    </bean>
+
+</beans>

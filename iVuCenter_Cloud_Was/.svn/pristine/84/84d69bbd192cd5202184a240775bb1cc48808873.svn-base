@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.vm.OssZoneNetwrokDiskDAO">
+
+    <select id="list" parameterType="OssZoneNetworkDiskVO" resultType="OssZoneNetworkDiskVO">
+		SELECT
+			*,
+			CASE WHEN zone_name = 'fa-zone' THEN 'FA운영' WHEN zone_name = 'oa-zone' THEN 'OA운영' WHEN zone_name = 'oa-dev-zone' THEN 'OA개발/품질' ELSE zone_name END AS zone_alias
+		FROM
+			OSS_ZONE_NETWORK OZN
+		LEFT JOIN
+			OSS_CLOUD OC
+		ON OZN.cloud_id = OC.cloud_id
+		WHERE
+			IS_AVAILABLE = 'Y'
+			<if test="zoneName != null ">
+			AND ZONE_NAME = #{zoneName}
+			</if>
+		<!-- 	<if test="vmImageType != null">
+			AND (SELECT COUNT(*) FROM bss_product_catalog_item A LEFT JOIN bss_product_os B ON A.product_seq = B.product_seq WHERE cloud_id = OZN.cloud_id AND catalog_category = 'CATACATE_OS' AND catalog_seq = #{catalogSeq} AND B.item_id = #{vmImageType}) > 0
+			</if> -->
+			<if test="projectBoxId != null ">
+			AND OC.cloud_id IN ( SELECT cloud_id FROM oss_project WHERE project_box_id = #{projectBoxId})
+			</if>
+		<if test="zoneName == null ">
+		GROUP BY zone_display_name
+		</if>
+	</select>
+
+</mapper>

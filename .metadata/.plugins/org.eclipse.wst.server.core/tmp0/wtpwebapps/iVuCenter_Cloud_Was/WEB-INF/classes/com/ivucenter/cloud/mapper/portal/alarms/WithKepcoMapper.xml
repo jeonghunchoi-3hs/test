@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.alarms.withkepco.WithKepcoDAO">
+
+	<insert id="alarmWithKepcoQueueInsert" parameterType="CustomWithKepcoVO">
+   		INSERT INTO alarm_kepco_queue (
+			alarm_seq
+			, approval_no
+			, sign_type
+			, payer_id
+			, writer_id
+			, writer_name
+			, system_name
+			, title
+			, content_url
+			, status
+			, reg_datetime
+			, redirect_url
+		) values (
+			#{alarmSeq}
+			, #{approvalNo}
+			, #{signType}
+			, #{payerId}
+			, #{writerId}
+			, #{writerName}
+			, #{systemName}
+			, #{title}
+			, #{contentUrl}
+			, #{status}
+			, NOW()
+			, #{redirectUrl}
+		)
+    </insert>    
+   
+    <select id="withKepcoHistoryList" resultType="CustomWithKepcoVO" parameterType="CustomWithKepcoVO">
+    	SELECT 
+    		*
+    		, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+    	FROM alarm_kepco_queue_history
+    	WHERE 1 = 1
+    	AND
+			DATE_FORMAT(z.reg_datetime, '%Y%m%') <![CDATA[>=]]> #{startYm}
+		AND
+			DATE_FORMAT(z.reg_datetime, '%Y%m%') <![CDATA[<=]]> #{endYm}
+    	<if test="searchKind != '' and keyword != null ">
+    		AND 
+    			#{searchKind} LIKE CONCAT('%', #{keyword}, '%')
+    	</if>
+    	ORDER BY reg_datetime DESC    	
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>    	
+    </select>
+    
+    <select id="list" resultType="CustomWithKepcoVO" parameterType="CustomWithKepcoVO">
+    	SELECT 
+			z.*
+		FROM
+		( 
+			SELECT 
+				*
+			FROM alarm_kepco_queue_history 
+		) z
+		WHERE 1=1
+		AND
+			DATE_FORMAT(z.reg_datetime, '%Y%m%')  >= #{startYm}
+		AND
+			DATE_FORMAT(z.reg_datetime, '%Y%m%')  <![CDATA[<=]]> #{endYm}	
+		<if test="searchKind == 'template_id' and keyword != ''">
+			AND
+				z.template_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'template_name' and keyword != ''">
+			AND
+				z.template_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+					z.template_id like CONCAT('%',#{keyword},'%')
+					OR
+					z.template_name like CONCAT('%',#{keyword},'%')
+				)
+		</if>		
+    	ORDER BY z.reg_datetime DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+    
+    <select id="detail" resultType="CustomWithKepcoVO" parameterType="java.lang.String">
+    	SELECT
+    		*
+    	FROM alarm_kepco_queue_history
+    	WHERE 
+    		alarm_seq = #{alarmSeq}
+    	ORDER BY 
+    		rtn_datetime DESC
+    	LIMIT 1
+    </select>
+    
+    <select id="selectSendKepcoList" resultType="CustomWithKepcoVO">
+    	SELECT
+    		alarm_seq
+    		, approval_no    		 
+    		, sign_type
+    		, payer_id
+    		, writer_id
+    		, writer_name
+    		, system_name
+    		, title
+    		, content_url
+    		, [status]
+    		, DATE_FORMAT(reg_datetime,'%Y%m%d%h%i%s') as reg_datetime
+    		, retry_count
+    		, redirect_url
+    	FROM alarm_kepco_queue
+    	order by reg_datetime asc
+    </select>
+    
+    <delete id="WithKepcoQueueDelete" parameterType="CustomWithKepcoVO">
+    	DELETE
+    		FROM alarm_kepco_queue
+    	WHERE
+    		alarm_seq = #{alarmSeq}
+    </delete>
+    
+    <insert id="WithKepcoQueueHistoryInsert" parameterType="CustomWithKepcoVO">
+    	INSERT INTO alarm_kepco_queue_history (
+			alarm_seq
+			, approval_no
+			, sign_type
+			, payer_id
+			, writer_id
+			, writer_name
+			, system_name
+			, title
+			, content_url
+			, status
+			, reg_datetime
+			, rtn_code
+			, rtn_datetime
+			, step
+			, redirect_url
+		) values (
+			#{alarmSeq}
+			, #{approvalNo}
+			, #{signType}
+			, #{payerId}
+			, #{writerId}
+			, #{writerName}
+			, #{systemName}
+			, #{title}
+			, #{contentUrl}
+			, #{status}
+			, #{regDatetime}	
+			, #{rtnCode}
+			, now()
+			, #{step}
+			, #{redirectUrl}		
+		)
+    </insert>
+    
+    <update id="WithkepcoRetryUpdate" parameterType="CustomWithKepcoVO">
+    	UPDATE 
+    		alarm_kepco_queue 
+    	SET 
+    		retry_count = retry_count + 1
+    	WHERE
+    		alarm_seq = #{alarmSeq}
+    </update>
+    
+    <update id="WithkepcoNextStepUpdate" parameterType="CustomWithKepcoVO">
+    	UPDATE
+    		alarm_kepco_queue
+    	SET
+    		sign_type = 'S',
+    		retry_count = 0
+    	WHERE
+    		alarm_seq = #{alarmSeq}
+    </update>
+</mapper>

@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bill.policy.BillPolicyDAO">
+
+	<select id="getBillPolicyList" resultType="CustomBillPolicyVO" parameterType="CustomBillPolicyVO">
+		SELECT
+			bill.*,
+			n.flag,
+			c.user_name AS mod_user_name,
+			DATE_FORMAT(bill.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2
+    	FROM
+    		bill_product_catalog bill
+				LEFT JOIN
+	    		      (SELECT policy_seq,
+	    		                  'NOW' AS flag,
+	    		                   apply_date
+	    		         FROM bill_product_catalog
+	    		       WHERE apply_date  <![CDATA[<=]]> NOW()
+	    		            AND del_flag ='N'
+	    		    ORDER BY apply_date DESC LIMIT 0, 1
+	    		       ) AS n
+    			ON n.policy_seq = bill.policy_seq
+				LEFT JOIN
+			cmm_user c
+    			ON bill.mod_user_id = c.user_id
+    	WHERE
+    		1=1
+	    	and bill.del_flag <![CDATA[<>]]> 'Y'
+
+		<if test="searchKind == 'policy_name' and keyword != ''">
+			AND
+				bill.policy_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'apply_date' and keyword != ''">
+			AND
+				bill.apply_date like CONCAT('%',#{keyword},'%')
+		</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			and
+			(
+				bill.policy_name like CONCAT('%',#{keyword},'%')
+			OR
+				bill.apply_date like CONCAT('%',#{keyword},'%')
+			)
+			</if>
+
+		order by
+			bill.apply_date desc
+
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+
+     <select id="cumlistTot" resultType="int" parameterType="CustomBillPolicyVO">
+    	SELECT
+			count(*)
+    	FROM bill_product_catalog
+    	order by reg_datetime desc
+    </select>
+
+    <select id="getBillPolicyView" resultType="CustomBillPolicyVO" parameterType="CustomBillPolicyVO">
+		SELECT
+			A.*
+			, (SELECT cloud_name FROM OSS_CLOUD WHERE cloud_id = A.cloud_id) AS cloud_name
+			, IF( B.apply_date IS NULL, 'N', 'Y') AS active
+		FROM
+			bill_product_catalog A
+				LEFT JOIN
+			( SELECT policy_seq, apply_date FROM bill_product_catalog WHERE apply_date > NOW() )B
+				ON A.policy_seq = B.policy_seq
+
+    	WHERE
+    		A.policy_seq = #{policySeq}
+    </select>
+
+    <select id="getBillItemList" resultType="CustomBillPolicyVO" parameterType="CustomBillPolicyVO">
+		SELECT
+			a.item_id,
+			a.item_name,
+			a.unit,
+			a.quantity,
+			a.description,
+			a.item_category,
+			a.disable_flag,
+			FLOOR(c.hourly_price) hourly_price,
+			FLOOR(c.monthly_price) monthly_price
+		FROM
+			bill_product a , bill_policy_item b, bill_product_catalog_item c
+		WHERE
+				b.policy_seq = #{policySeq}
+			AND a.item_id = b.item_id
+			AND c.policy_seq = #{policySeq}
+			AND c.item_id=b.item_id
+    </select>
+    
+    <select id="getBillTypeList" resultType="CustomBillPolicyVO" parameterType="CustomBillPolicyVO">
+			SELECT 
+			           unit
+	                 , item_category
+			  FROM bill_product		
+	    GROUP BY item_category 
+
+    </select>
+
+  	<select id="getBillItemSearchList" resultType="CustomBillPolicyVO" parameterType="CustomBillPolicyVO">
+		SELECT
+			a.item_id,
+			a.item_name,
+			a.unit,
+			a.quantity,
+			a.description,
+			a.item_category,
+			a.disable_flag
+		FROM
+			bill_product a
+		WHERE a.disable_flag = 'N'
+		AND NOT EXISTS (SELECT item_id FROM bill_policy_item WHERE item_id=a.item_id AND policy_seq=#{policySeq})
+		<if test="itemName != ''">
+		and
+			a.item_name like CONCAT('%',#{itemName},'%')
+		</if>
+    </select>
+
+
+   <!--bill_product_catalog 입력 -->
+    <insert id="setBillPolicy" parameterType="CustomBillPolicyVO" >
+		INSERT INTO bill_product_catalog
+			(
+				policy_seq,
+				cloud_id,
+				policy_name,
+				apply_date,
+				reg_datetime,
+				reg_user_id,
+				mod_datetime,
+				mod_user_id
+			)
+			VALUES
+			(
+				#{policySeq},
+				#{cloudId},
+				#{policyName},
+				#{applyDate},
+				now(),
+				#{regUserId},
+				now(),
+				#{modUserId}
+			)
+  	</insert>
+
+    <!--bill_product_catalog_item 입력 -->
+    <insert id="setBillPolicyItem" parameterType="CustomBillPolicyVO" >
+		INSERT INTO bill_policy_item
+		(
+			policy_seq,
+			item_id
+		)
+
+		( SELECT #{policySeq}, item_id FROM bill_policy_item  WHERE policy_seq = #{beforeCatalogSeq} )
+  	</insert>
+
+     <!--bill_product_catalog_item 입력 -->
+    <insert id="setBillPolicyItemPrice" parameterType="CustomBillPolicyVO" >
+		INSERT INTO bill_product_catalog_item
+		(
+			policy_seq,
+			item_id,
+			hourly_price,
+			monthly_price
+		)
+		(
+			SELECT
+				#{policySeq},
+				item_id,
+				hourly_price,
+				monthly_price
+			FROM
+				bill_product_catalog_item
+			WHERE
+				policy_seq = #{beforeCatalogSeq}
+		)
+  	</insert>
+
+	<select id="getOldBillPolicyInfo" resultType="CustomBillPolicyVO" parameterType="CustomBillPolicyVO">
+	 <![CDATA[
+		SELECT
+			b.policy_seq,
+			b.item_id,
+			c.hourly_price,
+			c.monthly_price
+		FROM
+			bill_product_catalog a , bill_policy_item b , bill_product_catalog_item c
+		WHERE
+			a.del_flag='N'
+		AND a.apply_date =
+			(
+			SELECT 	MAX(apply_date)
+			FROM
+			bill_product_catalog
+			WHERE del_flag='N' AND apply_date <= #{applyDate}
+			)
+		AND a.policy_seq = b.policy_seq
+		AND b.item_id = c.item_id GROUP BY b.item_id
+		]]>
+    </select>
+
+    <select id="getBillPolicyCnt" resultType="int" parameterType="CustomBillPolicyVO">
+    	SELECT
+			COUNT(*)
+    	FROM bill_product_catalog
+    	WHERE apply_date = #{applyDate} AND del_flag = 'N'
+    </select>
+    
+    <select id="billProductCheck" resultType="int" parameterType="CustomBillPolicyVO">
+    	
+    	SELECT COUNT(*)
+    	  FROM bill_product
+    	WHERE disable_flag = 'N'
+    	    AND item_id = #{itemId}
+    	
+    </select>
+
+    <select id="getBillPolicyInfo" resultType="CustomBillPolicyVO" parameterType="CustomBillPolicyVO">
+    	SELECT
+    		policy_seq,
+			policy_name,
+			apply_date
+		FROM
+			bill_product_catalog
+		where policy_seq = #{policySeq}
+    </select>
+
+     <!--bill_product_catalog 입력 -->
+    <update id="setBillPolicyEdit" parameterType="CustomBillPolicyVO" >
+		UPDATE
+			bill_product_catalog
+		SET
+			<if test="policyName != '' ">
+					policy_name = #{policyName},
+			</if>
+			apply_date = #{applyDate},
+			mod_datetime = now(),
+			mod_user_id = #{modUserId}
+		WHERE
+			policy_seq = #{policySeq}
+  	</update>
+
+  	<select id="getBillItemEditVo" resultType="CustomBillPolicyVO" parameterType="CustomBillPolicyVO">
+		SELECT
+			a.item_id,
+			a.item_name,
+			a.unit,
+			a.quantity,
+			a.description,
+			a.item_category,
+			a.disable_flag,
+			FLOOR(b.hourly_price) hourly_price,
+			FLOOR(b.monthly_price) monthly_price
+		FROM
+			bill_product a , bill_product_catalog_item b
+		WHERE  a.item_id = b.item_id AND b.policy_seq = #{policySeq} AND a.item_id = #{itemId}
+    </select>
+
+    <!--bill_product_catalog_item 수정 -->
+    <update id="setBillPolicyItemEdit" parameterType="CustomBillPolicyVO" >
+		UPDATE
+			bill_product_catalog_item
+		SET
+			hourly_price = #{hourlyPrice},
+			monthly_price = #{monthlyPrice}
+		WHERE
+			policy_seq = #{policySeq} AND item_id = #{itemId}
+  	</update>
+
+ 	<select id="getCopyBillPolicyInfo" resultType="CustomBillPolicyVO" parameterType="CustomBillPolicyVO">
+	 <![CDATA[
+		SELECT
+			b.policy_seq,
+			b.item_id,
+			c.hourly_price,
+			c.monthly_price
+		FROM
+			bill_product_catalog a , bill_policy_item b , bill_product_catalog_item c
+		WHERE
+			a.del_flag='N'
+		AND a.apply_date =
+			(
+			SELECT 	MAX(apply_date)
+			FROM
+			bill_product_catalog
+			WHERE del_flag='N' AND policy_seq = #{policySeq}
+			)
+		AND a.policy_seq = b.policy_seq
+		AND b.item_id = c.item_id GROUP BY b.item_id
+		]]>
+    </select>
+
+    <!--bill_product_catalog 삭제 -->
+    <delete id="delete" parameterType="CustomBillPolicyVO" >
+		DELETE FROM bill_product_catalog
+		WHERE policy_seq = #{policySeq}
+  	</delete>
+
+    <delete id="deleteItem" parameterType="CustomBillPolicyVO" >
+		DELETE FROM bill_policy_item
+		WHERE policy_seq = #{policySeq}
+  	</delete>
+
+  	    <!--bill_product_catalog 삭제 -->
+    <delete id="deleteItemPrice" parameterType="CustomBillPolicyVO" >
+		DELETE FROM bill_product_catalog_item
+		WHERE policy_seq = #{policySeq}
+  	</delete>
+  	
+  	
+    <insert id="billProductInsert" parameterType="CustomBillPolicyVO" >
+    
+		    INSERT INTO bill_product (
+				item_id,
+				cloud_id,
+				item_name,
+				unit,
+				quantity,
+				description,
+				item_category,
+				disable_flag
+			)VALUES	(
+				#{itemId},
+				#{cloudId},
+				#{itemName},
+				#{unit},
+				1,
+				#{description},
+				#{itemCategory},
+				'N'
+			)
+    
+  	</insert>
+    <insert id="billPolicyItemInsert" parameterType="CustomBillPolicyVO" >
+    
+		    INSERT INTO bill_policy_item (
+				policy_seq,
+				item_id
+			)VALUES(
+				#{policySeq},
+				#{itemId}
+			)
+		
+  	</insert>
+    <insert id="billProductCatalogItemInsert" parameterType="CustomBillPolicyVO" >
+          
+		INSERT INTO bill_product_catalog_item (
+				policy_seq,
+				item_id,
+				start_range,
+				end_range,
+				hourly_price,
+				monthly_price
+			)
+		VALUES
+			(
+				#{policySeq},
+				#{itemId},
+				0,
+				999999999,
+				#{hourlyPrice},
+				#{monthlyPrice}
+			);
+          
+  	</insert>
+  	
+</mapper>

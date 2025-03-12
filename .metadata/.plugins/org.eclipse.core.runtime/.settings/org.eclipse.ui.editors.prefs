@@ -1,0 +1,11 @@
+STS4BootMarkerIndicationColor=56,84,26
+eclipse.preferences.version=1
+org.eclipse.wst.jsdt.internal.ui.javaeditor.JavaElementHyperlinkDetector=true
+org.eclipse.wst.jsdt.internal.ui.javaeditor.JavaElementHyperlinkDetector_stateMask=262144
+org.eclipse.wst.jsdt.web.ui.JSDTHyperlinkDetector.HTML=true
+org.eclipse.wst.jsdt.web.ui.JSDTHyperlinkDetector.HTML_stateMask=262144
+org.eclipse.wst.jsdt.web.ui.JSDTHyperlinkDetector.SCRIPT=true
+org.eclipse.wst.jsdt.web.ui.JSDTHyperlinkDetector.SCRIPT.events=true
+org.eclipse.wst.jsdt.web.ui.JSDTHyperlinkDetector.SCRIPT.events_stateMask=262144
+org.eclipse.wst.jsdt.web.ui.JSDTHyperlinkDetector.SCRIPT_stateMask=262144
+spellingEnabled=false

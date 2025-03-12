@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.mail.template.MailTemplateDAO">
+
+    <select id="list" resultType="CustomMailTemplateVO" parameterType="CustomMailTemplateVO">
+    	SELECT 
+			*
+			, DATE_FORMAT(M.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2
+			, C.user_name
+    	FROM mail_template M
+    	
+    	LEFT OUTER JOIN cmm_user C
+		ON M.mod_user_id = C.user_id
+    	
+    	WHERE 1=1
+    	<if test="searchKind == 'tempId' and keyword != ''">
+    		AND M.template_id LIKE CONCAT('%',#{keyword},'%')
+    	</if>
+    	<if test="searchKind == 'title' and keyword != ''">
+    		AND M.title LIKE CONCAT('%',#{keyword},'%')
+    	</if>
+    	<if test="searchKind == 'searchAll' and keyword != ''">
+    		AND (
+    			M.template_id LIKE CONCAT('%',#{keyword},'%')
+    			OR
+    			M.title LIKE CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+    	ORDER BY M.template_id DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+
+	<select id="detail" resultType="CustomMailTemplateVO" parameterType="CustomMailTemplateVO">
+    	SELECT 
+			*
+			, DATE_FORMAT(M.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2			
+    	FROM mail_template M    	
+    	LEFT JOIN cmm_user C
+			   ON M.mod_user_id = C.user_id
+    	
+    	WHERE M.template_id = #{templateId}    	
+    </select>
+    
+    <insert id="insert" parameterType="CustomMailTemplateVO">
+   		INSERT INTO mail_template (
+			template_id
+			, title
+			, content
+			, reg_datetime
+			, reg_user_id
+			, mod_datetime
+			, mod_user_id
+			, del_flag
+		) values (
+			#{templateId}
+			, #{title}
+			, #{content}
+			, #{regDatetime}
+			, #{regUserId}
+			, #{modDatetime}
+			, #{modUserId}
+			, #{delFlag}
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomMailTemplateVO">
+        UPDATE mail_template SET
+			title = #{title}
+			, content = #{content}
+			, reg_datetime = #{regDatetime}
+			, reg_user_id = #{regUserId}
+			, mod_datetime = NOW()
+			, mod_user_id = #{modUserId}
+			, del_flag = #{delFlag}
+        WHERE template_id = #{templateId}	
+    </update>
+    
+</mapper>

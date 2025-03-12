@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN"  "classpath:mybatis-3-config.dtd">
+
+<configuration>
+    <settings>
+        <setting name="useGeneratedKeys" value="false" />
+        <setting name="mapUnderscoreToCamelCase" value="true" />
+    </settings>
+
+	<typeAliases>
+
+		<typeAlias alias="CustomBbsDownloadVO" 					type="com.ivucenter.cloud.portal.bbs.download.CustomBbsDownloadVO"/>
+		<typeAlias alias="CustomBbsFaqVO" 						type="com.ivucenter.cloud.portal.bbs.faq.CustomBbsFaqVO"/>
+		<typeAlias alias="CustomBbsNoticeVO" 					type="com.ivucenter.cloud.portal.bbs.notice.CustomBbsNoticeVO"/>
+		<typeAlias alias="CustomBbsQnaVO" 						type="com.ivucenter.cloud.portal.bbs.qna.CustomBbsQnaVO"/>
+		<typeAlias alias="CustomCmmCodeVO" 						type="com.ivucenter.cloud.portal.cmm.code.CustomCmmCodeVO"/>
+		<typeAlias alias="CustomCmmFileVO" 						type="com.ivucenter.cloud.portal.cmm.file.CustomCmmFileVO"/>
+		<typeAlias alias="CustomCmmUserVO" 						type="com.ivucenter.cloud.portal.cmm.user.CustomCmmUserVO"/>
+		<typeAlias alias="CustomCmmCustomerVO" 					type="com.ivucenter.cloud.portal.cmm.customer.CustomCmmCustomerVO"/>
+		<typeAlias alias="CustomReqCustomerVO" 					type="com.ivucenter.cloud.portal.req.customer.CustomReqCustomerVO"/>
+		<typeAlias alias="CustomReqUserVO" 						type="com.ivucenter.cloud.portal.req.user.CustomReqUserVO"/>
+		<typeAlias alias="CustomReqProjectVO" 					type="com.ivucenter.cloud.portal.req.project.CustomReqProjectVO"/>
+		<typeAlias alias="CustomReqOrderVO" 					type="com.ivucenter.cloud.portal.req.catalogue.CustomReqOrderVO"/>
+		<typeAlias alias="CustomReqBasketVO" 					type="com.ivucenter.cloud.portal.req.catalogue.CustomReqBasketVO"/>
+		<typeAlias alias="CustomReqCatalogueVO" 				type="com.ivucenter.cloud.portal.req.catalogue.CustomReqCatalogueVO"/>
+		<typeAlias alias="CustomMygoodsVmVO" 					type="com.ivucenter.cloud.portal.mygoods.vm.CustomMygoodsVmVO"/>
+		<typeAlias alias="CustomReqProductVO" 					type="com.ivucenter.cloud.portal.req.product.CustomReqProductVO"/>
+		<typeAlias alias="CustomBssCatalogVO" 					type="com.ivucenter.cloud.portal.bss.catalog.CustomBssCatalogVO"/>
+		<typeAlias alias="CustomOssProjectVO" 					type="com.ivucenter.cloud.portal.oss.project.CustomOssProjectVO"/>
+		<typeAlias alias="CustomBillPolicyVO" 					type="com.ivucenter.cloud.portal.bill.policy.CustomBillPolicyVO"/>
+		<typeAlias alias="CustomOssNetworkVO" 					type="com.ivucenter.cloud.portal.oss.network.CustomOssNetworkVO"/>
+		<typeAlias alias="CustomOssSubnetVO" 					type="com.ivucenter.cloud.portal.oss.subnet.CustomOssSubnetVO"/>
+		<typeAlias alias="CustomOssVmVO" 						type="com.ivucenter.cloud.portal.oss.vm.CustomOssVmVO"/>
+		<typeAlias alias="CustomBssAdjustmentVO" 				type="com.ivucenter.cloud.portal.bss.adjustment.CustomBssAdjustmentVO"/>
+		<!-- <typeAlias alias="CustomMngBssDiscountVO" 			type="com.ivucenter.cloud.portal.mng.bss.discount.CustomMngBssDiscountVO"/> -->
+		<!-- <typeAlias alias="CustomMngBssContractVO" 				type="com.ivucenter.cloud.portal.mng.bss.contract.CustomMngBssContractVO"/>-->
+		<typeAlias alias="CustomBssProductVO" 					type="com.ivucenter.cloud.portal.bss.product.CustomBssProductVO"/>
+		<typeAlias alias="CustomChargeBillVO" 					type="com.ivucenter.cloud.portal.charge.bill.CustomChargeBillVO"/>
+		<typeAlias alias="CustomMngReqWorkVO" 					type="com.ivucenter.cloud.portal.mng.req.work.CustomMngReqWorkVO"/>
+		<typeAlias alias="CustomMngOssVo" 						type="com.ivucenter.cloud.portal.mng.req.work.CustomMngOssVo"/>
+		<typeAlias alias="CustomOssDiskVO" 						type="com.ivucenter.cloud.portal.oss.disk.CustomOssDiskVO"/>
+		<typeAlias alias="CustomCmmNetworkVO" 					type="com.ivucenter.cloud.portal.cmm.network.CustomCmmNetworkVO"/>
+		<typeAlias alias="CustomOssNasVO" 						type="com.ivucenter.cloud.portal.oss.nas.CustomOssNasVO"/>
+		<typeAlias alias="CustomOssLbVO" 						type="com.ivucenter.cloud.portal.oss.loadbalancer.CustomOssLbVO"/>
+		<typeAlias alias="CustomOssIpVO" 						type="com.ivucenter.cloud.portal.oss.publicip.CustomOssIpVO"/>
+<!-- 		<typeAlias alias="CustomOssBackupVO" 					type="com.ivucenter.cloud.portal.oss.backup.CustomOssBackupVO"/> -->
+<!-- 		<typeAlias alias="CustomOssMcaVO" 						type="com.ivucenter.cloud.portal.oss.mca.CustomOssMcaVO"/> -->
+<!-- 		<typeAlias alias="CustomOssScmVO" 						type="com.ivucenter.cloud.portal.oss.scm.CustomOssScmVO"/> -->
+<!-- 		<typeAlias alias="CustomOssSecurityVO" 					type="com.ivucenter.cloud.portal.oss.security.CustomOssSecurityVO"/> -->
+		<typeAlias alias="CustomBssProductOsVO" 				type="com.ivucenter.cloud.portal.bss.productOs.CustomBssProductOsVO"/>
+		<typeAlias alias="CustomBssBatchVO" 					type="com.ivucenter.cloud.portal.bss.batch.CustomBssBatchVO"/>
+		<typeAlias alias="CustomMbrHomeVO" 						type="com.ivucenter.cloud.portal.home.CustomMbrHomeVO"/>
+		<typeAlias alias="CustomAdminUserVO" 					type="com.ivucenter.cloud.portal.operation.adminuser.CustomAdminUserVO"/>
+		<typeAlias alias="CustomApproveLineVO" 					type="com.ivucenter.cloud.portal.operation.approveLine.CustomApproveLineVO"/>
+		<typeAlias alias="CustomMonitorEventVO" 				type="com.ivucenter.cloud.portal.monitor.event.CustomMonitorEventVO"/>
+		<typeAlias alias="CustomLoginHistoryVO" 				type="com.ivucenter.cloud.portal.login.CustomLoginHistoryVO"/>
+		<typeAlias alias="CustomSchedulerVO" 					type="com.ivucenter.cloud.portal.bss.batch.CustomSchedulerVO"/>
+		<typeAlias alias="CustomApprovalVO" 					type="com.ivucenter.cloud.portal.approval.CustomApprovalVO"/>
+		<typeAlias alias="HrsystemTemporaryVO" 					type="com.ivucenter.cloud.entity.HrsystemTemporaryVO"/>
+		<typeAlias alias="CustomProductUsageStatusTotalVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.total.CustomProductUsageStatusTotalVO"/>
+		<typeAlias alias="CustomProductUsageStatusVmVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.vm.CustomProductUsageStatusVmVO"/>
+		<typeAlias alias="CustomProductUsageStatusDiskVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.disk.CustomProductUsageStatusDiskVO"/>
+		<typeAlias alias="CustomProductUsageStatusNasVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.nas.CustomProductUsageStatusNasVO"/>
+		<typeAlias alias="CustomProductUsageStatusLbVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.lb.CustomProductUsageStatusLbVO"/>
+		<typeAlias alias="CustomProductUsageStatusAppVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.app.CustomProductUsageStatusAppVO"/>
+		<typeAlias alias="CustomProductUsageStatusPvVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.pv.CustomProductUsageStatusPvVO"/>
+		<typeAlias alias="CustomProductUsageStatusFsVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.fs.CustomProductUsageStatusFsVO"/>
+
+<!-- 		<typeAlias alias="CustomProductUsageStatusSecVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.sec.CustomProductUsageStatusSecVO"/> -->
+<!-- 		<typeAlias alias="CustomProductUsageStatusScmVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.scm.CustomProductUsageStatusScmVO"/> -->
+<!-- 		<typeAlias alias="CustomProductUsageStatusMcaVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.mca.CustomProductUsageStatusMcaVO"/> -->
+<!-- 		<typeAlias alias="CustomProductUsageStatusBackVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.back.CustomProductUsageStatusBackVO"/> -->
+		<typeAlias alias="CustomProductUsageStatusIpVO" 		type="com.ivucenter.cloud.portal.productUsageStatus.ip.CustomProductUsageStatusIpVO"/>
+    	<typeAlias alias="CustomQuotaVO" 						type="com.ivucenter.cloud.portal.project.quota.CustomQuotaVO"/>
+    	<typeAlias alias="CustomCmmCompanyVO" 					type="com.ivucenter.cloud.portal.cmm.company.CustomCmmCompanyVO"/>
+    	<typeAlias alias="CustomBssDiscountVO" 					type="com.ivucenter.cloud.portal.bss.discount.CustomBssDiscountVO"/>
+    	<typeAlias alias="CustomBillInvoiceCustomerVO" 			type="com.ivucenter.cloud.portal.bill.invoice.customer.CustomBillInvoiceCustomerVO"/>
+    	<typeAlias alias="UserHistoryVO" 						type="com.ivucenter.cloud.portal.cmm.aop.UserHistoryVO"/>
+    	<typeAlias alias="CustomApproveUserVO" 					type="com.ivucenter.cloud.portal.operation.approveUser.CustomApproveUserVO"/>
+    	<typeAlias alias="CustomCmmDepartmentVO" 				type="com.ivucenter.cloud.portal.cmm.department.CustomCmmDepartmentVO"/>
+		<typeAlias alias="CustomMonitoringEventVO" 				type="com.ivucenter.cloud.portal.monitoring.event.CustomMonitoringEventVO"/>
+    	<typeAlias alias="CustomMonitoringStatusVO" 			type="com.ivucenter.cloud.portal.monitoring.status.CustomMonitoringStatusVO"/>
+		<typeAlias alias="CustomOssServiceVO" 					type="com.ivucenter.cloud.portal.oss.service.CustomOssServiceVO"/>
+    	<typeAlias alias="OssZoneNetworkDiskVO" 				type="com.ivucenter.cloud.portal.oss.zone.OssZoneNetworkDiskVO"/>
+    	<typeAlias alias="CustomProductUsageStatusServiceVO"	type="com.ivucenter.cloud.portal.productUsageStatus.service.CustomProductUsageStatusServiceVO"/>
+
+    	<typeAlias alias="CustomEventAlarmVO" 					type="com.ivucenter.cloud.portal.alarms.event.CustomEventAlarmVO"/>
+    	<typeAlias alias="CustomMailQueueVO" 					type="com.ivucenter.cloud.portal.alarms.mail.queue.CustomMailQueueVO"/>
+		<typeAlias alias="CustomMailQueueHistoryVO" 			type="com.ivucenter.cloud.portal.alarms.mail.history.CustomMailQueueHistoryVO"/>
+		<typeAlias alias="CustomMailTemplateVO" 				type="com.ivucenter.cloud.portal.alarms.mail.template.CustomMailTemplateVO"/>
+		<typeAlias alias="CustomSmsQueueVO" 					type="com.ivucenter.cloud.portal.alarms.sms.queue.CustomSmsQueueVO"/>
+		<typeAlias alias="CustomSmsQueueHistoryVO" 				type="com.ivucenter.cloud.portal.alarms.sms.history.CustomSmsQueueHistoryVO"/>
+		<typeAlias alias="CustomSmsTemplateVO" 					type="com.ivucenter.cloud.portal.alarms.sms.template.CustomSmsTemplateVO"/>
+		<typeAlias alias="CustomTemplateReservedWordVO"	 		type="com.ivucenter.cloud.portal.alarms.template.reservedword.CustomTemplateReservedWordVO"/>
+		<typeAlias alias="CustomNhwithVO" 						type="com.ivucenter.cloud.portal.alarms.withnh.CustomNhwithVO"/>
+    	<typeAlias alias="CustomWithKepcoVO"					type="com.ivucenter.cloud.portal.alarms.withkepco.CustomWithKepcoVO"/>
+		<typeAlias alias="CustomOssCloudVO"						type="com.ivucenter.cloud.portal.cmm.cloud.CustomOssCloudVO"/>
+		<typeAlias alias="CustomReqBasketCountVO"				type="com.ivucenter.cloud.portal.req.catalogue.CustomReqBasketCountVO"/>
+		<typeAlias alias="VmwareItemJsonObject"					type="com.ivucenter.cloud.api.vmware.object.VmwareItemJsonObject"/>
+		<typeAlias alias="CustomReqDataStoreVO"					type="com.ivucenter.cloud.portal.req.catalogue.CustomReqDataStoreVO"/>
+		<typeAlias alias="CustomOssLicenseVO"					type="com.ivucenter.cloud.portal.cmm.license.CustomOssLicenseVO"/>
+		<typeAlias alias="CustomReqBasketCountVO"				type="com.ivucenter.cloud.portal.req.catalogue.CustomReqBasketCountVO"/>
+		<typeAlias alias="CustomMonitoringKvmStatusVO"			type="com.ivucenter.cloud.portal.monitoring.kvm.CustomMonitoringKvmStatusVO"/>
+		<typeAlias alias="CustomPssServerVO"					type="com.ivucenter.cloud.portal.pss.server.CustomPssServerVO"/>
+		<typeAlias alias="CustomStorageVO"						type="com.ivucenter.cloud.portal.oss.disk.CustomStorageVO"/>
+		<typeAlias alias="CustomOssAppVO"						type="com.ivucenter.cloud.portal.oss.application.CustomOssAppVO"/>
+		<typeAlias alias="OpenStackUsage"						type="com.ivucenter.cloud.api.openstack.OpenStackUsage"/>
+		<typeAlias alias="CustomScaleOutVO"						type="com.ivucenter.cloud.portal.oss.scaleOut.CustomScaleOutVO"/>
+		<typeAlias alias="CustomOssPvVO"						type="com.ivucenter.cloud.portal.oss.persistentvolume.CustomOssPvVO"/>
+		<typeAlias alias="CustomOssFsVO"						type="com.ivucenter.cloud.portal.oss.filestorage.CustomOssFsVO"/>
+
+    	<package name="com.ivucenter.cloud.batch.entity"/>
+    	<package name="com.ivucenter.cloud.entity"/>
+
+    </typeAliases>
+
+</configuration>

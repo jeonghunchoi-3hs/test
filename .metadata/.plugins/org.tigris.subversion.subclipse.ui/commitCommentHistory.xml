@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CommitComments>	<CommitComment>김현주 부장 수정
+</CommitComment>
+	<CommitComment>Q&amp;A 수정요청사항 반영
+- 목록 미답변 표기 색상 변경
+- 미답변 목록 최상단 위치 
+- 미답변 카운트 표기 
+- 탭 메뉴 추가 
++ 탭 메뉴 공통 코드(Q&amp;A Type) 데이터로 생성</CommitComment>
+	<CommitComment>Q&amp;A 목록 수정</CommitComment>
+	<CommitComment>QNA 목록화면 수정</CommitComment>
+	<CommitComment>뉴타닉스 프로젝트 신청 수정</CommitComment>
+	<CommitComment>뉴타닉스 프로젝트 생성 변경 </CommitComment>
+	<CommitComment>뉴타닉스 vm api수정</CommitComment>
+	<CommitComment>자원 사용량 update 수정</CommitComment>
+	<CommitComment>뉴타닉스 프로젝트 생성실패 프로젝트 삭제 </CommitComment>
+	<CommitComment>프로젝트 신청 필수 프로젝트 기능 변경, 뉴타닉스 vm생성실패 자원 삭제 </CommitComment>
+</CommitComments>

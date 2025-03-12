@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.MntRequestMapper">
+	<select id="findPaginated" resultType="com.example.model.MntRequest">
+		SELECT
+			@rownum := @rownum +1 As rowNumber,
+			t.requestId,
+			t.userName,
+			t.requestType,
+			t.serverIp,
+			t.agentIp,
+			t.status,
+			t.kmType,
+			t.updateYmd
+		FROM (
+			SELECT 
+						r.request_id AS requestId,
+						u.username AS userName,
+						r.request_type AS requestType,
+						r.ip_addr AS serverIp,
+						a.agent_ip AS agentIp,
+						r.status AS status,
+						r.km_type AS kmType,
+						r.update_ymd AS updateYmd
+			FROM (SELECT @rownum := #{offset}) r_init,
+				km_request r
+			JOIN
+				km_users u ON r.user_id = u.user_id
+			LEFT JOIN
+				km_agent a ON r.ip_addr = a.master_ip
+				AND r.request_id = a.request_id
+			WHERE
+				r.request_type = '1'
+			ORDER BY r.request_id
+			LIMIT #{pageSize} OFFSET #{offset}
+		) t, (SELECT @rownum := #{offset}) r
+		ORDER BY t.requestId ASC
+	</select>
+	
+	<select id="getRequestCount" resultType="int">
+		SELECT COUNT(*)
+		FROM km_request r
+		JOIN
+			km_users u ON r.user_id = u.user_id
+		LEFT JOIN
+			km_agent a ON r.ip_addr = a.master_ip
+			AND r.request_id = a.request_id
+		WHERE
+			r.request_type = '1'
+	</select>
+	
+	<insert id="insertRequest" parameterType="com.example.model.MntRequest">
+		INSERT INTO km_request (request_id, user_id, request_type, ip_addr, status, km_type)
+		VALUES (#{requestId}, #{userName}, #{requestType}, #{serverIp}, #{status}, #{kmType});
+	</insert>
+	
+	<insert id="insertAgent">
+		INSERT INTO km_agent (request_id, master_ip, agent_ip)
+		VALUES (#{requestId}, #{serverIp}, #{agentIp});
+	</insert>
+	
+	<select id="findByMasterIp" resultType="com.example.model.MntRequest">
+		SELECT * FROM km_request WHERE ip_addr = #{masterIp}
+	</select>
+	
+	<select id="checkAgentIpExists" resultType="boolean">
+		SELECT COUNT(*) > 0 FROM km_agent WHERE master_ip = #{masterIp} AND agent_ip = #{agentIp}
+	</select>
+</mapper>

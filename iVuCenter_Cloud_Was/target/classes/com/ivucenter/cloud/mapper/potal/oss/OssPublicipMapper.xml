@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.publicip.OssIpDAO">
+ 	
+    <select id="getIpList" parameterType="CustomOssIpVO" resultType="CustomOssIpVO">
+		SELECT
+			*
+		FROM(
+			SELECT 	
+				publicip_id, 
+				project_id, 
+				vm_uuid, 
+				hourly_flag, 
+				description, 
+				publicip_ea, 
+				DATE_FORMAT(create_datetime, '%Y-%m-%d %H:%i') AS create_datetime,
+				expire_datetime, 
+				delete_datetime, 
+				reg_datetime, 
+				reg_user_id, 
+				mod_datetime, 
+				mod_user_id, 
+				del_flag, 
+				publicip_catalog_seq, 
+				publicip_product_seq,
+				(SELECT hostname FROM oss_vm WHERE vm_uuid=a.vm_uuid) AS hostname,
+				(SELECT hostname_alias FROM oss_vm WHERE vm_uuid=a.vm_uuid) AS hostname_alias 
+			FROM 
+				oss_publicip a
+			where project_id = #{projectId}
+			AND ( expire_datetime IS NULL OR expire_datetime  <![CDATA[>]]>  #{expireDatetime} )		
+		) a
+		<if test="searchKind == 'publicip_id' and keyword != ''">
+			AND
+				a.publicip_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>		
+    </select>
+    
+	<!--oss_publicip 수정-->
+<!--
+	<update id="setIpEditOk" parameterType="CustomOssIpVO">
+		UPDATE 
+			oss_publicip 
+		SET			
+			description = #{description}			
+		WHERE
+			publicip_id = #{publicipId}
+  	</update>
+-->  	
+  	
+<!--   	
+  	<select id="ipDetail" parameterType="CustomOssIpVO" resultType="CustomOssIpVO">
+		SELECT 	
+			a.publicip_id, 
+			a.project_id, 
+			(SELECT project_alias FROM oss_project PJ WHERE PJ.project_id =a.project_id) project_alias,
+			a.vm_uuid, 
+			a.hourly_flag, 
+			a.description, 
+			PROD.product_category,
+			a.publicip_ea, 
+			DATE_FORMAT(a.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime,
+			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =a.publicip_catalog_seq AND CF.program_seq = a.publicip_product_seq  ) AS image_name,
+			a.expire_datetime, 
+			a.delete_datetime, 
+			a.reg_datetime, 
+			a.reg_user_id, 
+			a.mod_datetime, 
+			a.mod_user_id, 
+			a.del_flag, 
+			a.publicip_catalog_seq, 
+			a.publicip_product_seq,
+			(SELECT hostname FROM oss_vm WHERE vm_uuid=a.vm_uuid) AS hostname,
+			(SELECT hostname_alias FROM oss_vm WHERE vm_uuid=a.vm_uuid) AS hostname_alias 
+		FROM 
+			oss_publicip a,
+			(
+				/* 상품 구성 */
+				SELECT 
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,			
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea,
+					IFNULL(SCM.scm_ea,0) AS scm_ea, 
+ 					IFNULL(BAK.backup_gb,0) AS backup_gb, 
+ 					IFNULL(MCA.mca_ea,0) AS mca_ea, 
+ 					IFNULL(SEC.security_ea,0) AS security_ea 
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		 블록 디스크
+				 ON PROD.product_seq = DSK.product_seq	 
+				 LEFT OUTER JOIN bss_product_nas NAS		 NAS
+				 ON PROD.product_seq = NAS.product_seq	 		 
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq	
+				 LEFT OUTER JOIN bss_product_publicip IP	 공인IP
+				 ON PROD.product_seq = IP.product_seq	 
+ 				 LEFT OUTER JOIN bss_product_backup BAK		 백업 
+ 				 ON PROD.product_seq = BAK.product_seq  
+ 				 LEFT OUTER JOIN bss_product_scm SCM		 형상관리 
+ 				 ON PROD.product_seq = SCM.product_seq  
+ 				 LEFT OUTER JOIN bss_product_mca MCA		 대외계
+ 				 ON PROD.product_seq = MCA.product_seq  
+ 				 LEFT OUTER JOIN bss_product_security SEC	 보안관제 
+ 				 ON PROD.product_seq = SEC.product_seq  
+				 WHERE PROD.del_flag = 'N'
+			
+			) PROD 
+		WHERE a.publicip_id = #{publicipId} AND	a.publicip_product_seq = PROD.product_seq
+    </select>
+-->    
+</mapper>

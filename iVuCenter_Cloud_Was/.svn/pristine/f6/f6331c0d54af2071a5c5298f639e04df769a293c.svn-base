@@ -1,0 +1,965 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.batch.metering.BatchMeteringDAO">
+
+	<!-- ===============================================
+		 ===== OSS_PROJECT
+		 =============================================== -->
+	<select id="selectProjectById" parameterType="BatchOssProjectVO" resultType="BatchOssProjectVO">
+		SELECT	A.*
+		FROM oss_project A
+		WHERE	A.delete_flag = 'N'
+		AND		A.project_id = #{projectId}
+	</select>
+
+	<update id="updateOssProject" parameterType="BatchOssProjectVO">
+		UPDATE	oss_project
+		SET		customer_id = #{customerId},
+				project_manager_id = #{projectManagerId},
+				project_name = #{projectName},
+				project_alias = #{projectAlias},
+				description = #{description},
+				reg_datetime = #{regDatetime},
+				reg_user_id = #{regUserId},
+				mod_datetime = #{modDatetime},
+				mod_user_id = #{modUserId},
+				delete_flag = #{deleteFlag}
+		WHERE	project_id = #{projectId}
+	</update>
+
+
+	<!-- ===============================================
+		 ===== OSS_NETWORK
+		 =============================================== -->
+	 <select id="selectOssNetworkById" parameterType="BatchOssNetworkVO" resultType="BatchOssNetworkVO">
+		SELECT 	*
+		FROM	oss_network
+		WHERE	network_id = #{networkId}
+	 </select>
+
+	 <select id="selectOssNetworkByName" parameterType="BatchOssNetworkVO" resultType="BatchOssNetworkVO">
+		SELECT 	*
+		FROM	oss_network
+		WHERE	project_id = #{projectId}
+		AND		network_name = #{networkName}
+	 </select>
+
+	<update id="updateOssNetwork" parameterType="BatchOssNetworkVO">
+		UPDATE	oss_network
+		SET		network_name = #{networkName},
+				network_alias = #{networkAlias},
+				project_id = #{projectId},
+				reg_datetime = #{regDatetime},
+				reg_user_id = #{regUserId},
+				mod_datetime = #{modDatetime},
+				mod_user_id = #{modUserId},
+				delete_flag = #{deleteFlag},
+				work_kind = #{workKind},
+				work_net_kind = #{workNetKind},
+				cloud_id = #{cloudId}
+		WHERE	network_id = #{networkId}
+	</update>
+
+	<insert id="insertOssNetwork" parameterType="BatchOssNetworkVO">
+		INSERT	 INTO oss_network (
+			network_id,
+			network_name,
+			network_alias,
+			project_id,
+			reg_datetime,
+			reg_user_id,
+			mod_datetime,
+			mod_user_id,
+			delete_flag,
+			work_kind,
+			work_net_kind,
+			cloud_id
+		) VALUES (
+			#{networkId},
+			#{networkName},
+			#{networkAlias},
+			#{projectId},
+			#{regDatetime},
+			#{regUserId},
+			#{modDatetime},
+			#{modUserId},
+			#{deleteFlag},
+			#{workKind},
+			#{workNetKind},
+			#{cloudId}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			network_id = #{networkId},
+			network_name = #{networkName},
+			network_alias = #{networkAlias},
+			project_id = #{projectId},
+			reg_datetime = #{regDatetime},
+			reg_user_id = #{regUserId},
+			mod_datetime = #{modDatetime},
+			mod_user_id = #{modUserId},
+			delete_flag = #{deleteFlag},
+			work_kind = #{workKind},
+			work_net_kind = #{workNetKind},
+			cloud_id = #{cloudId}
+	</insert>
+
+
+	<!-- =================================================================================== -->
+	<!-- OSS_VM -->
+	<!-- =================================================================================== -->
+	<select id="selectVmById" parameterType="BatchOssVmVO" resultType="BatchOssVmVO">
+
+		SELECT	A.*, B.cloud_id
+		FROM	oss_vm A
+		INNER JOIN oss_project B
+		ON a.project_id = b.project_id
+		WHERE	A.vm_uuid = #{vmUuid}
+
+	</select>
+
+	<select id="batchSelectOssVm" parameterType="java.util.Map" resultType="BatchOssVmVO">
+		SELECT	*
+		FROM	 oss_vm a
+		INNER JOIN oss_project b
+		ON a.project_id = b.project_id
+		INNER JOIN oss_cloud c
+		ON b.cloud_id = c.cloud_id
+		WHERE	delete_datetime IS NULL
+		OR 		(delete_datetime <![CDATA[>=]]> #{meteringStartDatetime} AND delete_datetime <![CDATA[<]]> #{meteringEndDatetime})
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<insert id="insertOssVm" parameterType="BatchOssVmVO">
+		INSERT  INTO oss_vm (
+			vm_uuid,
+			project_id,
+			hostname,
+			hostname_alias,
+			vcpus,
+			mem_gb,
+			disk_gb,
+			vm_product_seq,
+			os_product_seq,
+			description,
+			create_datetime,
+			expire_datetime,
+			delete_datetime,
+			reg_datetime,
+			reg_user_id,
+			mod_datetime,
+			mod_user_id,
+			del_flag,
+			hourly_flag,
+			flavor_id,
+			image_id,
+			az_name
+		) VALUES (
+			#{vmUuid},
+			#{projectId},
+			#{hostname},
+			#{hostnameAlias},
+			#{vcpus},
+			#{memGb},
+			#{diskGb},
+			#{vmProductSeq},
+			#{osProductSeq},
+			#{description},
+			#{createDatetime},
+			#{expireDatetime},
+			#{deleteDatetime},
+			#{regDatetime},
+			#{regUserId},
+			#{modDatetime},
+			#{modUserId},
+			#{delFlag},
+			#{hourlyFlag},
+			#{flavorId},
+			#{imageId},
+			#{azName}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			vm_uuid = #{vmUuid},
+			project_id = #{projectId},
+			hostname = #{hostname},
+			hostname_alias = #{hostnameAlias},
+			vcpus = #{vcpus},
+			mem_gb = #{memGb},
+			disk_gb = #{diskGb},
+			vm_product_seq = #{vmProductSeq},
+			os_product_seq = #{osProductSeq},
+			description = #{description},
+			create_datetime = #{createDatetime},
+			expire_datetime = #{expireDatetime},
+			delete_datetime = #{deleteDatetime},
+			reg_datetime = #{regDatetime},
+			reg_user_id = #{regUserId},
+			mod_datetime = #{modDatetime},
+			mod_user_id = #{modUserId},
+			del_flag = #{delFlag},
+			hourly_flag = #{hourlyFlag},
+			flavor_id = #{flavorId},
+			image_id = #{imageId},
+			az_name = #{azName}
+	</insert>
+
+	<update id="updateOssVm" parameterType="BatchOssVmVO">
+		UPDATE	oss_vm
+		SET		project_id = #{projectId},
+				hostname = #{hostname},
+				hostname_alias = #{hostnameAlias},
+				vcpus = #{vcpus},
+				mem_gb = #{memGb},
+				disk_gb = #{diskGb},
+				flavor_id = #{flavorId},
+				vm_product_seq = #{vmProductSeq},
+				os_product_seq = #{osProductSeq},
+				description = #{description},
+				create_datetime = #{createDatetime},
+				expire_datetime = #{expireDatetime},
+				delete_datetime = #{deleteDatetime},
+				reg_datetime = #{regDatetime},
+				reg_user_id = #{regUserId},
+				mod_datetime = #{modDatetime},
+				mod_user_id = #{modUserId},
+				del_flag = #{delFlag},
+				hourly_flag = #{hourlyFlag},
+				image_id = #{imageId},
+				az_name = #{azName}
+		WHERE 	vm_uuid = #{vmUuid}
+	</update>
+
+
+	<!-- ===============================================
+		 ===== OSS_VM_NETWORK
+		 =============================================== -->
+	<select id="selectOssVmNetwork" parameterType="BatchOssVmNetworkVO" resultType="BatchOssVmNetworkVO">
+		SELECT	*
+		FROM	oss_vm_network
+		WHERE	network_id = #{networkId}
+		AND		vm_uuid = #{vmUuid}
+	</select>
+
+	<insert id="insertOssVmNetwork" parameterType="BatchOssVmNetworkVO">
+		INSERT  INTO oss_vm_network (
+			network_id
+			, vm_uuid
+			, port_network_id
+			<if test="backupNetworkId != null and !backupNetworkId.equals('')">
+			, backup_network_id
+			</if>
+			<if test="portBackupNetworkId != null and !portBackupNetworkId.equals('')">
+			, port_backup_network_id
+			</if>
+
+			, reg_datetime
+			, reg_user_id
+
+
+		) VALUES (
+			#{networkId}
+			, #{vmUuid}
+			, #{portNetworkId}
+			<if test="backupNetworkId != null and !backupNetworkId.equals('')">
+			, #{backupNetworkId}
+			</if>
+			<if test="portBackupNetworkId != null and !portBackupNetworkId.equals('')">
+			, #{portBackupNetworkId}
+			</if>
+
+			, #{regDatetime}
+			, #{regUserId}
+
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			network_id = #{networkId}
+			, vm_uuid = #{vmUuid}
+			, port_network_id = #{portNetworkId}
+			<if test="backupNetworkId != null and !backupNetworkId.equals('')">
+			, backup_network_id = #{backupNetworkId}
+			</if>
+			<if test="portBackupNetworkId != null and !portBackupNetworkId.equals('')">
+			, port_backup_network_id = #{portBackupNetworkId}
+			</if>
+	</insert>
+
+
+	<!-- =================================================================================== -->
+	<!-- OSS_DISK -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectDisk" parameterType="java.util.Map" resultType="BatchOssDiskVO">
+		SELECT	*
+		FROM	oss_disk
+		WHERE	delete_datetime IS NULL
+		OR 		(delete_datetime <![CDATA[>=]]> #{meteringStartDatetime} AND delete_datetime <![CDATA[<]]> #{meteringEndDatetime})
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<select id="selectOssDiskById" parameterType="BatchOssDiskVO" resultType="BatchOssDiskVO">
+		SELECT	*
+		FROM	oss_disk
+		WHERE	disk_id = #{diskId}
+	</select>
+
+	<update id="updateOssDisk" parameterType="BatchOssDiskVO">
+		UPDATE 	oss_disk
+		SET
+			project_id = #{projectId},
+			vm_uuid = #{vmUuid},
+			disk_alias = #{diskAlias},
+			size_gb = #{sizeGb},
+			device = #{device},
+			create_datetime = #{createDatetime},
+			expire_datetime = #{expireDatetime},
+			delete_datetime = #{deleteDatetime},
+			reg_datetime = #{regDatetime},
+			reg_user_id = #{regUserId},
+			mod_datetime = #{modDatetime},
+			mod_user_id = #{modUserId},
+			del_flag = #{delFlag},
+			hourly_flag = #{hourlyFlag},
+			description = #{description},
+			volume_type = #{volumeType},
+			image_id = #{imageId},
+			image_item_id = #{imageItemId}
+		WHERE	disk_id = #{diskId}
+
+	</update>
+
+	<insert id="insertOssDisk" parameterType="BatchOssDiskVO">
+		INSERT  INTO oss_disk (
+			disk_id,
+			project_id,
+			vm_uuid,
+			disk_alias,
+			size_gb,
+			device,
+			create_datetime,
+			expire_datetime,
+			delete_datetime,
+			reg_datetime,
+			reg_user_id,
+			mod_datetime,
+			mod_user_id,
+			del_flag,
+			hourly_flag,
+			description,
+			volume_type,
+			image_id,
+			image_item_id
+		) VALUES (
+			#{diskId},
+			#{projectId},
+			#{vmUuid},
+			#{diskAlias},
+			#{sizeGb},
+			#{device},
+			#{createDatetime},
+			#{expireDatetime},
+			#{deleteDatetime},
+			#{regDatetime},
+			#{regUserId},
+			#{modDatetime},
+			#{modUserId},
+			#{delFlag},
+			#{hourlyFlag},
+			#{description},
+			#{volumeType},
+			#{imageId},
+			#{imageItemId}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			disk_id = #{diskId},
+			project_id = #{projectId},
+			vm_uuid = #{vmUuid},
+			disk_alias = #{diskAlias},
+			size_gb = #{sizeGb},
+			device = #{device},
+			create_datetime = #{createDatetime},
+			expire_datetime = #{expireDatetime},
+			delete_datetime = #{deleteDatetime},
+			reg_datetime = #{regDatetime},
+			reg_user_id = #{regUserId},
+			mod_datetime = #{modDatetime},
+			mod_user_id = #{modUserId},
+			del_flag = #{delFlag},
+			hourly_flag = #{hourlyFlag},
+			description = #{description},
+			volume_type = #{volumeType},
+			image_id = #{imageId},
+			image_item_id = #{imageItemId}
+
+	</insert>
+
+	<select id="selectItemByImageId" parameterType="BatchOssProductVO" resultType="BatchOssProductVO">
+		SELECT	distinct item_id
+		FROM	bss_product_os
+		WHERE	vm_image_id = #{vmImageId}
+	</select>
+
+	<select id="selectOssDiskList" parameterType="java.util.Map" resultType="BatchOssDiskVO">
+		SELECT	*
+		FROM	oss_disk
+		WHERE	del_flag != 'Y'
+	</select>
+
+		<!-- =================================================================================== -->
+	<!-- OSS_SERVICE -->
+	<!-- =================================================================================== -->
+	<select id="batchSelectService" parameterType="java.util.Map" resultType="BatchOssServiceVO">
+		SELECT	*
+		FROM	 oss_service
+		WHERE	expire_datetime IS NULL
+		OR 		(expire_datetime <![CDATA[>=]]> #{meteringStartDatetime} AND expire_datetime <![CDATA[<]]> #{meteringEndDatetime})
+        LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+
+	<!-- =================================================================================== -->
+	<!-- METERING_METRIC -->
+	<!-- =================================================================================== -->
+	<select id="selectMetricById" parameterType="BatchMeteringMeticVO" resultType="BatchMeteringMeticVO">
+		SELECT	*
+		FROM	metering_metric
+		WHERE	metric_id = #{metricId}
+	</select>
+
+	<select id="selectMetricByResourceId" parameterType="BatchMeteringMeticVO" resultType="BatchMeteringMeticVO">
+		SELECT	*
+		FROM	metering_metric
+		WHERE	resource_id = #{resourceId}
+		AND		metric_item = #{metricItem}
+	</select>
+
+	<insert id="insertMeteringMetric" parameterType="BatchMeteringMeticVO">
+		INSERT  INTO metering_metric (
+			metric_id,
+			metric_item,
+			resource_id,
+			reg_datetime
+		) VALUES (
+			#{metricId},
+			#{metricItem},
+			#{resourceId},
+			#{regDatetime}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			metric_id = #{metricId},
+			metric_item = #{metricItem},
+			resource_id = #{resourceId},
+			reg_datetime = #{regDatetime}
+
+	</insert>
+
+
+	<!-- =================================================================================== -->
+	<!-- METERING_MEASURE_VCPU-->
+	<!-- =================================================================================== -->
+	<!--  옵션을 이용하여 삭제없이 바로 INSERT하며 중복되면 SKIP -->
+	<insert id="insertMeteringMeasureVcpu" parameterType="BatchMeteringMeasureVO">
+		INSERT  INTO metering_measure_vcpu (
+			metric_id,
+			metering_datetime,
+			metering_value,
+			reg_datetime
+		) VALUES (
+			#{metricId},
+			#{meteringDatetime},
+			#{meteringValue},
+			#{regDatetime}
+		)
+    	ON DUPLICATE KEY
+			UPDATE
+			metric_id = #{metricId},
+			metering_datetime = #{meteringDatetime},
+			metering_value = #{meteringValue},
+			reg_datetime = #{regDatetime}
+	</insert>
+
+
+	<!-- =================================================================================== -->
+	<!-- METERING_MEASURE_MEM-->
+	<!-- =================================================================================== -->
+	<!--  옵션을 이용하여 삭제없이 바로 INSERT하며 중복되면 SKIP -->
+	<insert id="insertMeteringMeasureMem" parameterType="BatchMeteringMeasureVO">
+		INSERT  INTO metering_measure_mem (
+			metric_id,
+			metering_datetime,
+			metering_value,
+			reg_datetime
+		) VALUES (
+			#{metricId},
+			#{meteringDatetime},
+			#{meteringValue},
+			#{regDatetime}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			metric_id = #{metricId},
+			metering_datetime = #{meteringDatetime},
+			metering_value = #{meteringValue},
+			reg_datetime = #{regDatetime}
+	</insert>
+
+
+	<!-- =================================================================================== -->
+	<!-- METERING_MEASURE_DISK -->
+	<!-- =================================================================================== -->
+	<!--  옵션을 이용하여 삭제없이 바로 INSERT하며 중복되면 SKIP -->
+	<insert id="insertMeteringMeasureDisk" parameterType="BatchMeteringMeasureVO">
+		INSERT  INTO metering_measure_disk (
+			metric_id,
+			metering_datetime,
+			metering_value,
+			reg_datetime
+		) VALUES (
+			#{metricId},
+			#{meteringDatetime},
+			#{meteringValue},
+			#{regDatetime}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			metric_id = #{metricId},
+			metering_datetime = #{meteringDatetime},
+			metering_value = #{meteringValue},
+			reg_datetime = #{regDatetime}
+	</insert>
+
+	<!-- =================================================================================== -->
+	<!-- METERING_MEASURE_NAS -->
+	<!-- =================================================================================== -->
+	<!--  옵션을 이용하여 삭제없이 바로 INSERT하며 중복되면 SKIP -->
+	<insert id="insertMeteringMeasureNas" parameterType="BatchMeteringMeasureVO">
+		INSERT  INTO metering_measure_nas (
+			metric_id,
+			metering_datetime,
+			metering_value,
+			reg_datetime
+		) VALUES (
+			#{metricId},
+			#{meteringDatetime},
+			#{meteringValue},
+			#{regDatetime}
+		)
+	   ON DUPLICATE KEY
+			UPDATE
+			metric_id = #{metricId},
+			metering_datetime = #{meteringDatetime},
+			metering_value = #{meteringValue},
+			reg_datetime = #{regDatetime}
+	</insert>
+
+	<!-- =================================================================================== -->
+	<!-- METERING_MEASURE_LOADBALANCER -->
+	<!-- =================================================================================== -->
+	<!--  옵션을 이용하여 삭제없이 바로 INSERT하며 중복되면 SKIP -->
+	<insert id="insertMeteringMeasureLoadBalancer" parameterType="BatchMeteringMeasureVO">
+		INSERT  INTO metering_measure_loadbalancer (
+			metric_id,
+			metering_datetime,
+			metering_value,
+			reg_datetime
+		) VALUES (
+			#{metricId},
+			#{meteringDatetime},
+			#{meteringValue},
+			#{regDatetime}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			metric_id = #{metricId},
+			metering_datetime = #{meteringDatetime},
+			metering_value = #{meteringValue},
+			reg_datetime = #{regDatetime}
+	</insert>
+
+	<!-- =================================================================================== -->
+	<!-- METERING_MEASURE_PUBLICIP -->
+	<!-- =================================================================================== -->
+	<!--  옵션을 이용하여 삭제없이 바로 INSERT하며 중복되면 SKIP -->
+	<insert id="insertMeteringMeasurePublicip" parameterType="BatchMeteringMeasureVO">
+		INSERT  INTO metering_measure_publicip (
+			metric_id,
+			metering_datetime,
+			metering_value,
+			reg_datetime
+		) VALUES (
+			#{metricId},
+			#{meteringDatetime},
+			#{meteringValue},
+			#{regDatetime}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+			metric_id = #{metricId},
+			metering_datetime = #{meteringDatetime},
+			metering_value = #{meteringValue},
+			reg_datetime = #{regDatetime}
+	</insert>
+
+	<!-- =================================================================================== -->
+	<!-- METERING_MEASURE_SERVICE -->
+	<!-- =================================================================================== -->
+	<!--  옵션을 이용하여 삭제없이 바로 INSERT하며 중복되면 SKIP -->
+	<insert id="insertMeteringMeasureService" parameterType="BatchMeteringMeasureVO">
+		INSERT  INTO metering_measure_service (
+			metric_id,
+			metering_datetime,
+			metering_value,
+			reg_datetime,
+			service_type
+		) VALUES (
+			#{metricId},
+			#{meteringDatetime},
+			#{meteringValue},
+			#{regDatetime},
+			#{serviceType}
+		)
+
+		ON DUPLICATE KEY
+			UPDATE
+			metric_id = #{metricId},
+			metering_datetime = #{meteringDatetime},
+			metering_value = #{meteringValue},
+			reg_datetime = #{regDatetime},
+			service_type = #{serviceType}
+
+	</insert>
+
+	<delete id="deleteMeasureData" parameterType="BatchMeteringMeasureVO">
+		DELETE FROM
+			#{tableName}
+		WHERE
+			reg_datetime  <![CDATA[<=]]> #{regDateTimeToString}
+		LIMIT #{limit}
+	</delete>
+
+	<select id="selectMeasureDataRegDatetime"  parameterType="BatchMeteringMeasureVO" resultType="BatchMeteringMeasureVO">
+		SELECT * FROM #{tableName}
+		WHERE
+			reg_datetime  <![CDATA[<=]]> #{regDateTimeToString}
+			AND ROWNUM = 1
+		ORDER BY
+			reg_datetime
+	</select>
+
+	<!-- ===============================================
+		 ===== OSS_SUBNET
+		 =============================================== -->
+	 <select id="selectOssSubnetById" parameterType="BatchOssSubnetVO" resultType="BatchOssSubnetVO">
+		SELECT 	*
+		FROM	oss_subnet
+		WHERE	subnet_id = #{subnetId}
+	 </select>
+
+	<update id="updateOssSubnet" parameterType="BatchOssSubnetVO">
+		UPDATE	oss_subnet
+		SET		subnet_name = #{subnetName},
+				subnet_alias = #{subnetAlias},
+				network_id = #{networkId},
+				allocation_pools = #{allocationPools},
+				subnet_cidr = #{subnetCidr},
+				enable_dhcp = #{enableDhcp},
+				gateway_ip = #{gatewayIp},
+				dns_nameservers = #{dnsNameservers},
+				reg_datetime = #{regDatetime},
+				reg_user_id = #{regUserId},
+				mod_datetime = #{modDatetime},
+				mod_user_id = #{modUserId},
+				delete_flag = #{deleteFlag}
+		WHERE	subnet_id = #{subnetId}
+
+	</update>
+
+	<insert id="insertOssSubnet" parameterType="BatchOssSubnetVO">
+		INSERT	 INTO oss_subnet (
+			subnet_id,
+			subnet_name,
+			subnet_alias,
+			network_id,
+			allocation_pools,
+			subnet_cidr,
+			enable_dhcp,
+			gateway_ip,
+			dns_nameservers,
+			reg_datetime,
+			reg_user_id,
+			mod_datetime,
+			mod_user_id,
+			delete_flag
+		) VALUES (
+			#{subnetId},
+			#{subnetName},
+			#{subnetAlias},
+			#{networkId},
+			#{allocationPools},
+			#{subnetCidr},
+			#{enableDhcp},
+			#{gatewayIp},
+			#{dnsNameservers},
+			#{regDatetime},
+			#{regUserId},
+			#{modDatetime},
+			#{modUserId},
+			#{deleteFlag}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+				subnet_id = #{subnetId},
+				subnet_name = #{subnetName},
+				subnet_alias = #{subnetAlias},
+				network_id = #{networkId},
+				allocation_pools = #{allocationPools},
+				subnet_cidr = #{subnetCidr},
+				enable_dhcp = #{enableDhcp},
+				gateway_ip = #{gatewayIp},
+				dns_nameservers = #{dnsNameservers},
+				reg_datetime = #{regDatetime},
+				reg_user_id = #{regUserId},
+				mod_datetime = #{modDatetime},
+				mod_user_id = #{modUserId},
+				delete_flag = #{deleteFlag}
+	</insert>
+
+	<!-- ===============================================
+		 ===== OSS_Port
+		 =============================================== -->
+	 <select id="selectOssPortById" parameterType="BatchOssPortVO" resultType="BatchOssPortVO">
+		SELECT 	*
+		FROM	oss_port
+		WHERE	port_id = #{portId}
+		AND 	delete_flag = 'N'
+	 </select>
+
+	<update id="updateOssPort" parameterType="BatchOssPortVO">
+		UPDATE	oss_port
+		SET		port_name = #{portName},
+				fixed_ips = #{fixedIps},
+				mac_address = #{macAddress},
+				project_id = #{projectId},
+				network_id = #{networkId},
+				subnet_id = #{subnetId},
+				device_id = #{deviceId},
+				device_owner = #{deviceOwner},
+				binding_host_id = #{bindingHostId},
+				status = #{status},
+				reg_datetime = #{regDatetime},
+				reg_user_id = #{regUserId},
+				mod_datetime = #{modDatetime},
+				mod_user_id = #{modUserId},
+				delete_flag = #{deleteFlag}
+		WHERE	port_id = #{portId}
+	</update>
+
+	<update id="updateOssPortWithNoDevice" parameterType="BatchOssPortVO">
+		UPDATE	oss_port
+		SET		delete_flag = 'Y'
+		WHERE	device_id = ''
+	</update>
+
+	<insert id="insertOssPort" parameterType="BatchOssPortVO">
+		INSERT	 INTO oss_port (
+			port_id,
+			port_name ,
+			fixed_ips ,
+			mac_address,
+			project_id ,
+			network_id ,
+			subnet_id ,
+			device_id ,
+			device_owner,
+			binding_host_id,
+			status ,
+			reg_datetime,
+			reg_user_id,
+			mod_datetime,
+			mod_user_id,
+			delete_flag
+		) VALUES (
+		 	#{portId},
+		 	#{portName},
+			#{fixedIps},
+			#{macAddress},
+			#{projectId},
+			#{networkId},
+			#{subnetId},
+			#{deviceId},
+			#{deviceOwner},
+			#{bindingHostId},
+			#{status},
+			#{regDatetime},
+			#{regUserId},
+			#{modDatetime},
+			#{modUserId},
+			#{deleteFlag}
+		)
+		ON DUPLICATE KEY
+			UPDATE
+				port_id = #{portId},
+				port_name = #{portName},
+				fixed_ips = #{fixedIps},
+				mac_address = #{macAddress},
+				project_id = #{projectId},
+				network_id = #{networkId},
+				subnet_id = #{subnetId},
+				device_id = #{deviceId},
+				device_owner = #{deviceOwner},
+				binding_host_id = #{bindingHostId},
+				status = #{status},
+				reg_datetime = #{regDatetime},
+				reg_user_id = #{regUserId},
+				mod_datetime = #{modDatetime},
+				mod_user_id = #{modUserId},
+				delete_flag = #{deleteFlag}
+	</insert>
+
+	 <select id = "OssVmCloudId" parameterType="BatchOssVmVO" resultType="BatchOssVmVO">
+        SELECT  *
+		  FROM	 oss_vm a
+		  INNER JOIN oss_project b
+		  on a.project_id = b.project_id
+		   INNER JOIN oss_cloud c
+		  ON b.cloud_id = c.cloud_id
+		  WHERE a.vm_uuid = #{vmUuid}
+	 </select>
+
+	<select id="selectCloudById" resultType="CustomOssCloudVO" parameterType="CustomOssCloudVO">
+
+		SELECT
+			cloud_id
+			, cloud_name
+			, cloud_type
+			, admin_domain
+			, admin_project
+			, admin_username
+			, admin_password
+			, project_username
+			, project_password
+			, api_gateway_server
+			, api_identity_server
+			, api_compute_server
+			, api_network_server
+			, api_volume_v3server
+			, api_image_server
+			, api_metrics_server
+			, api_alarm_server
+			, alarm_ocurred_url
+			, alarm_clear_url
+			, reg_user_id
+			, reg_datetime
+			, mod_user_id
+			, mod_datetime
+		FROM oss_cloud
+		WHERE del_flag = 'N' AND cloud_id = #{cloudId}
+	</select>
+
+	<select id="selectOssFlavor" parameterType="BatchOssFlavorVO" resultType="BatchOssFlavorVO">
+
+		SELECT *
+		  FROM oss_flavor
+	    WHERE delete_flag = 'N'
+		    AND cloud_id = #{cloudId}
+		    AND ram_mb = #{ramMb}
+		    AND vcpus = #{vcpus}
+
+	</select>
+
+
+
+    <select id="selectOssZoneNetwork" parameterType="BatchOssNetworkVO" resultType="BatchOssNetworkVO">
+
+		SELECT *
+		  FROM oss_zone_network
+		WHERE network_id = #{networkId}
+	</select>
+
+    <select id="selectBssProductOs" parameterType="BatchBssProductOsVO" resultType="BatchBssProductOsVO">
+
+	   SELECT *
+	     FROM bss_product_os
+       WHERE vm_image_name = #{vmImageName}
+           AND cloud_id = #{cloudId}
+
+	</select>
+
+	<select id="getOssDiskCheck" resultType="CustomReqProductVO">
+				SELECT	*
+	              FROM oss_disk
+	           WHERE disk_id = #{vmdiskUuid}
+    </select>
+
+    <update id="updateOssDiskToDiskGb" parameterType="BatchOssSubnetVO">
+		UPDATE	oss_vm SET
+		disk_gb = #{diskGb}
+		WHERE	vm_uuid = #{vmUuid}
+
+	</update>
+
+
+	<insert id="insertOssDiskNutanix" parameterType="BatchOssDiskVO">
+		INSERT  INTO oss_disk (
+		disk_id,
+		project_id,
+		vm_uuid,
+		disk_alias,
+		size_gb,
+		device,
+		create_datetime,
+		expire_datetime,
+		delete_datetime,
+		reg_datetime,
+		reg_user_id,
+		mod_datetime,
+		mod_user_id,
+		del_flag,
+		hourly_flag,
+		description,
+		disk_catalog_seq,
+		disk_product_seq,
+		volume_type,
+		image_id,
+		image_item_id,
+		vmdk_file,
+		boot_able,
+		device_uuid,
+		storage_container_uuid
+		) VALUES (
+
+
+        #{diskId},
+		#{projectId},
+		#{vmUuid},
+		#{diskAlias},
+		#{sizeGb},
+		#{device},
+		#{createDatetime},
+		#{expireDatetime},
+		#{deleteDatetime},
+		#{regDatetime},
+		#{regUserId},
+		#{modDatetime},
+		#{modUserId},
+		#{delFlag},
+		#{hourlyFlag},
+		#{description},
+		#{diskCatalogSeq},
+		#{diskProductSeq},
+		#{volumeType},
+		#{imageId},
+		#{imageItemId},
+		#{vmdkFile},
+		#{bootAble},
+		#{deviceUuid},
+		#{storageContainerUuid}
+
+		)
+
+
+	</insert>
+
+
+</mapper>

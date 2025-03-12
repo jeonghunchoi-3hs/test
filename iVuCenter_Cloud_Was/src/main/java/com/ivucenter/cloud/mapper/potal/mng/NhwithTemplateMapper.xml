@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.mng.nhwith.NhwithDAO">
+
+    <select id="nhwithTemplatelist" resultType="CustomNhwithVO" parameterType="CustomNhwithVO">
+    	SELECT 
+			*
+			, DATE_FORMAT(N.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2
+			, C.user_name
+    	FROM nhwith_template N
+    	
+    	LEFT OUTER JOIN cmm_user C
+		ON N.mod_user_id = C.user_id
+    	
+    	WHERE 1=1
+    	<if test="searchKind == 'tempId' and keyword != ''">
+    		AND N.template_id LIKE CONCAT('%',#{keyword},'%')
+    	</if>
+    	<if test="searchKind == 'title' and keyword != ''">
+    		AND N.title LIKE CONCAT('%',#{keyword},'%')
+    	</if>
+    	<if test="searchKind == 'searchAll' and keyword != ''">
+    		AND (
+    			N.template_id LIKE CONCAT('%',#{keyword},'%')
+    			OR
+    			N.title LIKE CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+    	ORDER BY N.template_id DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+
+	<select id="templateviewDetail" resultType="CustomNhwithVO" parameterType="CustomNhwithVO">
+    	SELECT 
+			N.*
+			, DATE_FORMAT(N.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2
+			, C.user_name
+    	FROM nhwith_template N
+    	
+    	LEFT OUTER JOIN cmm_user C
+		ON N.mod_user_id = C.user_id
+		
+    	WHERE N.template_id = #{templateId}    	
+    </select>
+    
+    <insert id="insert" parameterType="CustomNhwithVO">
+   		INSERT INTO mail_template (
+			template_id
+			, title
+			, content
+			, reg_datetime
+			, reg_user_id
+			, mod_datetime
+			, mod_user_id
+			, del_flag
+		) values (
+			#{templateId}
+			, #{title}
+			, #{content}
+			, #{regDatetime}
+			, #{regUserId}
+			, #{modDatetime}
+			, #{modUserId}
+			, #{delFlag}
+		)
+    </insert>
+    
+    <update id="templateUpdate" parameterType="CustomNhwithVO">
+        UPDATE nhwith_template SET
+			title = #{title}
+			, content = #{content}			
+			, reg_user_id = #{modUserId}
+			, mod_datetime = NOW()
+			, mod_user_id = #{modUserId}			
+        WHERE template_id = #{templateId}	
+    </update>
+    
+    <select id="nhwithTemplateHistoryList" resultType="CustomNhwithVO" parameterType="CustomNhwithVO">
+		SELECT 
+			z.*
+			, DATE_FORMAT(z.result_datetime, '%Y-%m-%d %H:%i') AS result_datetime2
+		FROM
+		( 
+			SELECT 
+				a.*
+				,b.template_name
+				, (CASE 
+					WHEN a.receiver_flg = 'U' 
+					THEN (
+						SELECT 
+							cc.customer_name 
+						FROM cmm_user cu, cmm_customer cc 
+						WHERE cu.customer_id=cc.customer_id
+						AND cu.user_id=a.receiver_id
+						)
+					WHEN a.receiver_flg = 'C' 
+					THEN (SELECT cc2.customer_name FROM cmm_customer cc2 WHERE cc2.customer_id=a.receiver_id)
+					ELSE '' END
+				) AS customer
+			FROM nhwith_queue_history a
+			
+			LEFT JOIN mail_template b 
+				ON a.template_id = b.template_id
+		) z    	
+    	where 1=1
+    	AND
+			DATE_FORMAT(z.result_datetime, '%Y%m%')  >= #{startYm}
+		AND
+			DATE_FORMAT(z.result_datetime, '%Y%m%')  <![CDATA[<=]]> #{endYm}
+    	ORDER BY result_datetime DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+    
+    <insert id="nhwithTemplateHistoryInsert" parameterType="CustomNhwithVO">
+   		INSERT INTO nhwith_queue_history (
+			template_id
+			,nhwith_seq
+			, title
+			, content
+			, sender_name
+			, sender_id
+			, receiver_id
+			, receiver_name
+			, result_flg
+			, result_datetime
+			, receiver_flg
+		) values (
+			#{templateId}
+			, #{nhwithSeq}
+			, #{title}
+			, #{content}
+			, #{senderName}
+			, #{senderId}
+			, #{receiverId}
+			, #{receiverName}
+			, #{resultFlg}
+			, now()
+			, #{receiverFlg}
+		)
+    </insert>
+    
+    <select id="nhwithTemplateHistoryDetail" resultType="CustomNhwithVO" parameterType="CustomNhwithVO">
+		SELECT 
+		z.*
+		, DATE_FORMAT(z.result_datetime, '%Y-%m-%d %H:%i') AS result_datetime2
+		FROM
+		( 
+			SELECT 
+				*
+				, (CASE 
+					WHEN receiver_flg = 'U' 
+					THEN ( 
+						SELECT 
+							customer_name 
+						FROM cmm_user, cmm_customer 
+						WHERE cmm_user.customer_id=cmm_customer.customer_id
+						AND cmm_user.user_id=nhwith_queue_history.receiver_id
+						)
+					WHEN receiver_flg = 'C' 
+					THEN (SELECT customer_name FROM cmm_customer WHERE customer_id=nhwith_queue_history.receiver_id)
+					ELSE '' END
+				) AS customer
+			FROM nhwith_queue_history
+		) z    	
+    	where nhwith_seq = #{nhwithSeq}
+    </select>
+</mapper>

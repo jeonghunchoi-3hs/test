@@ -1,0 +1,259 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" 	uri="http://java.sun.com/jsp/jstl/core"%>
+<%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt"%>
+<%@ taglib prefix="fn" 	uri="http://java.sun.com/jsp/jstl/functions"%>
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
+
+<sec:authorize access="isAuthenticated()">
+	<sec:authentication var="userId" 	property="principal.username" />
+	<sec:authentication var="userName" 	property="principal.nickname"/>
+</sec:authorize>
+<c:set var="contextPath" value="<%=request.getContextPath()%>"></c:set>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="ko">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=Edge">
+	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
+	<meta content="" name="description" />
+	<meta content="" name="author" />
+	<c:import url="/WEB-INF/views/mng/include/import.jsp" charEncoding="UTF-8"></c:import>
+	<title>KEPCO Cloud Service Platform</title>
+</head>
+<body>
+
+	<!-- begin #page-container -->
+	<div id="page-container" class="fade page-container page-header-fixed page-sidebar-fixed page-with-footer">
+
+		<!-- begin #header -->
+		<c:import url="/WEB-INF/views/mng/include/header.jsp" charEncoding="UTF-8"></c:import>
+		<!-- end #header -->
+
+		<!-- begin #sidebar -->
+		<c:import url="/WEB-INF/views/mng/include/sidebar.jsp" charEncoding="UTF-8"></c:import>
+		<!-- end #sidebar -->
+
+		<!-- begin #content (페이지 바디 컨텐츠 시작입니다)-->
+		<div id="content" class="content">
+
+			<!-- begin header -->
+			<div class="page_header mb30">
+				<h1>클라우드 상세</h1>
+				<div class="pageNav">
+					<a href="/mng/mnghome/dashboard?loginFlag=Y" class="home"><i></i></a><a href="#">정책관리</a><a href="#" class="on">클라우드 관리</a>
+				</div>
+			</div>
+			<!-- end header -->
+
+			<!-- begin page-body -->
+			<div class="row pb50">
+
+						<input type="hidden" id="hiddenCloudId" value="${cloudId}">
+						<table class="tableH">
+							<colgroup>
+								 <col width="200px">
+								 <col width="*">
+								 <col width="200px">
+								 <col width="*">
+							</colgroup>
+							<tbody>
+							
+								<tr>
+									<th>calm_admin_user</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="calmAdminUser" id="calmAdminUser"></td>
+									<th>calm_admin_password</th>
+									<td><input maxlength="30" type="password" autocomplete="off" readonly="readonly" class="w100" name="calmAdminPassword" id="calmAdminPassword"></td>
+								</tr>
+								
+								
+								<tr>
+									<th>admin_username</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="adminUsername" id="adminUsername"></td>
+									<th>admin_password</th>
+									<td><input maxlength="30" type="password" autocomplete="off" readonly="readonly" class="w100" name="adminPassword" id="adminPassword"></td>
+								</tr>
+								
+							
+								<tr>
+									<th>cloud_name</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="cloudName" id="cloudName"></td>
+									<th>api_identity_server</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="apiIdentityServer" id="apiIdentityServer"></td>
+								</tr>
+								<tr>
+									<th>cloud_type</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="cloudType" id="cloudType"></td>
+									<th>api_network_server</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="apiNetworkServer" id="apiNetworkServer"></td>
+								</tr>
+								<tr>
+									<th>api_metrics_server</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="apiMetricsServer" id="apiMetricsServer"></td>
+									<th>api_volume_v3server</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="apiVolumeV3server" id="apiVolumeV3server"></td>
+								</tr>
+								<tr>
+									<th>admin_domain</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="adminDomain" id="adminDomain"></td>
+									<th>api_image_server</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="apiImageServer" id="apiImageServer"></td>
+								</tr>
+								<tr>
+									<th>admin_project</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="adminProject" id="adminProject"></td>
+									<th>api_alarm_server</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="apiAlarmServer" id="apiAlarmServer"></td>
+								</tr>
+								<tr>
+									<th>project_username</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="projectUsername" id="projectUsername"></td>
+
+									<th>alarm_ocurred_url</th>
+									<td><input maxlength="30" type="text" readonly="readonly"  class="w100" name="alarmOcurredUrl" id="alarmOcurredUrl"></td>
+								</tr>
+								<tr>
+                                    <th>project_password</th>
+									<td><input maxlength="30" type="password" autocomplete="off" readonly="readonly" class="w100" name="projectPassword" id="projectPassword"></td>
+									<th>alarm_clear_url</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="alarmClearUrl" id="alarmClearUrl"></td>
+								</tr>
+								<tr>
+									<th>api_compute_server</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="apiComputeServer" id="apiComputeServer"></td>
+									<th>api_gateway_server</th>
+									<td><input maxlength="30" type="text" readonly="readonly" class="w100" name="apiGatewayServer" id="apiGatewayServer"></td>
+								</tr>
+							</tbody>
+						</table>
+
+
+				<div class="row tac m-t-60">
+					<a type='button' id="noticeDelete" class="rbton bton_orange" onclick="deleteCloudInfo()"><i class="fa fa-trash"></i> 삭제</a>
+					<a type='button' id="noticeModify" class="rbton bton_blue" onclick="moveInsertPage()"><i class="fa fa-pencil"></i> 수정</a>
+					<a type='button' id="noticeList" class="rbton bton_dgrey" onclick="moveListPage()"><i class="fa fa-list"></i> 목록</a>
+				</div>
+			
+			</div>
+			<!-- end page-body -->
+
+			<!-- begin #footer -->
+            <c:import url="/WEB-INF/views/mng/include/footer.jsp" charEncoding="UTF-8"></c:import>
+			<!-- end #footer -->
+
+		</div>
+		<!-- end #content -->
+
+	</div>
+	<!-- end page container -->
+
+
+<c:import url="/WEB-INF/views/mng/include/script.jsp" charEncoding="UTF-8"></c:import>
+
+<script type="text/javascript">
+
+	function bbsDetail(cloudId) {
+
+		$.ajax({
+			url : "${contextPath}/mng/cmm/cloud/detail",
+			dataType : "JSON",
+// 			type : "POST",
+			data : {
+				"cloudId" : cloudId
+			},
+			success : function(data) {
+				var result = data;
+				setData(result);
+			},
+			error : function(request, status, error) {
+				errorBox("code:" + request.status + "\n" + "error:" + error);
+			}
+		});
+
+	}
+
+	function deleteCloudInfo(){
+		confirmBox("삭제하시겠습니까?",ajaxdeleteCloudInfo);
+	}
+
+	function ajaxdeleteCloudInfo(){
+
+		var cloudId = $("#hiddenCloudId").val();
+
+		$.ajax({
+			url : "${contextPath}/mng/cmm/cloud/delete",
+			dataType : "JSON",
+			type : "POST",
+			data : {
+				"cloudId" : cloudId
+			},
+			success : function(data) {
+				var result = data.result;
+				if(data==1){
+					alertBox("삭제되었습니다.", moveListPage);
+				}else{
+					errorBox("failed!!");
+				}
+			},
+			error : function(request, status, error) {
+				errorBox("code:" + request.status + "\n" + "error:" + error);
+			}
+		});
+	}
+
+
+	function setData(result){
+
+		$("#adminDomain").val(result.adminDomain);
+		$("#adminProject").val(result.adminProject);
+		$("#adminUsername").val(result.adminUsername);
+		$("#adminPassword").val(result.adminPassword);
+		$("#projectUsername").val(result.projectUsername);
+		$("#projectPassword").val(result.projectPassword);
+		$("#apiGatewayServer").val(result.apiGatewayServer);
+		$("#apiIdentityServer").val(result.apiIdentityServer);
+		$("#apiNetworkServer").val(result.apiNetworkServer);
+		$("#apiMetricsServer").val(result.apiMetricsServer);
+		$("#apiVolumeV3server").val(result.apiVolumeV3server);
+		$("#apiComputeServer").val(result.apiComputeServer);
+		$("#apiImageServer").val(result.apiImageServer);
+		$("#apiAlarmServer").val(result.apiAlarmServer);
+		$("#alarmOcurredUrl").val(result.alarmOcurredUrl);
+		$("#alarmClearUrl").val(result.alarmClearUrl);
+		$("#regDatetime").val(result.regDatetime);
+		$("#regUserId").val(result.regUserId);
+		$("#modUserId").val(result.modUserId);
+		$("#modDatetime").val(result.modDatetime);
+		$("#cloudType").val(result.cloudType);
+		$("#cloudId").val(result.cloudId);
+		$("#cloudName").val(result.cloudName);
+		$("#hiddenCloudId").val(result.cloudId);
+		$("#calmAdminUser").val(result.calmAdminUser);
+		$("#calmAdminPassword").val(result.calmAdminPassword);
+
+	}
+
+	// 목록 페이지이동
+	function moveListPage(){
+		//location.href = "/NHCloud/mng/bbs/notice/";
+		location.href = "${contextPath}/mng/cmm/cloud/";
+	}
+	// 등록/수정 페이지이동
+	function moveInsertPage(){
+
+		var cloudId = $("#hiddenCloudId").val();
+		location.href = "${contextPath}/mng/cmm/cloud/write?cloudId="+cloudId;
+	}
+
+	$(document).ready(function() {
+		bbsDetail("${cloudId}");
+		App.init();
+
+		//메뉴활성화
+		$("#operation").addClass("active");
+		$("#ossCloud").addClass("active");
+
+	});
+
+</script>
+</body>
+</html>

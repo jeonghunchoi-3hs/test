@@ -1,0 +1,525 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.vm.OssVmDAO">
+
+    <select id="list" parameterType="CustomOssVmVO" resultType="CustomOssVmVO">
+		  	SELECT
+				OV.*
+				, DATE_FORMAT(OV.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+		    FROM
+		    (
+		    	SELECT
+			    		a.vm_uuid,
+						a.project_id,
+						a.hostname,
+						a.hostname_alias,
+						a.flavor_id,
+						a.vcpus,
+						a.mem_gb,
+						a.disk_gb,
+						a.image_id,
+						a.volume_type,
+						a.az_name,
+						a.vm_catalog_seq,
+						a.vm_product_seq,
+						a.os_product_seq,
+						a.description,
+						a.create_datetime,
+						a.expire_datetime,
+						a.delete_datetime,
+						a.reg_datetime,
+						a.reg_user_id,
+						a.mod_datetime,
+						a.mod_user_id,
+						a.del_flag,
+						a.hourly_flag,
+						b.network_id,
+						c.network_name,
+						c.network_alias,
+						c.work_kind,
+						c.work_net_kind,
+						d.fixed_ips
+	    	FROM oss_vm a
+	    	LEFT OUTER JOIN oss_vm_network b ON b.vm_uuid = a.vm_uuid
+	    	LEFT OUTER JOIN oss_network c ON b.network_id = c.network_id
+	    	LEFT OUTER JOIN oss_port d ON a.vm_uuid = d.device_id
+
+	    	WHERE
+	    		a.project_id = #{projectId}
+	    		AND a.expire_datetime IS NULL
+	    		AND a.del_flag = 'N'
+
+	    		<if test="volumeType != '' and volumeType != null">
+	    		AND a.volume_type = #{volumeType}
+	    		</if>
+
+	    		<if test="searchKind == 'searchAll' and keyword != ''">
+	    		AND (
+	    			a.hostname_alias  like CONCAT('%',#{keyword},'%')
+	    			OR
+	    			a.hostname  like CONCAT('%',#{keyword},'%')
+	    			)
+	    		</if>
+			<if test="searchKind == 'hostname_alias' and keyword != ''">
+				AND
+					a.hostname_alias like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'hostname' and keyword != ''">
+				AND
+					a.hostname like CONCAT('%',#{keyword},'%')
+			</if>
+			ORDER BY
+				a.hostname_alias desc
+	    ) OV
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="viewlist" parameterType="CustomOssVmVO" resultType="CustomOssVmVO">
+
+	    		SELECT
+				OV.*
+				, DATE_FORMAT(OV.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, DATE_FORMAT(OV.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+		    FROM
+		    (
+		    	SELECT
+			    		a.vm_uuid,
+						a.project_id,
+						a.hostname,
+						a.hostname_alias,
+						a.flavor_id,
+						a.vcpus,
+						a.mem_gb,
+						a.disk_gb,
+						a.image_id,
+						a.volume_type,
+						a.az_name,
+						a.vm_catalog_seq,
+						a.vm_product_seq,
+						a.os_product_seq,
+						a.description,
+						a.create_datetime,
+						a.expire_datetime,
+						a.delete_datetime,
+						a.reg_datetime,
+						a.reg_user_id,
+						a.mod_datetime,
+						a.mod_user_id,
+						a.del_flag,
+						a.hourly_flag,
+						b.network_id,
+						c.network_name,
+						c.network_alias,
+						c.work_kind,
+						c.work_net_kind,
+						c.fixed_ips,
+						d.bakup_fixed_ips,
+						oc.cloud_type,
+						oc.cloud_id,
+						oc.cloud_name
+	    	FROM oss_vm a
+	    	LEFT JOIN oss_project op ON a.project_id = op.project_id
+	    	LEFT JOIN oss_cloud oc ON op.cloud_id = oc.cloud_id
+	    	LEFT OUTER JOIN oss_vm_network b ON b.vm_uuid = a.vm_uuid
+	    	LEFT OUTER JOIN
+								(
+
+								SELECT              ot.network_name,
+														ot.network_alias,
+														ot.work_kind,
+														ot.work_net_kind,
+														op.fixed_ips,
+														op.device_id
+														 FROM oss_port op
+								LEFT OUTER JOIN oss_network ot
+								ON op.network_id = ot.network_id
+								<!-- WHERE op.project_id =  a.project_id -->
+								WHERE network_name != 'backup-net'
+								AND network_name != 'nas-net'
+
+								)c ON a.vm_uuid = c.device_id
+
+
+								LEFT OUTER JOIN
+
+								(
+
+								SELECT
+														op.fixed_ips AS bakup_fixed_ips,
+														op.device_id
+														 FROM oss_port op
+								LEFT OUTER JOIN oss_network ot
+								ON op.network_id = ot.network_id
+								WHERE op.project_id = #{projectId}
+								AND network_name = 'backup-net'
+								)d ON a.vm_uuid = d.device_id
+
+
+	    	WHERE
+	    		op.project_box_id =  #{projectBoxId}
+	    		AND a.expire_datetime IS NULL
+	    		AND a.del_flag = 'N'
+
+	    		<if test="volumeType != '' and volumeType != null">
+	    		AND a.volume_type = #{volumeType}
+	    		</if>
+
+	    		<if test="searchKind == 'searchAll' and keyword != ''">
+	    		AND (
+	    			a.hostname_alias  like CONCAT('%',#{keyword},'%')
+	    			OR
+	    			a.hostname  like CONCAT('%',#{keyword},'%')
+	    			)
+	    		</if>
+	    		<if test="cloudId != '' and cloudId != null">
+	    		AND op.cloud_id = #{cloudId}
+	    		</if>
+				<if test="searchKind == 'hostname_alias' and keyword != ''">
+					AND
+						a.hostname_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'hostname' and keyword != ''">
+					AND
+						a.hostname like CONCAT('%',#{keyword},'%')
+				</if>
+			ORDER BY
+				a.hostname_alias
+	    ) OV
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+
+	<select id="viewProjectlist" parameterType="CustomOssVmVO" resultType="CustomOssVmVO">
+
+	    		SELECT
+				OV.*
+				, DATE_FORMAT(OV.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, DATE_FORMAT(OV.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+		    FROM
+		    (
+		    	SELECT
+			    		a.vm_uuid,
+						a.project_id,
+						a.hostname,
+						a.hostname_alias,
+						a.flavor_id,
+						a.vcpus,
+						a.mem_gb,
+						a.disk_gb,
+						a.image_id,
+						a.volume_type,
+						a.az_name,
+						a.vm_catalog_seq,
+						a.vm_product_seq,
+						a.os_product_seq,
+						a.description,
+						a.create_datetime,
+						a.expire_datetime,
+						a.delete_datetime,
+						a.reg_datetime,
+						a.reg_user_id,
+						a.mod_datetime,
+						a.mod_user_id,
+						a.del_flag,
+						a.hourly_flag,
+						a.application_uuid,
+						a.power_state,
+						a.host_uuid,
+						b.network_id,
+						c.network_name,
+						c.network_alias,
+						c.work_kind,
+						c.work_net_kind,
+						c.fixed_ips,
+						d.bakup_fixed_ips,
+						oc.cloud_type,
+						oc.cloud_id,
+						oc.cloud_name
+	    	FROM oss_project_box opb
+	    	LEFT JOIN oss_project op ON opb.project_box_id = op.project_box_id
+	    	LEFT JOIN (SELECT *
+	    	                   FROM oss_vm
+
+	    	            <if test="instanceType != '' and instanceType != null">
+	    	                WHERE instance_type = #{instanceType}
+                        </if>
+	    	                   ) a
+
+	    	                ON a.project_id = op.project_id
+	    	LEFT JOIN oss_cloud oc ON op.cloud_id = oc.cloud_id
+	    	LEFT OUTER JOIN oss_vm_network b ON b.vm_uuid = a.vm_uuid
+	    	LEFT OUTER JOIN
+								(
+
+								SELECT              ot.network_name,
+														ot.network_alias,
+														ot.work_kind,
+														ot.work_net_kind,
+														osp.fixed_ips,
+														osp.device_id
+														 FROM oss_port osp
+								LEFT OUTER JOIN oss_network ot
+								ON osp.network_id = ot.network_id
+								WHERE osp.project_id = op.project_id
+								AND network_name != 'backup-net'
+								AND network_name != 'nas-net'
+
+								)c ON a.vm_uuid = c.device_id
+
+
+								LEFT OUTER JOIN
+
+								(
+
+								SELECT
+														osp.fixed_ips AS bakup_fixed_ips,
+														osp.device_id
+														 FROM oss_port osp
+								LEFT OUTER JOIN oss_network ot
+								ON osp.network_id = ot.network_id
+								WHERE osp.project_id = op.project_id
+								AND network_name = 'backup-net'
+								)d ON a.vm_uuid = d.device_id
+
+
+	    	WHERE
+	    		opb.project_box_id =  #{projectBoxId}
+	    		AND a.expire_datetime IS NULL
+	    		AND a.del_flag = 'N'
+
+	    		<if test="volumeType != '' and volumeType != null">
+	    		AND a.volume_type = #{volumeType}
+	    		</if>
+
+	    		<if test="searchKind == 'searchAll' and keyword != ''">
+	    		AND (
+	    			a.hostname_alias  like CONCAT('%',#{keyword},'%')
+	    			OR
+	    			a.hostname  like CONCAT('%',#{keyword},'%')
+	    			)
+	    		</if>
+
+				<if test="searchKind == 'hostname_alias' and keyword != ''">
+					AND
+						a.hostname_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'hostname' and keyword != ''">
+					AND
+						a.hostname like CONCAT('%',#{keyword},'%')
+				</if>
+			ORDER BY
+				a.hostname_alias
+	    ) OV
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+    <select id="detailSum" parameterType="CustomOssVmVO" resultType="CustomOssVmVO">
+
+             	SELECT
+	    		            sum(a.vcpus) AS cores,
+			                sum(a.mem_gb) AS ram,
+			                count(a.vm_uuid) AS instances
+                   FROM (SELECT *
+                               FROM oss_vm
+                             WHERE expire_datetime IS NULL
+                                 AND del_flag = 'N'
+                                <if test="instanceType != '' and instanceType != null">
+	    	                	 AND instance_type = #{instanceType}
+                                </if>
+                          ) a
+         INNER JOIN oss_project b
+                       ON a.project_id = b.project_id
+		    	WHERE	b.project_box_id = #{projectBoxId}
+
+	</select>
+
+    <select id="detail" parameterType="CustomOssVmVO" resultType="CustomOssVmVO">
+		SELECT
+			*
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+		FROM
+			(SELECT * FROM oss_vm WHERE del_flag = 'N') a
+			LEFT JOIN oss_project b
+			ON a.project_id = b.project_id
+	     	LEFT JOIN cmm_department c
+	     	ON b.dept_code = c.dept_code
+		WHERE
+			vm_uuid = #{vmUuid}
+	</select>
+
+    <update id="update" parameterType="CustomOssVmVO">
+        UPDATE oss_vm
+        SET
+			hostname_alias	= #{hostnameAlias}
+		    , mod_datetime = now()
+		    , mod_user_id = #{modUserId}
+        WHERE
+        	vm_uuid = #{vmUuid}
+    </update>
+
+    <update id="vmHistoryInsert" parameterType="CustomOssVmVO">
+		INSERT INTO oss_vm_history
+		(
+			vm_uuid,
+			ip,
+			user_id,
+			user_name,
+			action_type,
+			action_datetime,
+			description
+		)
+		VALUES
+		(
+			#{vmUuid},
+			#{ip},
+			#{userId},
+			#{userName},
+			#{actionType},
+			now(),
+			#{description}
+		);
+
+    </update>
+
+	<select id="vmListProjectByUser" parameterType="CustomOssVmVO" resultType="CustomOssVmVO">
+		SELECT
+			DISTINCT upper(hostname) HOSTNAME,
+			hostname_alias,
+			fixed_ips
+		FROM
+			(SELECT * FROM OSS_VM WHERE del_flag = 'N') VM,
+			(select * from oss_port WHERE network_id IN (SELECT network_id FROM oss_zone_network WHERE is_backup='N')) PORT,
+			(
+				SELECT
+					*
+				FROM
+					oss_project_manager
+				<if test="userId != 'admin' ">
+				WHERE
+					manager_id = #{userId}
+				</if>
+			) MA
+		LEFT JOIN
+			oss_project OP
+		ON MA.project_id = OP.project_box_id
+		WHERE
+			VM.vm_uuid = PORT.device_id
+			AND VM.project_id = OP.project_id
+	</select>
+
+	<select id="detailByHostname" parameterType="CustomOssVmVO" resultType="CustomOssVmVO">
+		SELECT
+			project_name,
+			project_alias,
+			(SELECT customer_name FROM cmm_customer WHERE customer_id = OP.customer_id) customer_name,
+			(SELECT dept_name FROM cmm_department WHERE dept_code = OP.dept_code) dept_name,
+			OP.reg_user_id,
+			CU.user_name,
+			CU.user_tel,
+			OV.HOSTNAME,
+			OV.HOSTNAME_ALIAS,
+			vcpus,
+			mem_gb,
+			disk_gb,
+			SUM(IFNULL(size_gb, 0)) size_gb,
+			LIST(SELECT fixed_ips FROM OSS_PORT WHERE device_id = OV.vm_uuid) AS fixed_ips,
+			--DATE_FORMAT(OV.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime
+			OV.create_datetime AS create_datetime
+		FROM
+			(SELECT * FROM	oss_vm WHERE hostname = #{hostname} AND del_flag = 'N') OV
+			LEFT JOIN OSS_DISK OD
+			ON OV.vm_uuid = OD.vm_uuid
+			LEFT JOIN OSS_PROJECT OP
+			ON OV.project_id = OP.project_id
+			LEFT JOIN cmm_user CU
+			ON OP.reg_user_id = CU.user_id
+		GROUP BY
+			HOSTNAME
+	</select>
+
+	<select id="nutanixViewlist" parameterType="CustomOssVmVO" resultType="CustomOssVmVO">
+
+	    		SELECT
+				OV.*
+				, DATE_FORMAT(OV.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, DATE_FORMAT(OV.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+		    FROM
+		    (
+		    	SELECT
+			    		a.vm_uuid,
+						a.project_id,
+						a.hostname,
+						a.hostname_alias,
+						a.flavor_id,
+						a.vcpus,
+						a.mem_gb,
+						a.disk_gb,
+						a.image_id,
+						a.volume_type,
+						a.az_name,
+						a.vm_catalog_seq,
+						a.vm_product_seq,
+						a.os_product_seq,
+						a.description,
+						a.create_datetime,
+						a.expire_datetime,
+						a.delete_datetime,
+						a.reg_datetime,
+						a.reg_user_id,
+						a.mod_datetime,
+						a.mod_user_id,
+						a.del_flag,
+						a.hourly_flag,
+						b.network_id,
+						oc.cloud_type,
+						oc.cloud_id,
+						oc.cloud_name
+	    	FROM oss_vm a
+	    	LEFT JOIN oss_project op ON a.project_id = op.project_id
+	    	LEFT JOIN oss_cloud oc ON op.cloud_id = oc.cloud_id
+	    	LEFT OUTER JOIN oss_vm_network b ON b.vm_uuid = a.vm_uuid
+
+
+	    	WHERE 1=1
+	    		AND a.expire_datetime IS NULL
+	    		AND a.del_flag = 'N'
+	    		AND oc.cloud_type = 'nutanix'
+	    		AND op.project_box_id = #{projectBoxId}
+
+	    		<if test="volumeType != '' and volumeType != null">
+	    		AND a.volume_type = #{volumeType}
+	    		</if>
+
+	    		<if test="searchKind == 'searchAll' and keyword != ''">
+	    		AND (
+	    			a.hostname_alias  like CONCAT('%',#{keyword},'%')
+	    			OR
+	    			a.hostname  like CONCAT('%',#{keyword},'%')
+	    			)
+	    		</if>
+	    		<if test="cloudId != '' and cloudId != null">
+	    		AND op.cloud_id = #{cloudId}
+	    		</if>
+				<if test="searchKind == 'hostname_alias' and keyword != ''">
+					AND
+						a.hostname_alias like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'hostname' and keyword != ''">
+					AND
+						a.hostname like CONCAT('%',#{keyword},'%')
+				</if>
+			ORDER BY
+				a.hostname_alias
+	    ) OV
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+</mapper>

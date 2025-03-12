@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bss.basket.BssBasketDAO">
+
+    <insert id="insertBssBasket" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket(
+			basket_seq
+			, user_id
+			, request_type
+			, product_category
+			, basket_summary
+			, hourly_flag
+			, amount
+			, cloud_id
+		)VALUES(
+			#{basketSeq}
+			, #{userId}
+			, #{requestType}
+			, #{productCategory}
+			, #{basketSummary}
+			, #{hourlyFlag}
+			, #{amount}
+			, #{cloudId}
+		)
+    </insert>
+
+    <insert id="insertBssBasketVm" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_vm(
+			basket_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, project_name
+			, vm_uuid
+			, default_network_id
+			, default_network_name
+			, default_network_alias
+			, hostname
+			, hostname_alias
+			, vcpus
+			, before_vcpus
+			, mem_gb
+			, before_mem_gb
+			, disk_gb
+			, volume_type
+			, flavor_id
+			, description
+			, vm_catalog_seq
+			, vm_product_seq
+			, os_product_seq
+			, before_flavor_id
+			, az_name
+			, image_id
+		)VALUES(
+			#{basketSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{projectName}
+			, #{vmUuid}
+			, #{defaultNetworkId}
+			, #{defaultNetworkName}
+			, #{defaultNetworkAlias}
+			, #{hostname}
+			, #{hostnameAlias}
+			, #{vcpus}
+			, #{beforeVcpus}
+			, #{memGb}
+			, #{beforeMemGb}
+			, #{diskGb}
+			, #{volumeType}
+			, #{flavorId}
+			, #{description}
+			, #{vmCatalogSeq}
+			, #{vmProductSeq}
+			, #{osProductSeq}
+			, #{beforeFlavorId}
+			, #{azName}
+			, #{imageId}
+		)
+    </insert>
+
+     <insert id="insertBssBasketDisk" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_disk(
+			basket_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, disk_name
+			, disk_type
+			, disk_gb
+			, before_disk_gb
+			, description
+			, disk_id
+			, disk_catalog_seq
+			, disk_product_seq
+			, vm_uuid
+		)VALUES(
+			#{basketSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{diskTypeName}
+			, #{diskTypeCode}
+			, #{diskGb}
+			, #{beforeDiskGb}
+			, #{description}
+			, #{diskId}
+			, #{diskCatalogSeq}
+			, #{diskProductSeq}
+			, #{vmUuid}
+		)
+    </insert>
+
+     <insert id="insertBssBasketNas" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_nas(
+			basket_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, vm_uuid
+			, nas_name
+			, nas_alias
+			, nas_nfs_object_id
+			, nas_file_system_path
+			, nas_gb
+			, before_nas_gb
+			, description
+			, nas_catalog_seq
+			, nas_product_seq
+			, nas_id
+			, vm_name
+		)VALUES(
+			#{basketSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{vmUuid}
+			, #{nasName}
+			, #{nasAlias}
+			, #{nasNfsObjectId}
+			, #{nasFileSystemPath}
+			, #{nasGb}
+			, #{beforeNasGb}
+			, #{description}
+			, #{nasCatalogSeq}
+			, #{nasProductSeq}
+			, #{nasId}
+			, #{vmName}
+		)
+    </insert>
+
+     <insert id="insertBssBasketNasVm" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_nas_vm(
+			basket_seq,
+			vm_uuid
+		) VALUES (
+			#{basketSeq},
+			#{vmUuid}
+		)
+	</insert>
+
+     <insert id="insertBssBasketIp" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_publicip(
+			basket_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, vm_uuid
+			, publicip_ea
+			, description
+			, publicip_catalog_seq
+			, publicip_product_seq
+			, publicip_id
+		)VALUES(
+			#{basketSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{vmUuid}
+			, #{publicipEa}
+			, #{description}
+			, #{publicipCatalogSeq}
+			, #{publicipProductSeq}
+			, #{publicipId}
+		)
+    </insert>
+    <insert id="insertBssBasketService" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_service(
+			basket_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, service_ea
+			, description
+			, service_catalog_seq
+			, service_type
+			, service_product_seq
+			, vm_uuid
+			, service_name
+
+		)VALUES(
+			#{basketSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{serviceEa}
+			, #{description}
+			, #{serviceCatalogSeq}
+			, #{serviceType}
+			, #{serviceProductSeq}
+			, #{vmUuid}
+			, #{serviceName}
+		)
+    </insert>
+
+<!--
+     <insert id="insertBssBasketBack" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_backup(
+			basket_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, backup_gb
+			, description
+			, backup_catalog_seq
+			, backup_product_seq
+			, backup_id
+			, vm_uuid
+		)VALUES(
+			#{basketSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{backupGb}
+			, #{description}
+			, #{backupCatalogSeq}
+			, #{backupProductSeq}
+			, #{backupId}
+			, #{vmUuid}
+		)
+		</insert>
+-->
+<!--
+     <insert id="insertBssBasketMca" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_mca(
+			basket_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, mca_ea
+			, description
+			, mca_catalog_seq
+			, mca_product_seq
+			, mca_id
+		)VALUES(
+			#{basketSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{mcaEa}
+			, #{description}
+			, #{mcaCatalogSeq}
+			, #{mcaProductSeq}
+			, #{mcaId}
+		)
+    </insert>
+ -->
+<!--
+     <insert id="insertBssBasketScm" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_scm(
+			basket_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, scm_ea
+			, description
+			, scm_catalog_seq
+			, scm_product_seq
+			, scm_id
+		)VALUES(
+			#{basketSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{scmEa}
+			, #{description}
+			, #{scmCatalogSeq}
+			, #{scmProductSeq}
+			, #{scmId}
+		)
+    </insert>
+-->
+<!--
+     <insert id="insertBssBasketSec" parameterType="CustomReqBasketVO">
+		INSERT INTO bss_basket_security(
+			basket_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, security_ea
+			, description
+			, security_catalog_seq
+			, security_product_seq
+			, security_id
+		)VALUES(
+			#{basketSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{securityEa}
+			, #{description}
+			, #{securityCatalogSeq}
+			, #{securityProductSeq}
+			, #{securityId}
+		)
+    </insert>
+-->
+</mapper>

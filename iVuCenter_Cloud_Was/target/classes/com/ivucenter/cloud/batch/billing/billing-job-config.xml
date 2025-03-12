@@ -1,0 +1,986 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+     xmlns="http://www.springframework.org/schema/beans"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:aop="http://www.springframework.org/schema/aop"
+     xmlns:tx="http://www.springframework.org/schema/tx"
+     xmlns:batch="http://www.springframework.org/schema/batch"
+     xmlns:context="http://www.springframework.org/schema/context"
+     xmlns:util="http://www.springframework.org/schema/util"
+
+     xsi:schemaLocation="
+         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+         http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+         http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch-2.2.xsd
+         http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd
+     http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+    ">
+
+     <!-- *********************************************************** -->
+     <!-- ********** Job 선언 ********** -->
+     <!-- *********************************************************** -->
+     <batch:job id="billingJob">
+
+    	<batch:step id="billingJobContextStep" next="checkBillMasterStatusStep">
+			<batch:tasklet ref="billingJobContextTasklet" />
+		</batch:step>
+
+    	<batch:step id="checkBillMasterStatusStep">
+			<batch:tasklet ref="checkBillMasterStatusTasklet" />
+			<batch:next on="*" to="deleteCurrentBillDateStep" />
+			<batch:end on="FAILED" />
+		</batch:step>
+
+		<!-- ++++++++ Initialization +++++++++ -->
+    	<batch:step id="deleteCurrentBillDateStep" next="initBillMasterStep">
+			<batch:tasklet ref="deleteCurrentBillDateTasklet" />
+		</batch:step>
+
+
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+		<!-- +++++ 빌링 기본 정보 등록 +++++ -->
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+		
+		<!-- ++++++++ BILL_MASTER : 빌링 마스터 등록 +++++++++ -->
+    	<batch:step id="initBillMasterStep" next="insertBillInvoiceCustomerStep">
+			<batch:tasklet ref="initBillMasterTasklet" />
+		</batch:step>
+
+		<!-- +++++ BILL_INVOICE_CUSTOMER : 고객사 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+		<batch:step id="insertBillInvoiceCustomerStep" next="insertBillInvoiceProjectStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceCustomerReader"
+							writer="insertBillInvoiceCustomerWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_INVOICE_PROJECT : 프로젝트 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+		<batch:step id="insertBillInvoiceProjectStep" next="insertBillChargeVmStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectReader"
+							writer="insertBillInvoiceProjectWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+		<!-- +++++ 가상 서버 관련 빌링 +++++ -->
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+		<!-- +++++ BILL_CHARGE_VM : 가상서버 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+		<batch:step id="insertBillChargeVmStep" next="insertBillChargeVmResourceStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeVmReader"
+							writer="insertBillChargeVmWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_VM_RESOURCE : 가상서버 자원 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+		<batch:step id="insertBillChargeVmResourceStep" next="insertBillChargeVmResourceDetailCpuStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeVmResourceReader"
+							writer="insertBillChargeVmResourceWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+		<!-- +++++ BILL_CHARGE_VM_RESOURCE : 가상서버 자원 CPU 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillChargeVmResourceDetailCpuStep" next="insertBillChargeVmResourceDetailMemStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeVmResourceDetailCpuReader"
+							processor="insertBillChargeVmResourceDetailCpuProcessor"
+							writer="insertBillChargeVmResourceDetailCpuWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_VM_RESOURCE : 가상서버 자원 MEMORY 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillChargeVmResourceDetailMemStep" next="insertBillChargeVmResourceDetailForOsDiskStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeVmResourceDetailMemReader"
+							processor="insertBillChargeVmResourceDetailMemProcessor"
+							writer="insertBillChargeVmResourceDetailMemWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_VM_RESOURCE : 가상서버 자원 OS DISK 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillChargeVmResourceDetailForOsDiskStep" next="updateBillChargeVmResourceForAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeVmResourceDetailForOsDiskReader"
+							writer="insertBillChargeVmResourceDetailForOsDiskWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_VM_RESOURCE : 가상서버 자원 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="updateBillChargeVmResourceForAmountStep" next="updateBillChargeVmForAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="updateBillChargeVmResourceForAmountReader"
+							writer="updateBillChargeVmResourceForAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_VM : 가상서버 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="updateBillChargeVmForAmountStep" next="insertBillChargeDiskStep">
+			<batch:tasklet>
+				<batch:chunk reader="updateBillChargeVmForAmountReader"
+							writer="updateBillChargeVmForAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+		<!-- +++++ 블록디스크 관련 빌링 +++++ -->
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+		<!-- +++++ BILL_CHARGE_DISK : DISK 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+		<batch:step id="insertBillChargeDiskStep" next="insertBillChargeDiskResourceStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeDiskReader"
+							writer="insertBillChargeDiskWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_DISK_RESOURCE : DISK 자원 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+		<batch:step id="insertBillChargeDiskResourceStep" next="insertBillChargeDiskResourceDetailGbStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeDiskResourceReader"
+							writer="insertBillChargeDiskResourceWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_DISK_RESOURCE : DISK 자원  사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillChargeDiskResourceDetailGbStep" next="updateBillChargeDiskResourceForAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeDiskResourceDetailGbReader"
+							processor="insertBillChargeDiskResourceDetailProcessor"
+							writer="insertBillChargeDiskResourceDetailWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_DISK_RESOURCE : DISK 자원 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="updateBillChargeDiskResourceForAmountStep" next="updateBillChargeDiskForAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="updateBillChargeDiskResourceForAmountReader"
+							writer="updateBillChargeDiskResourceForAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_DISK : DISK 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="updateBillChargeDiskForAmountStep" next="insertBillChargeServiceStep">
+			<batch:tasklet>
+				<batch:chunk reader="updateBillChargeDiskForAmountReader"
+							writer="updateBillChargeDiskForAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+		<!-- +++++ SERVICE 관련 빌링 +++++ -->
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+		<!-- +++++ BILL_CHARGE_SERVICE : 서비스 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+		<batch:step id="insertBillChargeServiceStep" next="insertBillChargeServiceResourceStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeServiceReader"
+							writer="insertBillChargeServiceWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_SERVICE_RESOURCE : 서비스 자원 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+		<batch:step id="insertBillChargeServiceResourceStep" next="insertBillChargeServiceResourceDetailEaStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeServiceResourceReader"
+							writer="insertBillChargeServiceResourceWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_SERVICE_RESOURCE : 서비스 자원  사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillChargeServiceResourceDetailEaStep" next="updateBillChargeServiceResourceForAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillChargeServiceResourceDetailEaReader"
+							processor="insertBillChargeServiceResourceDetailProcessor"
+							writer="insertBillChargeServiceResourceDetailWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_SERVICE_RESOURCE : 서비스 자원 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="updateBillChargeServiceResourceForAmountStep" next="updateBillChargeServiceForAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="updateBillChargeServiceResourceForAmountReader"
+							writer="updateBillChargeServiceResourceForAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_CHARGE_SERVICE : 서비스 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="updateBillChargeServiceForAmountStep" next="insertBillInvoiceProjectDetailForVirtualMachineStep">
+			<batch:tasklet>
+				<batch:chunk reader="updateBillChargeServiceForAmountReader"
+							writer="updateBillChargeServiceForAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		<!--  서비스 끝 -->
+
+
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+		<!-- +++++ 프로젝트별 사용내역 처리 +++++ -->
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 가상서버(AAA0) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForVirtualMachineStep" next="insertBillInvoiceProjectDetailForBasicProductStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForVirtualMachineReader"
+							writer="insertBillInvoiceProjectDetailForVirtualMachineWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 기본상품(AA00) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForBasicProductStep" next="insertBillInvoiceProjectDetailForDiskStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForBasicProductReader"
+							writer="insertBillInvoiceProjectDetailForBasicProductWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : DISK(AEA0) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForDiskStep" next="insertBillInvoiceProjectDetailForAdditionalProductStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForDiskReader"
+							writer="insertBillInvoiceProjectDetailForDiskWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 부가상품(AE00) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForAdditionalProductStep" next="insertBillInvoiceProjectDetailForServiceInsertStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForAdditionalProductReader"
+							writer="insertBillInvoiceProjectDetailForAdditionalProductWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+			<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 서비스(SVS0) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForServiceInsertStep" next="insertBillInvoiceProjectDetailForServiceStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForServiceInsertReader"
+							writer="insertBillInvoiceProjectDetailForServiceInsertWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 서비스(AI00) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForServiceStep" next="insertBillInvoiceProjectDetailForDiscountStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForServiceReader"
+							writer="insertBillInvoiceProjectDetailForServiceWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 프로젝트요금활인(EA00) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForDiscountStep" next="insertBillInvoiceProjectDetailForAdjustmentitemStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForDiscountReader"
+							writer="insertBillInvoiceProjectDetailForDiscountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 보정명칭(IA00) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForAdjustmentitemStep" next="insertBillInvoiceProjectDetailForAdjustmentsumStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForAdjustmentitemReader"
+							writer="insertBillInvoiceProjectDetailForAdjustmentitemWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 보정(I000) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForAdjustmentsumStep" next="insertBillInvoiceProjectDetailForCloudProductStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForAdjustmentsumReader"
+							writer="insertBillInvoiceProjectDetailForAdjustmentsumWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 클라우드상품(A000) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForCloudProductStep" next="insertBillInvoiceProjectDetailForTotalAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForCloudProductReader"
+							writer="insertBillInvoiceProjectDetailForCloudProductWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 프로젝트 총금액(0000) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceProjectDetailForTotalAmountStep" next="updateBillInvoiceProjectDetailForDiscountAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceProjectDetailForTotalAmountReader"
+							writer="insertBillInvoiceProjectDetailForTotalAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 요금할인(E000)  ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="updateBillInvoiceProjectDetailForDiscountAmountStep" next="insertBillInvoiceCustomerDetailStep">
+			<batch:tasklet>
+				<batch:chunk reader="updateBillInvoiceProjectDetailForDiscountAmountReader"
+							writer="updateBillInvoiceProjectDetailForDiscountAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+		<!-- +++++ 회원사 청구서 처리 +++++ -->
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+		<!-- +++++ BILL_INVOICE_CUSTOMER_DETAIL : 회원사 청구 상세 ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceCustomerDetailStep" next="insertBillInvoiceCustomerDetailForVatStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceCustomerDetailReader"
+							writer="insertBillInvoiceCustomerDetailWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_INVOICE_CUSTOMER_DETAIL : 회원사 부과가치세(L000, LA000) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceCustomerDetailForVatStep" next="insertBillInvoiceCustomerDetailForTotalAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceCustomerDetailForVatReader"
+							writer="insertBillInvoiceCustomerDetailForVatWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+		<!-- +++++ BILL_INVOICE_CUSTOMER_DETAIL : 총청구금액(0000), 10원미만절사할인(EL00) ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="insertBillInvoiceCustomerDetailForTotalAmountStep" next="updateBillInvoiceCustomerDetailForDiscountAmountStep">
+			<batch:tasklet>
+				<batch:chunk reader="insertBillInvoiceCustomerDetailForTotalAmountReader"
+							writer="insertBillInvoiceCustomerDetailForTotalAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+		<!-- +++++ BILL_INVOICE_CUSTOMER_DETAIL : 요금할인(E000)  ++++++++++++++++++++++++++++++++++ -->
+ 		<batch:step id="updateBillInvoiceCustomerDetailForDiscountAmountStep" next="endBillMasterStep">
+			<batch:tasklet>
+				<batch:chunk reader="updateBillInvoiceCustomerDetailForDiscountAmountReader"
+							writer="updateBillInvoiceCustomerDetailForDiscountAmountWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+
+
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+		<!-- +++++ 배치작업 종료 +++++ -->
+		<!-- ++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+		<!-- ++++++++ END STEP +++++++++ -->
+    	<batch:step id="endBillMasterStep" next="endJobStep">
+			<batch:tasklet ref="endBillMasterTasklet" />
+		</batch:step>
+
+    	<batch:step id="endJobStep">
+			<batch:tasklet ref="endJobTasklet" />
+		</batch:step>
+
+     </batch:job>
+
+
+
+	<!-- *********************************************************** -->
+	<!-- ********** 변수 선언 ********** -->
+	<!-- *********************************************************** -->
+
+	<!-- 입력변수 -->
+	<util:map id="billingJobParams" key-type="java.lang.String" scope="step" >
+		<entry key="runtime" value="#{jobParameters['runtime']}" />
+		<entry key="billYM" value="#{jobParameters['billYM']}" />
+		<entry key="procUserId" value="#{jobParameters['procUserId']}" />
+		<entry key="runForce" value="#{jobParameters['runForce']}" />
+	</util:map>
+
+	<!-- 스텝간 동적 변수 -->
+	<util:map id="billingStepParams" key-type="java.lang.String" scope="step">
+		<entry key="multiCloudStrList" value="#{jobExecutionContext['multiCloudStrList']}" />
+		<entry key="billYM" value="#{jobExecutionContext['billYM']}" />
+		<entry key="procUserId" value="#{jobExecutionContext['procUserId']}" />
+		<entry key="procUserName" value="#{jobExecutionContext['procUserName']}" />
+		<entry key="runForce" value="#{jobExecutionContext['runForce']}" />
+		<entry key="baseBillStartDate" value="#{jobExecutionContext['baseBillStartDate']}" />
+		<entry key="baseBillEndDate" value="#{jobExecutionContext['baseBillEndDate']}" />
+		<entry key="createDatetime" value="#{jobExecutionContext['createDatetime']}" />
+	</util:map>
+
+
+     <!-- *********************************************************** -->
+     <!-- ********** Bean 선언 ********** -->
+     <!-- *********************************************************** -->
+
+	<!-- +++++++++++++++++++++++++++++++++++++++ -->
+	<bean id="billingJobContextTasklet" class="com.ivucenter.cloud.batch.billing.JobContextTasklet">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingJobParams"/>
+    </bean>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++ -->
+    <bean id="checkBillMasterStatusTasklet" class="com.ivucenter.cloud.batch.billing.CheckBillMasterStatusTasklet">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++ -->
+    <bean id="deleteCurrentBillDateTasklet" class="com.ivucenter.cloud.batch.billing.DeleteCurrentBillDateTasklet">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++ -->
+    <bean id="initBillMasterTasklet" class="com.ivucenter.cloud.batch.billing.InitBillMasterTasklet">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_CUSTOMER : 고객사 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceCustomerReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListCmmCustomer"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceCustomerWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceCustomerWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_PROJECT : 프로젝트 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListOssProject"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_VM : 가상서버 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeVmReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeVm"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeVmWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeVmWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_VM_RESOURCE : 가상서버 자원 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeVmResourceReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeVmResource"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeVmResourceWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeVmResourceWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<!-- +++++ BILL_CHARGE_VM_RESOURCE : 가상서버 자원 CPU 사용요금 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeVmResourceDetailCpuReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeVmResourceCpu"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeVmResourceDetailCpuProcessor" class="com.ivucenter.cloud.batch.billing.InsertBillChargeVmResourceDetailCpuProcessor">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeVmResourceDetailCpuWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeVmResourceDetailCpuWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_VM_RESOURCE : 가상서버 자원 MEMORY 사용요금 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeVmResourceDetailMemReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeVmResourceMem"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeVmResourceDetailMemProcessor" class="com.ivucenter.cloud.batch.billing.InsertBillChargeVmResourceDetailMemProcessor">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeVmResourceDetailMemWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeVmResourceDetailMemWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_VM_RESOURCE : 가상서버 자원 OS DISK 사용요금 등록 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeVmResourceDetailForOsDiskReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillChargeVmResourceDetailForOsDisk"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeVmResourceDetailForOsDiskWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeVmResourceDetailForOsDiskWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ UPDATE BILL_CHARGE_VM_RESOURCE : 가상서버 자원 사용금액 변경  ++++++++++++++++++++++++++++++++++ -->
+    <bean id="updateBillChargeVmResourceForAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillChargeVmResourceForAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="updateBillChargeVmResourceForAmountWriter" class="com.ivucenter.cloud.batch.billing.UpdateBillChargeVmResourceForAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_VM : 가상서버 사용요금 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="updateBillChargeVmForAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillChargeVmForAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="updateBillChargeVmForAmountWriter" class="com.ivucenter.cloud.batch.billing.UpdateBillChargeVmForAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<!-- +++++ BILL_CHARGE_DISK : DISK 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeDiskReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeDisk"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeDiskWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeDiskWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_DISK_RESOURCE : DISK 자원 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeDiskResourceReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeDiskResource"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeDiskResourceWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeDiskResourceWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_DISK_RESOURCE : DISK 자원  GB 사용요금 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeDiskResourceDetailGbReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeDiskResourceGb"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeDiskResourceDetailProcessor" class="com.ivucenter.cloud.batch.billing.InsertBillChargeDiskResourceDetailProcessor">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeDiskResourceDetailWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeDiskResourceDetailWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ UPDATE BILL_CHARGE_Disk_RESOURCE : DISK 자원 사용금액 변경  ++++++++++++++++++++++++++++++++++ -->
+    <bean id="updateBillChargeDiskResourceForAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillChargeDiskResourceForAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="updateBillChargeDiskResourceForAmountWriter" class="com.ivucenter.cloud.batch.billing.UpdateBillChargeDiskResourceForAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_DISK : DISK 사용요금 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="updateBillChargeDiskForAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillChargeDiskForAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="updateBillChargeDiskForAmountWriter" class="com.ivucenter.cloud.batch.billing.UpdateBillChargeDiskForAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+	<!-- 서비스 시작 -->
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<!-- +++++ BILL_CHARGE_SERVICE : SERVICE 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeServiceReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeService"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeServiceWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeServiceWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_SERVICE_RESOURCE : SERVICE 자원 기본정보 등록 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeServiceResourceReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeServiceResource"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeServiceResourceWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeServiceResourceWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_SERVICE_RESOURCE : SERVICE 자원  EA 사용요금 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillChargeServiceResourceDetailEaReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeServiceResourceEa"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeServiceResourceDetailProcessor" class="com.ivucenter.cloud.batch.billing.InsertBillChargeServiceResourceDetailProcessor">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillChargeServiceResourceDetailWriter" class="com.ivucenter.cloud.batch.billing.InsertBillChargeServiceResourceDetailWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ UPDATE BILL_CHARGE_SERVICE_RESOURCE : 서비스 자원 사용금액 변경  ++++++++++++++++++++++++++++++++++ -->
+    <bean id="updateBillChargeServiceResourceForAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillChargeServiceResourceForAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="updateBillChargeServiceResourceForAmountWriter" class="com.ivucenter.cloud.batch.billing.UpdateBillChargeServiceResourceForAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_CHARGE_SERVICE : 서비스 사용요금 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="updateBillChargeServiceForAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillChargeServiceForAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="updateBillChargeServiceForAmountWriter" class="com.ivucenter.cloud.batch.billing.UpdateBillChargeServiceForAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 가상서버(AAA0) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForVirtualMachineReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceProjectDetailForVirtualMachine"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForVirtualMachineWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForVirtualMachineWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 기본상품(AA00) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForBasicProductReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceProjectDetailForBasicProduct"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForBasicProductWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForBasicProductWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 블록디스크(AEA0) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForDiskReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceProjectDetailForDisk"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForDiskWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForDiskWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 부가상품(AE00) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForAdditionalProductReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceProjectDetailForAdditionalProduct"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForAdditionalProductWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForAdditionalProductWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+
+     <!-- 서비스 시작 -->
+    <!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 서비스(SVS0) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForServiceInsertReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceProjectDetailForServiceInsert"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForServiceInsertWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForServiceInsertWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+    <!-- 서비스 끝 -->
+
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 서비스(AI00) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForServiceReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceProjectDetailForService"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForServiceWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForServiceWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 프로젝트 할인(EA00) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForDiscountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeDiscount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+
+    <bean id="insertBillInvoiceProjectDetailForDiscountWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForDiscountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 보정명칭(IA00) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForAdjustmentitemReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeAdjustmentitem"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForAdjustmentitemWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForAdjustmentitemWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 보정(I000) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForAdjustmentsumReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectListChargeAdjustmentsum"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForAdjustmentsumWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForAdjustmentsumWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 클라우드상품(A000) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForCloudProductReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceProjectDetailForCloudProduct"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForCloudProductWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForCloudProductWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 프로젝트 총금액(0000) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceProjectDetailForTotalAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceProjectDetailForTotalAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceProjectDetailForTotalAmountWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceProjectDetailForTotalAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_PROJECT_DETAIL : 요금할인(E000) 수정 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="updateBillInvoiceProjectDetailForDiscountAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceProjectDetailForDiscountAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="updateBillInvoiceProjectDetailForDiscountAmountWriter" class="com.ivucenter.cloud.batch.billing.UpdateBillInvoiceProjectDetailForDiscountAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_CUSTOMER_DETAIL : 회원사 청구 상세 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceCustomerDetailReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectProjectDetailForBillInvoiceCustomerDetail"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceCustomerDetailWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceCustomerDetailWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_CUSTOMER_DETAIL : 회원사 부과가치세(L000, LA000) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceCustomerDetailForVatReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceCustomerDetailForVat"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceCustomerDetailForVatWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceCustomerDetailForVatWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_CUSTOMER_DETAIL : 요금할인(E000) 수정 ++++++++++++++++++++++++++++++++++ -->
+    <bean id="updateBillInvoiceCustomerDetailForDiscountAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceCustomerDetailForDiscountAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="updateBillInvoiceCustomerDetailForDiscountAmountWriter" class="com.ivucenter.cloud.batch.billing.UpdateBillInvoiceCustomerDetailForDiscountAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ BILL_INVOICE_CUSTOMER_DETAIL : 총청구금액(0000), 10원미만절사할인(EL00) ++++++++++++++++++++++++++++++++++ -->
+    <bean id="insertBillInvoiceCustomerDetailForTotalAmountReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.billing.BatchBillingDAO.batchSelectBillInvoiceCustomerDetailForTotalAmount"/>
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="insertBillInvoiceCustomerDetailForTotalAmountWriter" class="com.ivucenter.cloud.batch.billing.InsertBillInvoiceCustomerDetailForTotalAmountWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+	<!-- +++++ END STEP ++++++++++++++++++++++++++++++++++ -->
+
+    <bean id="endBillMasterTasklet" class="com.ivucenter.cloud.batch.billing.EndBillMasterTasklet">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+
+    <bean id="endJobTasklet" class="com.ivucenter.cloud.batch.billing.EndJobTasklet">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+	    <property name="parameterValues" ref="billingStepParams"/>
+    </bean>
+</beans>

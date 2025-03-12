@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.batch.resources.BatchHrSystemDAO">
+
+	<delete id="deleteHrSystem" parameterType="BatchHrSystemVO">
+		DELETE FROM hrsystem_temporary
+	</delete>
+	
+	<select id="selectListHrSystem" parameterType="BatchHrSystemVO" resultType="BatchHrSystemVO">
+		SELECT *
+		FROM hrsystem_temporary
+		WHERE user_id =#{userId}
+	</select>
+	
+	<insert id="insertHrSystem" parameterType="BatchHrSystemVO">
+		INSERT  INTO hrsystem_temporary(
+			user_id,
+			user_name,
+			dept_code,
+			duty_code,
+			duty_name,
+			rank_code,
+			rank_name,
+			user_phone,
+			user_tel,
+			user_mail,
+			reg_user_id,
+			reg_datetime
+		)VALUES(
+			#{userId},
+			#{userName},
+			#{deptCode},
+			#{dutyCode},
+			#{dutyName},
+			#{rankCode},
+			#{rankName},
+			#{userPhone},
+			#{userTel},
+			#{userMail},
+			#{regUserId},
+			NOW()
+		)
+		ON DUPLICATE KEY 
+			UPDATE 
+			user_id = #{userId},
+			user_name = #{userName},
+			dept_code = #{deptCode},
+			duty_code = #{dutyCode},
+			duty_name = #{dutyName},
+			rank_code = #{rankCode},
+			rank_name = #{rankName},
+			user_phone = #{userPhone},
+			user_tel = #{userTel},
+			user_mail = #{userMail},
+			reg_user_id = #{regUserId},
+			reg_datetime = NOW()
+	</insert>	
+	
+	<update  id="updateHrSystem" parameterType="BatchHrSystemVO"  >
+		UPDATE hrsystem_temporary
+		SET 
+			user_name = #{userName},
+			dept_code = #{deptCode},
+			duty_code = #{dutyCode},
+			duty_name = #{dutyName},
+			rank_code = #{rankCode},
+			rank_name = #{rankName},
+			user_phone = #{userPhone},
+			user_tel = #{userTel},
+			user_mail = #{userMail},
+			reg_user_id = #{userMail} ,
+			reg_datetime = 	NOW()
+		WHERE user_id = #{userId}				
+	</update>
+	
+	<select id="selectListCmmUser" parameterType="CmmUserVO" resultType="CmmUserVO">
+		SELECT *
+		FROM cmm_user		
+		where user_id = #{userId}
+	</select>
+	
+	<select id="selectListCmmUserNhis" parameterType="CmmUserVO" resultType="CmmUserVO">
+		SELECT *
+		FROM cmm_user		
+		WHERE customer_id ='NHIS'
+		AND user_id NOT IN ('admin', 'admin1', 'admin2', 'customer1', 'manager1', 'manager2')
+		LIMIT #{_skiprows}, #{_pagesize}
+	</select>
+		
+	
+	<insert id="insertCmmUser" parameterType="CmmUserVO">
+		INSERT  INTO cmm_user(
+			user_id,
+			user_name,
+			user_password,
+			customer_id,
+			user_phone,
+			user_tel,
+			user_mail,
+			sms_recv_flag,
+			pwd_mod_datetime,
+			pwd_init_flag,
+			user_status,
+			user_authority,			
+			reg_user_id,			
+			reg_datetime,
+			del_flag
+		)VALUES(
+			#{userId},
+			#{userName},
+			#{userPassword},
+			#{customerId},
+			#{userPhone},
+			#{userTel},
+			#{userMail},
+			#{smsRecvFlag},
+			#{pwdModDatetime},
+			#{pwdInitFlag},
+			#{userStatus},
+			#{userAuthority},			
+			#{regUserId},
+			NOW(),
+			#{delFlag}
+		)
+		ON DUPLICATE KEY 
+			UPDATE 
+			user_id = #{userId},
+			user_name = #{userName},
+			user_password = #{userPassword},
+			customer_id = #{customerId},
+			user_phone = #{userPhone},
+			user_tel = #{userTel},
+			user_mail = #{userMail},
+			sms_recv_flag = #{smsRecvFlag},
+			pwd_mod_datetime = #{pwdModDatetime},
+			pwd_init_flag = #{pwdInitFlag},
+			user_status = #{userStatus},
+			user_authority = #{userAuthority},
+			reg_user_id = #{regUserId},
+			reg_datetime = NOW(),
+			del_flag = #{delFlag}
+	</insert>		
+	
+	<update  id="updateCmmUser" parameterType="CmmUserVO"  >
+		UPDATE cmm_user
+		SET 
+			user_name = #{userName},
+			user_phone = #{userPhone},
+			user_tel = #{userTel},
+			user_mail = #{userMail},
+			reg_user_id = #{regUserId},			
+			reg_datetime = NOW(),
+			del_flag = #{delFlag}	
+		WHERE user_id = #{userId}				
+	</update>
+	
+	<update  id="updateCmmUserRetirement" parameterType="CmmUserVO"  >
+		UPDATE cmm_user
+		SET 
+			del_flag = #{delFlag},
+			mod_user_id = #{modUserId},			
+			mod_datetime = NOW()				
+		WHERE user_id = #{userId}				
+	</update>
+	
+			
+</mapper>

@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.persistentvolume.OssPvDAO">
+
+    <select id="list" parameterType="CustomOssPvVO" resultType="CustomOssPvVO">
+		SELECT
+			TOT.*
+		FROM
+		(
+			SELECT
+				  CU2.user_name AS reg_user_name
+			    , CC.customer_name AS project_customer_name
+			    , TRIM(CD.dept_name) AS dept_name
+			    , CU.user_id AS manager_id
+			    , CU.user_name AS manager_name
+			    , CU.user_tel AS manager_tel
+			    , CU.user_tel_ex AS manager_tel_ex
+			    , CU.user_phone AS manager_phone
+			    , SUM(IFNULL(OA.pv_cnt, 0)) AS pv_cnt
+			    , OP.project_box_id
+			    , OP.project_name
+			    , OP.project_alias
+			    , OP.delete_flag
+			    , OP.program_seq
+			    , OPJ.project_id
+			    , OPJ.cloud_id
+			    , IFNULL(CD2.dept_name,'-') AS dept_name2
+			FROM
+				oss_project_box OP
+			INNER JOIN
+				oss_project OPJ
+				ON OP.project_box_id = OPJ.project_box_id
+			INNER JOIN
+				oss_project_manager OPM
+				ON OP.project_box_id = OPM.project_id
+			 LEFT JOIN
+			 	cmm_user CU
+			 	ON OPM.manager_id=CU.user_id
+			 LEFT JOIN
+			 	cmm_user CU2
+			 	ON OP.reg_user_id=CU2.user_id
+			 LEFT JOIN
+			 	cmm_customer CC
+			 	ON OP.customer_id = CC.customer_id
+			 LEFT JOIN
+			 	cmm_department CD
+			 	ON OP.dept_code = CD.dept_code
+			 LEFT JOIN
+			 	(SELECT project_id, COUNT(*) AS pv_cnt FROM oss_nas onas INNER JOIN oss_nas_app ona ON onas.nas_id = ona.nas_id WHERE ona.del_flag = 'N' AND nas_type ='PV'  GROUP BY project_id ) OA
+			 	ON OPJ.project_id = OA.project_id
+			 LEFT JOIN (
+		 					SELECT dept_code
+								 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+								 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+			WHERE OP.delete_flag != 'Y'
+			 GROUP BY OP.project_box_id, OPM.manager_id
+		) TOT
+		WHERE
+			1=1
+			<if test="userId != 'admin' ">
+			AND (TOT.manager_id = #{userId} OR TOT.project_manager_id = #{userId})
+			</if>
+
+    		<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			TOT.project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_alias like CONCAT('%',#{keyword},'%')
+    			)
+    		</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				TOT.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				TOT.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		GROUP BY TOT.project_box_id
+		<if test="!length.equals(0)">
+		LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="nasList" parameterType="CustomOssPvVO" resultType="CustomOssPvVO">
+		SELECT
+			onas.*
+			, op.project_alias
+			, DATE_FORMAT(onas.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+			, DATE_FORMAT(onas.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+			, oc.cloud_type AS cloud_type
+			, oc.cloud_id AS cloud_id
+			, oc.cloud_name AS cloud_name
+			, bop.amount
+			, nasvm.nas_vm_list
+			, nasvm.hostname_alias
+			, nasvm.nas_vm_server
+			, nasvm.nas_vm_ip
+			, op.env_type
+		FROM oss_nas onas
+		LEFT OUTER JOIN bss_order_product bop
+		ON onas.order_product_seq = bop.order_product_seq
+
+		LEFT OUTER JOIN	(
+			select		ORDNASVMSUB.nas_vm_server as nas_vm_list
+					,   ORDNASVMSUB.order_product_seq
+					, 	OVLIST.hostname_alias
+					, ORDNASVMSUB.nas_vm_server
+					, ORDNASVMSUB.nas_vm_ip
+			from		bss_order_product_nas_vm ORDNASVMSUB
+			LEFT JOIN oss_vm OVLIST
+				ON		ORDNASVMSUB.vm_uuid = OVLIST.vm_uuid
+			LEFT JOIN bss_order_product PRD
+				ON		ORDNASVMSUB.order_product_seq = PRD.order_product_seq
+			 ) nasvm
+		ON nasvm.order_product_seq = onas.order_product_seq
+
+		INNER JOIN oss_project op
+		ON onas.project_id = op.project_id
+
+		INNER JOIN oss_cloud oc
+		ON op.cloud_id = oc.cloud_id
+
+		WHERE 1=1
+		AND op.project_box_id = #{projectBoxId}
+		AND onas.del_flag = 'N'
+		AND onas.nas_type ='PV'
+		<if test="searchKind == 'searchAll' and keyword != ''">
+    		AND (
+    			nas_alias  like CONCAT('%',#{keyword},'%')
+    			OR
+    			nas_name  like CONCAT('%',#{keyword},'%')
+    			)
+    		</if>
+    		<if test="searchKind != 'searchAll' and keyword != '' ">
+			AND ${searchKind} like CONCAT('%',#{keyword},'%')
+		</if>
+		ORDER BY
+			onas.nas_alias asc
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="pvDetachList" parameterType="CustomOssPvVO" resultType="CustomOssPvVO">
+			SELECT
+				onas.nas_id,
+				onas.project_id,
+				op.project_name,
+				onas.nas_name,
+				onas.nas_alias,
+				onas.nas_gb,
+				onas.nas_file_system_path,
+				onas.pv_name,
+				onas.pvc_name,
+				onas.connect_status,
+				ona.app_uid,
+				ona.mount_path,
+				oa.app_name,
+				oa.app_name_space
+			FROM
+				oss_nas onas
+				LEFT JOIN oss_nas_app ona ON onas.nas_id = ona.nas_id
+				INNER JOIN oss_app oa ON ona.app_uid = oa.app_uid
+				LEFT JOIN oss_project op ON onas.project_id = op.project_id
+			WHERE onas.nas_id = #{nasId}
+	</select>
+
+	<insert id="insertOssNasApp" parameterType="CustomReqProductVO">
+
+		INSERT INTO oss_nas_app (
+			nas_id,
+			app_uid,
+			mount_path,
+			order_product_seq,
+			reg_datetime,
+			reg_user_id,
+			mod_datetime,
+			mod_user_id,
+			del_flag
+		)
+		VALUES(
+			#{nasId},
+			#{appUid},
+			#{mountPath},
+			#{orderProductSeq},
+			#{regDatetime},
+			#{regUserId},
+			#{modDatetime},
+			#{modUserId},
+			'N'
+		)
+
+	</insert>
+    <update id="updateAppPvc" parameterType="CustomOssPvVO">
+        UPDATE oss_app SET
+			pvc_yn = #{pvcYn}
+        WHERE app_uid = #{appUid}
+    </update>
+
+    <update id="pvcStatusUpdate" parameterType="CustomOssPvVO">
+        UPDATE oss_nas SET
+			connect_status	= #{connectStatus}
+        WHERE pvc_name = #{pvcName}
+    </update>
+
+    <update id="pvcPathUpdate" parameterType="CustomOssPvVO">
+        UPDATE oss_nas_app SET
+			mount_path	= #{mountPath}
+        WHERE nas_id = #{nasId}
+    </update>
+
+     <update id="deleteNasApp" parameterType="CustomOssPvVO">
+        DELETE FROM oss_nas_app
+		WHERE
+			nas_id = #{nasId}
+		AND
+			app_uid = #{appUid}
+   	 </update>
+
+</mapper>

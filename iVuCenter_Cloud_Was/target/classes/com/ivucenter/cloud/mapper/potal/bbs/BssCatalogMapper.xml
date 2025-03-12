@@ -1,0 +1,3166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bss.catalog.BssCatalogDAO">
+
+	<!-- 진열상품(카탈로그) 관리 -> 목록 -->
+    <select id="list" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+		SELECT
+			BC.catalog_seq
+			,BC.catalog_name
+			,BC.apply_date
+			,BC.reg_user_id
+			,(SELECT CU.user_name FROM cmm_user CU WHERE CU.user_id = BC.reg_user_id) AS user_name
+			,BC.mod_user_id
+			,BC.del_flag
+			,DATE_FORMAT(BC.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+			,DATE_FORMAT(BC.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime
+			,IF(n.flag = 'NOW', 'Y', 'N') AS active
+		FROM
+			bss_product_catalog BC
+
+			 LEFT JOIN (
+				SELECT
+				         apply_date,
+						 catalog_seq,
+						 'NOW' AS flag
+				FROM bss_product_catalog
+
+				WHERE  apply_date  <![CDATA[<=]]> NOW()
+				AND del_flag ='N'
+            ORDER BY apply_date DESC LIMIT 0,1
+        ) n
+            	ON BC.catalog_seq = n.catalog_seq
+
+		WHERE
+			1=1
+			AND BC.del_flag <![CDATA[<>]]>	'Y'
+			<!-- <if test="cloudKind != 'ALL' and cloudKind != ''">
+			AND BC.cloud_id = #{cloudKind}
+			</if> -->
+
+
+	 		<if test="searchKind == 'sCatalogName' and keyword != ''">
+			AND BC.catalog_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'sApplyDate' and keyword != ''">
+			AND DATE_FORMAT(BC.apply_date, '%Y-%m-%d') like CONCAT('%',#{keyword},'%')
+			</if>
+
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			AND
+			(
+				BC.catalog_name like CONCAT('%',#{keyword},'%')
+				OR
+				DATE_FORMAT(BC.apply_date, '%Y-%m-%d') like CONCAT('%',#{keyword},'%')
+			)
+			</if>
+
+		ORDER BY
+			BC.apply_date DESC
+
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+
+	</select>
+
+ 	<select id="listTot" resultType="Int" parameterType="CustomBssCatalogVO">
+		SELECT
+			count(*)
+	 	FROM
+		 	bss_product_catalog
+    </select>
+
+  	 <!-- 카탈로그 상세 탭 가상서버 리스트-->
+    <select id="getCatalogueProductList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+    <![CDATA[
+		SELECT
+			CAPR.catalog_seq,
+			CAPR.catalog_category,
+			CD.code_name AS catalog_category_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.display_name,
+			CAPR.display_flag,
+			CAPR.recommand_flag,
+		 	(SELECT CONCAT(CF.file_path,CF.file_id) FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_path,
+ 			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_name,
+		 	CAPR.description,
+		 	CAPR.display_order,
+		 	PROD.product_category,
+		 	/*가상서버 시작*/
+		 	PROD.vcpus, 		-- vcpu
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_quantity ELSE 0 END AS cpu_quantity ,			-- vpcu 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_hourly_price ELSE 0 END AS cpu_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_monthly_price ELSE 0 END AS cpu_monthly_price ,		-- 월 단위 금액
+		 	PROD.mem_gb,		-- 메모리
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_quantity ELSE 0 END AS mem_quantity ,			-- mem 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_hourly_price ELSE 0 END AS mem_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_monthly_price ELSE 0 END AS mem_monthly_price ,		-- 월 단위 금액
+		 	PROD.vm_disk_gb,	-- 디스크
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_quantity ELSE 0 END AS vm_disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_hourly_price ELSE 0 END AS vm_disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_monthly_price ELSE 0 END AS vm_disk_monthly_price ,	-- 월 단위 금액
+		 	/*가상서버 끝*/
+
+		 	/*블록 디스크 시작*/
+		 	PROD.disk_gb,	-- 블록 디스크 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_quantity ELSE 0 END AS disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_hourly_price ELSE 0 END AS disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_monthly_price ELSE 0 END AS disk_monthly_price ,	-- 월 단위 금액
+		 	/*블록 디스크  끝*/
+
+		 	/*NAS 디스크 시작*/
+		 	PROD.nas_gb,	-- NAS 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_quantity ELSE 0 END AS nas_quantity ,			-- NAS 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_hourly_price ELSE 0 END AS nas_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_monthly_price ELSE 0 END AS nas_monthly_price ,		-- 월 단위 금액
+		 	/*NAS 디스크  끝*/
+
+		 	/*로드밸런서 시작*/
+		 	PROD.loadbalancer_ea,	-- 로드 밸런서 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_quantity ELSE 0 END AS loadbalancer_quantity ,			-- 로드밸런서 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_hourly_price ELSE 0 END AS loadbalancer_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_monthly_price ELSE 0 END AS loadbalancer_monthly_price ,	-- 월 단위 금액
+		 	/*N로드밸런서  끝*/
+
+		 	/*공인IP 시작*/
+		 	PROD.publicip_ea,	-- 공인 IP 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_quantity ELSE 0 END AS publicip_quantity ,			-- 공인IP 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_hourly_price ELSE 0 END AS publicip_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_monthly_price ELSE 0 END AS publicip_monthly_price ,		-- 월 단위 금액
+		 	/*공인IP 끝*/
+
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_hourly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_hourly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_hourly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_hourly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_hourly_price
+		 	ELSE 0 END AS hourly_price,
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_monthly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_monthly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_monthly_price
+		 	ELSE 0 END AS monthly_price
+
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			cmm_code CD,
+			(
+				/* 상품 구성 */
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		-- 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		-- 블록 디스크
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_nas NAS		-- NAS
+				 ON PROD.product_seq = NAS.product_seq
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	-- 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq
+				 LEFT OUTER JOIN bss_product_publicip IP	-- 공인IP
+				 ON PROD.product_seq = IP.product_seq
+				 WHERE PROD.del_flag = 'N'
+
+			) PROD,
+			( /* 가격표 */
+				SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.hourly_price ELSE 0 END) cpu_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.hourly_price ELSE 0 END) mem_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) disk_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.hourly_price ELSE 0 END) nas_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.monthly_price ELSE 0 END) nas_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN ITEM.quantity ELSE 0 END) nas_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.hourly_price ELSE 0 END) loadbalancer_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.monthly_price ELSE 0 END) loadbalancer_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN ITEM.quantity ELSE 0 END) loadbalancer_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.hourly_price ELSE 0 END) publicip_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.monthly_price ELSE 0 END) publicip_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN ITEM.quantity ELSE 0 END) publicip_quantity
+
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN ('CPU010', 'MEM010', 'DISK010', 'NAS010', 'LOADBALANCER010','PUBLICIP010')
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+			) PRIC
+
+		WHERE	CATA.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bss_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.product_seq = PROD.product_seq
+		AND CAPR.catalog_category = CD.code_id
+		AND CD.code_key_id = 'CATALOG_CATEGORY'
+		AND CAPR.catalog_category ='CATACATE_VM'
+		AND CAPR.catalog_seq = #{catalogSeq}
+		AND CAPR.del_flag = 'N'
+		ORDER BY CAPR.catalog_category, CAPR.display_order
+	]]>
+  	</select>
+
+ 	 <!--  카탈로그 상세 탭 OS 리스트-->
+    <select id="getCatalogueProductOsList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+    <![CDATA[
+		SELECT
+			CAPR.catalog_seq,
+			CAPR.catalog_category,
+			CD.code_name AS catalog_category_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.display_name,
+			CAPR.display_flag,
+			CAPR.recommand_flag,
+		 	(SELECT CONCAT(CF.file_path,CF.file_id) FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_path,
+ 			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_name,
+		 	CAPR.description,
+		 	CAPR.display_order,
+		 	PROD.product_seq,
+		 	PROD.product_category,
+		 	/*가상서버 시작*/
+		 	PROD.vcpus, 		-- vcpu
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_quantity ELSE 0 END AS cpu_quantity ,			-- vpcu 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_hourly_price ELSE 0 END AS cpu_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_monthly_price ELSE 0 END AS cpu_monthly_price ,		-- 월 단위 금액
+		 	PROD.mem_gb,		-- 메모리
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_quantity ELSE 0 END AS mem_quantity ,			-- mem 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_hourly_price ELSE 0 END AS mem_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_monthly_price ELSE 0 END AS mem_monthly_price ,		-- 월 단위 금액
+		 	PROD.vm_disk_gb,	-- 디스크
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_quantity ELSE 0 END AS vm_disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_hourly_price ELSE 0 END AS vm_disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_monthly_price ELSE 0 END AS vm_disk_monthly_price ,	-- 월 단위 금액
+		 	/*가상서버 끝*/
+
+		 	/*블록 디스크 시작*/
+		 	PROD.disk_gb,	-- 블록 디스크 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_quantity ELSE 0 END AS disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_hourly_price ELSE 0 END AS disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_monthly_price ELSE 0 END AS disk_monthly_price ,	-- 월 단위 금액
+		 	/*블록 디스크  끝*/
+
+		 	/*NAS 디스크 시작*/
+		 	PROD.nas_gb,	-- NAS 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_quantity ELSE 0 END AS nas_quantity ,			-- NAS 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_hourly_price ELSE 0 END AS nas_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_monthly_price ELSE 0 END AS nas_monthly_price ,		-- 월 단위 금액
+		 	/*NAS 디스크  끝*/
+
+		 	/*로드밸런서 시작*/
+		 	PROD.loadbalancer_ea,	-- 로드 밸런서 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_quantity ELSE 0 END AS loadbalancer_quantity ,			-- 로드밸런서 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_hourly_price ELSE 0 END AS loadbalancer_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_monthly_price ELSE 0 END AS loadbalancer_monthly_price ,	-- 월 단위 금액
+		 	/*N로드밸런서  끝*/
+
+		 	/*공인IP 시작*/
+		 	PROD.publicip_ea,	-- 공인 IP 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_quantity ELSE 0 END AS publicip_quantity ,			-- 공인IP 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_hourly_price ELSE 0 END AS publicip_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_monthly_price ELSE 0 END AS publicip_monthly_price ,		-- 월 단위 금액
+		 	/*공인IP 끝*/
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_hourly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_hourly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_hourly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_hourly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_hourly_price
+		 	ELSE 0 END AS hourly_price,
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_monthly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_monthly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_monthly_price
+		 	ELSE 0 END AS monthly_price
+
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			cmm_code CD,
+			(
+				/* 상품 구성 */
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		-- 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		-- 블록 디스크
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_nas NAS		-- NAS
+				 ON PROD.product_seq = NAS.product_seq
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	-- 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq
+				 LEFT OUTER JOIN bss_product_publicip IP	-- 공인IP
+				 ON PROD.product_seq = IP.product_seq
+				 WHERE PROD.del_flag = 'N'
+
+			) PROD,
+			( /* 가격표 */
+				SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.hourly_price ELSE 0 END) cpu_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.hourly_price ELSE 0 END) mem_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) disk_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.hourly_price ELSE 0 END) nas_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.monthly_price ELSE 0 END) nas_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN ITEM.quantity ELSE 0 END) nas_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.hourly_price ELSE 0 END) loadbalancer_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.monthly_price ELSE 0 END) loadbalancer_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN ITEM.quantity ELSE 0 END) loadbalancer_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.hourly_price ELSE 0 END) publicip_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.monthly_price ELSE 0 END) publicip_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN ITEM.quantity ELSE 0 END) publicip_quantity
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN ('CPU010', 'MEM010', 'DISK010', 'NAS010', 'LOADBALANCER010','PUBLICIP010')
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+			) PRIC
+
+		WHERE	CATA.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bss_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.product_seq = PROD.product_seq
+		AND CAPR.catalog_category = CD.code_id
+		AND CD.code_key_id = 'CATALOG_CATEGORY'
+		AND CAPR.catalog_category ='CATACATE_OS'
+		AND CAPR.catalog_seq = #{catalogSeq}
+		AND CAPR.del_flag = 'N'
+		ORDER BY CAPR.catalog_category, CAPR.display_order
+	]]>
+  	</select>
+	 <!-- 카탈로그 상세 탭 블록디스크 리스트-->
+    <select id="getCatalogueProductDiskList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+    <![CDATA[
+		SELECT
+			CAPR.catalog_seq,
+			CAPR.catalog_category,
+			CD.code_name AS catalog_category_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.display_name,
+			CAPR.display_flag,
+			CAPR.recommand_flag,
+		 	(SELECT CONCAT(CF.file_path,CF.file_id) FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_path,
+ 			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_name,
+		 	CAPR.description,
+		 	CAPR.display_order,
+		 	PROD.product_seq,
+		 	PROD.product_category,
+		 	/*가상서버 시작*/
+		 	PROD.vcpus, 		-- vcpu
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_quantity ELSE 0 END AS cpu_quantity ,			-- vpcu 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_hourly_price ELSE 0 END AS cpu_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_monthly_price ELSE 0 END AS cpu_monthly_price ,		-- 월 단위 금액
+		 	PROD.mem_gb,		-- 메모리
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_quantity ELSE 0 END AS mem_quantity ,			-- mem 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_hourly_price ELSE 0 END AS mem_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_monthly_price ELSE 0 END AS mem_monthly_price ,		-- 월 단위 금액
+		 	PROD.vm_disk_gb,	-- 디스크
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_quantity ELSE 0 END AS vm_disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_hourly_price ELSE 0 END AS vm_disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_monthly_price ELSE 0 END AS vm_disk_monthly_price ,	-- 월 단위 금액
+		 	/*가상서버 끝*/
+
+		 	/*블록 디스크 시작*/
+		 	PROD.disk_gb,	-- 블록 디스크 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_quantity ELSE 0 END AS disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_hourly_price ELSE 0 END AS disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_monthly_price ELSE 0 END AS disk_monthly_price ,	-- 월 단위 금액
+		 	/*블록 디스크  끝*/
+
+		 	/*NAS 디스크 시작*/
+		 	PROD.nas_gb,	-- NAS 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_quantity ELSE 0 END AS nas_quantity ,			-- NAS 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_hourly_price ELSE 0 END AS nas_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_monthly_price ELSE 0 END AS nas_monthly_price ,		-- 월 단위 금액
+		 	/*NAS 디스크  끝*/
+
+		 	/*로드밸런서 시작*/
+		 	PROD.loadbalancer_ea,	-- 로드 밸런서 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_quantity ELSE 0 END AS loadbalancer_quantity ,			-- 로드밸런서 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_hourly_price ELSE 0 END AS loadbalancer_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_monthly_price ELSE 0 END AS loadbalancer_monthly_price ,	-- 월 단위 금액
+		 	/*N로드밸런서  끝*/
+
+		 	/*공인IP 시작*/
+		 	PROD.publicip_ea,	-- 공인 IP 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_quantity ELSE 0 END AS publicip_quantity ,			-- 공인IP 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_hourly_price ELSE 0 END AS publicip_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_monthly_price ELSE 0 END AS publicip_monthly_price ,		-- 월 단위 금액
+		 	/*공인IP 끝*/
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_hourly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_hourly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_hourly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_hourly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_hourly_price
+		 	ELSE 0 END AS hourly_price,
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_monthly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_monthly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_monthly_price
+		 	ELSE 0 END AS monthly_price
+
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			cmm_code CD,
+			(
+				/* 상품 구성 */
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		-- 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		-- 블록 디스크
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_nas NAS		-- NAS
+				 ON PROD.product_seq = NAS.product_seq
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	-- 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq
+				 LEFT OUTER JOIN bss_product_publicip IP	-- 공인IP
+				 ON PROD.product_seq = IP.product_seq
+				 WHERE PROD.del_flag = 'N'
+
+			) PROD,
+			( /* 가격표 */
+				SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.hourly_price ELSE 0 END) cpu_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.hourly_price ELSE 0 END) mem_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) disk_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.hourly_price ELSE 0 END) nas_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.monthly_price ELSE 0 END) nas_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN ITEM.quantity ELSE 0 END) nas_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.hourly_price ELSE 0 END) loadbalancer_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.monthly_price ELSE 0 END) loadbalancer_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN ITEM.quantity ELSE 0 END) loadbalancer_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.hourly_price ELSE 0 END) publicip_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.monthly_price ELSE 0 END) publicip_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN ITEM.quantity ELSE 0 END) publicip_quantity
+
+
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN ('CPU010', 'MEM010', 'DISK010', 'NAS010', 'LOADBALANCER010','PUBLICIP010')
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+			) PRIC
+
+		WHERE	CATA.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bss_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.product_seq = PROD.product_seq
+		AND CAPR.catalog_category = CD.code_id
+		AND CD.code_key_id = 'CATALOG_CATEGORY'
+		AND CAPR.catalog_category ='CATACATE_DISK'
+		AND CAPR.catalog_seq = #{catalogSeq}
+		AND CAPR.del_flag = 'N'
+		ORDER BY CAPR.catalog_category, CAPR.display_order
+	]]>
+  	</select>
+  	<!-- 카탈로그 상세 탭 NAS 리스트-->
+  	<select id="getCatalogueProductNasList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+    <![CDATA[
+		SELECT
+			CAPR.catalog_seq,
+			CAPR.catalog_category,
+			CD.code_name AS catalog_category_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.display_name,
+			CAPR.display_flag,
+			CAPR.recommand_flag,
+		 	(SELECT CONCAT(CF.file_path,CF.file_id) FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_path,
+ 			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_name,
+		 	CAPR.description,
+		 	CAPR.display_order,
+		 	PROD.product_seq,
+		 	PROD.product_category,
+		 	/*가상서버 시작*/
+		 	PROD.vcpus, 		-- vcpu
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_quantity ELSE 0 END AS cpu_quantity ,			-- vpcu 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_hourly_price ELSE 0 END AS cpu_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_monthly_price ELSE 0 END AS cpu_monthly_price ,		-- 월 단위 금액
+		 	PROD.mem_gb,		-- 메모리
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_quantity ELSE 0 END AS mem_quantity ,			-- mem 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_hourly_price ELSE 0 END AS mem_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_monthly_price ELSE 0 END AS mem_monthly_price ,		-- 월 단위 금액
+		 	PROD.vm_disk_gb,	-- 디스크
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_quantity ELSE 0 END AS vm_disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_hourly_price ELSE 0 END AS vm_disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_monthly_price ELSE 0 END AS vm_disk_monthly_price ,	-- 월 단위 금액
+		 	/*가상서버 끝*/
+
+		 	/*블록 디스크 시작*/
+		 	PROD.disk_gb,	-- 블록 디스크 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_quantity ELSE 0 END AS disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_hourly_price ELSE 0 END AS disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_monthly_price ELSE 0 END AS disk_monthly_price ,	-- 월 단위 금액
+		 	/*블록 디스크  끝*/
+
+		 	/*NAS 디스크 시작*/
+		 	PROD.nas_gb,	-- NAS 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_quantity ELSE 0 END AS nas_quantity ,			-- NAS 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_hourly_price ELSE 0 END AS nas_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_monthly_price ELSE 0 END AS nas_monthly_price ,		-- 월 단위 금액
+		 	/*NAS 디스크  끝*/
+
+		 	/*로드밸런서 시작*/
+		 	PROD.loadbalancer_ea,	-- 로드 밸런서 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_quantity ELSE 0 END AS loadbalancer_quantity ,			-- 로드밸런서 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_hourly_price ELSE 0 END AS loadbalancer_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_monthly_price ELSE 0 END AS loadbalancer_monthly_price ,	-- 월 단위 금액
+		 	/*N로드밸런서  끝*/
+
+		 	/*공인IP 시작*/
+		 	PROD.publicip_ea,	-- 공인 IP 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_quantity ELSE 0 END AS publicip_quantity ,			-- 공인IP 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_hourly_price ELSE 0 END AS publicip_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_monthly_price ELSE 0 END AS publicip_monthly_price ,		-- 월 단위 금액
+		 	/*공인IP 끝*/
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_hourly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_hourly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_hourly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_hourly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_hourly_price
+		 	ELSE 0 END AS hourly_price,
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_monthly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_monthly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_monthly_price
+		 	ELSE 0 END AS monthly_price
+
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			cmm_code CD,
+			(
+				/* 상품 구성 */
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		-- 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		-- 블록 디스크
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_nas NAS		-- NAS
+				 ON PROD.product_seq = NAS.product_seq
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	-- 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq
+				 LEFT OUTER JOIN bss_product_publicip IP	-- 공인IP
+				 ON PROD.product_seq = IP.product_seq
+				 WHERE PROD.del_flag = 'N'
+
+			) PROD,
+			( /* 가격표 */
+				SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.hourly_price ELSE 0 END) cpu_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.hourly_price ELSE 0 END) mem_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) disk_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.hourly_price ELSE 0 END) nas_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.monthly_price ELSE 0 END) nas_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN ITEM.quantity ELSE 0 END) nas_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.hourly_price ELSE 0 END) loadbalancer_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.monthly_price ELSE 0 END) loadbalancer_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN ITEM.quantity ELSE 0 END) loadbalancer_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.hourly_price ELSE 0 END) publicip_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.monthly_price ELSE 0 END) publicip_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN ITEM.quantity ELSE 0 END) publicip_quantity
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN ('CPU010', 'MEM010', 'DISK010', 'NAS010', 'LOADBALANCER010','PUBLICIP010')
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+			) PRIC
+
+		WHERE	CATA.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bss_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.product_seq = PROD.product_seq
+		AND CAPR.catalog_category = CD.code_id
+		AND CD.code_key_id = 'CATALOG_CATEGORY'
+		AND CAPR.catalog_category ='CATACATE_NAS'
+		AND CAPR.catalog_seq = #{catalogSeq}
+		AND CAPR.del_flag = 'N'
+		ORDER BY CAPR.catalog_category, CAPR.display_order
+	]]>
+  	</select>
+
+  	<!-- 카탈로그 상세 탭 공인IP 리스트-->
+  	<select id="getCatalogueProductPublicIpList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+    <![CDATA[
+		SELECT
+			CAPR.catalog_seq,
+			CAPR.catalog_category,
+			CD.code_name AS catalog_category_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.display_name,
+			CAPR.display_flag,
+			CAPR.recommand_flag,
+		 	(SELECT CONCAT(CF.file_path,CF.file_id) FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_path,
+ 			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_name,
+		 	CAPR.description,
+		 	CAPR.display_order,
+		 	PROD.product_seq,
+		 	PROD.product_category,
+		 	/*가상서버 시작*/
+		 	PROD.vcpus, 		-- vcpu
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_quantity ELSE 0 END AS cpu_quantity ,			-- vpcu 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_hourly_price ELSE 0 END AS cpu_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_monthly_price ELSE 0 END AS cpu_monthly_price ,		-- 월 단위 금액
+		 	PROD.mem_gb,		-- 메모리
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_quantity ELSE 0 END AS mem_quantity ,			-- mem 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_hourly_price ELSE 0 END AS mem_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_monthly_price ELSE 0 END AS mem_monthly_price ,		-- 월 단위 금액
+		 	PROD.vm_disk_gb,	-- 디스크
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_quantity ELSE 0 END AS vm_disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_hourly_price ELSE 0 END AS vm_disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_monthly_price ELSE 0 END AS vm_disk_monthly_price ,	-- 월 단위 금액
+		 	/*가상서버 끝*/
+
+		 	/*블록 디스크 시작*/
+		 	PROD.disk_gb,	-- 블록 디스크 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_quantity ELSE 0 END AS disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_hourly_price ELSE 0 END AS disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_monthly_price ELSE 0 END AS disk_monthly_price ,	-- 월 단위 금액
+		 	/*블록 디스크  끝*/
+
+		 	/*NAS 디스크 시작*/
+		 	PROD.nas_gb,	-- NAS 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_quantity ELSE 0 END AS nas_quantity ,			-- NAS 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_hourly_price ELSE 0 END AS nas_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_monthly_price ELSE 0 END AS nas_monthly_price ,		-- 월 단위 금액
+		 	/*NAS 디스크  끝*/
+
+		 	/*로드밸런서 시작*/
+		 	PROD.loadbalancer_ea,	-- 로드 밸런서 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_quantity ELSE 0 END AS loadbalancer_quantity ,			-- 로드밸런서 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_hourly_price ELSE 0 END AS loadbalancer_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_monthly_price ELSE 0 END AS loadbalancer_monthly_price ,	-- 월 단위 금액
+		 	/*N로드밸런서  끝*/
+
+		 	/*공인IP 시작*/
+		 	PROD.publicip_ea,	-- 공인 IP 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_quantity ELSE 0 END AS publicip_quantity ,			-- 공인IP 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_hourly_price ELSE 0 END AS publicip_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_monthly_price ELSE 0 END AS publicip_monthly_price ,		-- 월 단위 금액
+		 	/*공인IP 끝*/
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_hourly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_hourly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_hourly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_hourly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_hourly_price
+		 	ELSE 0 END AS hourly_price,
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_monthly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_monthly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_monthly_price
+		 	ELSE 0 END AS monthly_price
+
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			cmm_code CD,
+			(
+				/* 상품 구성 */
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		-- 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		-- 블록 디스크
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_nas NAS		-- NAS
+				 ON PROD.product_seq = NAS.product_seq
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	-- 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq
+				 LEFT OUTER JOIN bss_product_publicip IP	-- 공인IP
+				 ON PROD.product_seq = IP.product_seq
+				 WHERE PROD.del_flag = 'N'
+
+			) PROD,
+			( /* 가격표 */
+				SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.hourly_price ELSE 0 END) cpu_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.hourly_price ELSE 0 END) mem_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) disk_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.hourly_price ELSE 0 END) nas_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.monthly_price ELSE 0 END) nas_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN ITEM.quantity ELSE 0 END) nas_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.hourly_price ELSE 0 END) loadbalancer_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.monthly_price ELSE 0 END) loadbalancer_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN ITEM.quantity ELSE 0 END) loadbalancer_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.hourly_price ELSE 0 END) publicip_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.monthly_price ELSE 0 END) publicip_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN ITEM.quantity ELSE 0 END) publicip_quantity
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN ('CPU010', 'MEM010', 'DISK010', 'NAS010', 'LOADBALANCER010','PUBLICIP010')
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+			) PRIC
+
+		WHERE	CATA.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bss_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.product_seq = PROD.product_seq
+		AND CAPR.catalog_category = CD.code_id
+		AND CD.code_key_id = 'CATALOG_CATEGORY'
+		AND CAPR.catalog_category ='CATACATE_PUBLICIP'
+		AND CAPR.catalog_seq = #{catalogSeq}
+		AND CAPR.del_flag = 'N'
+		ORDER BY CAPR.catalog_category, CAPR.display_order
+	]]>
+  	</select>
+
+  	<!-- 카탈로그 상세 탭 로드밸런서 리스트-->
+  	<select id="getCatalogueProductLbList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+    <![CDATA[
+		SELECT
+			CAPR.catalog_seq,
+			CAPR.catalog_category,
+			CD.code_name AS catalog_category_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.display_name,
+			CAPR.display_flag,
+			CAPR.recommand_flag,
+		 	(SELECT CONCAT(CF.file_path,CF.file_id) FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_path,
+ 			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_name,
+		 	CAPR.description,
+		 	CAPR.display_order,
+		 	PROD.product_seq,
+		 	PROD.product_category,
+		 	/*가상서버 시작*/
+		 	PROD.vcpus, 		-- vcpu
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_quantity ELSE 0 END AS cpu_quantity ,			-- vpcu 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_hourly_price ELSE 0 END AS cpu_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_monthly_price ELSE 0 END AS cpu_monthly_price ,		-- 월 단위 금액
+		 	PROD.mem_gb,		-- 메모리
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_quantity ELSE 0 END AS mem_quantity ,			-- mem 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_hourly_price ELSE 0 END AS mem_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_monthly_price ELSE 0 END AS mem_monthly_price ,		-- 월 단위 금액
+		 	PROD.vm_disk_gb,	-- 디스크
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_quantity ELSE 0 END AS vm_disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_hourly_price ELSE 0 END AS vm_disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_monthly_price ELSE 0 END AS vm_disk_monthly_price ,	-- 월 단위 금액
+		 	/*가상서버 끝*/
+
+		 	/*블록 디스크 시작*/
+		 	PROD.disk_gb,	-- 블록 디스크 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_quantity ELSE 0 END AS disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_hourly_price ELSE 0 END AS disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_monthly_price ELSE 0 END AS disk_monthly_price ,	-- 월 단위 금액
+		 	/*블록 디스크  끝*/
+
+		 	/*NAS 디스크 시작*/
+		 	PROD.nas_gb,	-- NAS 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_quantity ELSE 0 END AS nas_quantity ,			-- NAS 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_hourly_price ELSE 0 END AS nas_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_monthly_price ELSE 0 END AS nas_monthly_price ,		-- 월 단위 금액
+		 	/*NAS 디스크  끝*/
+
+		 	/*로드밸런서 시작*/
+		 	PROD.loadbalancer_ea,	-- 로드 밸런서 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_quantity ELSE 0 END AS loadbalancer_quantity ,			-- 로드밸런서 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_hourly_price ELSE 0 END AS loadbalancer_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_monthly_price ELSE 0 END AS loadbalancer_monthly_price ,	-- 월 단위 금액
+		 	/*N로드밸런서  끝*/
+
+		 	/*공인IP 시작*/
+		 	PROD.publicip_ea,	-- 공인 IP 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_quantity ELSE 0 END AS publicip_quantity ,			-- 공인IP 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_hourly_price ELSE 0 END AS publicip_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_monthly_price ELSE 0 END AS publicip_monthly_price ,		-- 월 단위 금액
+		 	/*공인IP 끝*/
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_hourly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_hourly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_hourly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_hourly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_hourly_price
+		 	ELSE 0 END AS hourly_price,
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_monthly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_monthly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_monthly_price
+
+		 	ELSE 0 END AS monthly_price
+
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			cmm_code CD,
+			(
+				/* 상품 구성 */
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		-- 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		-- 블록 디스크
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_nas NAS		-- NAS
+				 ON PROD.product_seq = NAS.product_seq
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	-- 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq
+				 LEFT OUTER JOIN bss_product_publicip IP	-- 공인IP
+				 ON PROD.product_seq = IP.product_seq
+
+				 WHERE PROD.del_flag = 'N'
+
+			) PROD,
+			( /* 가격표 */
+				SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.hourly_price ELSE 0 END) cpu_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.hourly_price ELSE 0 END) mem_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) disk_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.hourly_price ELSE 0 END) nas_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.monthly_price ELSE 0 END) nas_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN ITEM.quantity ELSE 0 END) nas_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.hourly_price ELSE 0 END) loadbalancer_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.monthly_price ELSE 0 END) loadbalancer_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN ITEM.quantity ELSE 0 END) loadbalancer_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.hourly_price ELSE 0 END) publicip_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.monthly_price ELSE 0 END) publicip_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN ITEM.quantity ELSE 0 END) publicip_quantity
+
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN ('CPU010', 'MEM010', 'DISK010', 'NAS010', 'LOADBALANCER010','PUBLICIP010')
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+			) PRIC
+
+		WHERE	CATA.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bss_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.product_seq = PROD.product_seq
+		AND CAPR.catalog_category = CD.code_id
+		AND CD.code_key_id = 'CATALOG_CATEGORY'
+		AND CAPR.catalog_category ='CATACATE_LOADBALANCER'
+		AND CAPR.catalog_seq = #{catalogSeq}
+		AND CAPR.del_flag = 'N'
+		ORDER BY CAPR.catalog_category, CAPR.display_order
+	]]>
+  	</select>
+	<!-- 카탈로그 상세 탭 서비스  리스트-->
+  	<select id="getCatalogueProductServiceList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+    <![CDATA[
+		SELECT
+			CAPR.catalog_seq,
+			CAPR.catalog_category,
+			CD.code_name AS catalog_category_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.display_name,
+			CAPR.display_flag,
+			CAPR.recommand_flag,
+		 	(SELECT CONCAT(CF.file_path,CF.file_id) FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_path,
+ 			(SELECT CF.file_id FROM cmm_file CF WHERE CF.program_name =CAPR.catalog_seq AND CF.program_seq = PROD.product_seq  ) AS image_name,
+		 	CAPR.description,
+		 	CAPR.display_order,
+		 	PROD.product_seq,
+		 	PROD.product_category,
+		 	/*가상서버 시작*/
+		 	PROD.vcpus, 		-- vcpu
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_quantity ELSE 0 END AS cpu_quantity ,			-- vpcu 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_hourly_price ELSE 0 END AS cpu_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_monthly_price ELSE 0 END AS cpu_monthly_price ,		-- 월 단위 금액
+		 	PROD.mem_gb,		-- 메모리
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_quantity ELSE 0 END AS mem_quantity ,			-- mem 과금 단위
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_hourly_price ELSE 0 END AS mem_hourly_price ,		-- 시간 단위 금액
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_monthly_price ELSE 0 END AS mem_monthly_price ,		-- 월 단위 금액
+		 	PROD.vm_disk_gb,	-- 디스크
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_quantity ELSE 0 END AS vm_disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_hourly_price ELSE 0 END AS vm_disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.disk_monthly_price ELSE 0 END AS vm_disk_monthly_price ,	-- 월 단위 금액
+		 	/*가상서버 끝*/
+
+		 	/*블록 디스크 시작*/
+		 	PROD.disk_gb,	-- 블록 디스크 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_quantity ELSE 0 END AS disk_quantity ,			-- disk 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_hourly_price ELSE 0 END AS disk_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_DISK' THEN PRIC.disk_monthly_price ELSE 0 END AS disk_monthly_price ,	-- 월 단위 금액
+		 	/*블록 디스크  끝*/
+
+		 	/*NAS 디스크 시작*/
+		 	PROD.nas_gb,	-- NAS 용량
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_quantity ELSE 0 END AS nas_quantity ,			-- NAS 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_hourly_price ELSE 0 END AS nas_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_NAS' THEN PRIC.nas_monthly_price ELSE 0 END AS nas_monthly_price ,		-- 월 단위 금액
+		 	/*NAS 디스크  끝*/
+
+		 	/*로드밸런서 시작*/
+		 	PROD.loadbalancer_ea,	-- 로드 밸런서 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_quantity ELSE 0 END AS loadbalancer_quantity ,			-- 로드밸런서 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_hourly_price ELSE 0 END AS loadbalancer_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_LOADBALANCER' THEN PRIC.loadbalancer_monthly_price ELSE 0 END AS loadbalancer_monthly_price ,	-- 월 단위 금액
+		 	/*N로드밸런서  끝*/
+
+		 	/*공인IP 시작*/
+		 	PROD.publicip_ea,	-- 공인 IP 갯수
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_quantity ELSE 0 END AS publicip_quantity ,			-- 공인IP 과금 단위
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_hourly_price ELSE 0 END AS publicip_hourly_price ,		-- 시간 단위 금액
+			CASE CAPR.catalog_category  WHEN 'CATACATE_PUBLICIP' THEN PRIC.publicip_monthly_price ELSE 0 END AS publicip_monthly_price ,		-- 월 단위 금액
+		 	/*공인IP 끝*/
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_hourly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_hourly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_hourly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_hourly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_hourly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_hourly_price
+		 	ELSE 0 END AS hourly_price,
+
+		 	CASE CAPR.catalog_category
+		 	WHEN 'CATACATE_VM' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price)
+		 	WHEN 'CATACATE_DISK' THEN (PROD.disk_gb / PRIC.disk_quantity) * PRIC.disk_monthly_price
+		 	WHEN 'CATACATE_NAS' THEN (PROD.nas_gb / PRIC.nas_quantity) * PRIC.nas_monthly_price
+		 	WHEN 'CATACATE_PUBLICIP' THEN (PROD.publicip_ea / PRIC.publicip_quantity) * PRIC.publicip_monthly_price
+		 	WHEN 'CATACATE_LOADBALANCER' THEN (PROD.loadbalancer_ea / PRIC.loadbalancer_quantity) * PRIC.loadbalancer_monthly_price
+
+		 	ELSE 0 END AS monthly_price
+
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			cmm_code CD,
+			(
+				/* 상품 구성 */
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(NAS.nas_gb,0) AS nas_gb,
+					IFNULL(BAL.loadbalancer_ea,0) AS loadbalancer_ea,
+					IFNULL(IP.publicip_ea,0) AS publicip_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM		-- 가상서버
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK		-- 블록 디스크
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_nas NAS		-- NAS
+				 ON PROD.product_seq = NAS.product_seq
+				 LEFT OUTER JOIN bss_product_loadbalancer BAL	-- 로드 밸런서
+				 ON PROD.product_seq = BAL.product_seq
+				 LEFT OUTER JOIN bss_product_publicip IP	-- 공인IP
+				 ON PROD.product_seq = IP.product_seq
+				 WHERE PROD.del_flag = 'N'
+
+			) PROD,
+			( /* 가격표 */
+				SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.hourly_price ELSE 0 END) cpu_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.hourly_price ELSE 0 END) mem_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.hourly_price ELSE 0 END) disk_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.hourly_price ELSE 0 END) nas_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN PRIC.monthly_price ELSE 0 END) nas_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'NAS010' THEN ITEM.quantity ELSE 0 END) nas_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.hourly_price ELSE 0 END) loadbalancer_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN PRIC.monthly_price ELSE 0 END) loadbalancer_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'LOADBALANCER010' THEN ITEM.quantity ELSE 0 END) loadbalancer_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.hourly_price ELSE 0 END) publicip_hourly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN PRIC.monthly_price ELSE 0 END) publicip_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'PUBLICIP010' THEN ITEM.quantity ELSE 0 END) publicip_quantity
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN ('CPU010', 'MEM010', 'DISK010', 'NAS010', 'LOADBALANCER010','PUBLICIP010')
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+			) PRIC
+
+		WHERE	CATA.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bss_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.product_seq = PROD.product_seq
+		AND CAPR.catalog_category = CD.code_id
+		AND CD.code_key_id = 'CATALOG_CATEGORY'
+		AND CAPR.catalog_category ='CATACATE_SERVICE'
+		AND CAPR.catalog_seq = #{catalogSeq}
+		AND CAPR.del_flag = 'N'
+		ORDER BY CAPR.catalog_category, CAPR.display_order
+	]]>
+  	</select>
+
+	<!-- 카탈로그 상세 탭 형상관리 리스트-->
+<!--
+  	<select id="getCatalogueProductScmList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+  	</select>
+-->
+  	<!-- 카탈로그 상세 탭 백업 리스트-->
+<!--
+	<select id="getCatalogueProductBackupList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+  	</select>
+-->
+
+  	<!-- 카탈로그 상세 탭 보안관제 리스트-->
+<!--
+  	<select id="getCatalogueProductSercurityList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+  	</select>
+-->
+
+	<!-- 카탈로그 상세 탭 대외계 리스트-->
+<!--
+	<select id="getCatalogueProductMcaList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+  	</select>
+-->
+
+
+	<!-- 진열상품 관리 - 카탈로그 상세 - 카탈로그 정보 + 클라우드 정보 -->
+    <select id="detail" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+		SELECT
+			CATA.catalog_name
+			, CATA.reg_user_id
+			, CATA.catalog_seq
+			, CATA.apply_date
+			, CATA.reg_user_id
+			, CATA.mod_datetime
+			, CATA.mod_user_id
+			, CATA.del_flag
+			, DATE_FORMAT(CATA.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+			, (SELECT CU.user_name FROM cmm_user CU WHERE CU.user_id = CATA.reg_user_id) AS user_name
+			, IF( B.apply_date IS NULL, 'N', 'Y') AS active
+		FROM
+			bss_product_catalog CATA
+				LEFT JOIN
+			( SELECT catalog_seq, apply_date FROM bss_product_catalog WHERE apply_date > NOW() )B
+				ON CATA.catalog_seq = B.catalog_seq
+
+		WHERE
+			CATA.catalog_seq = #{catalogSeq}
+  	</select>
+
+  	<!--카탈로그 수정상세-->
+    <select id="catalogDetail" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+		SELECT
+				*
+		 FROM
+		 	bss_product_catalog
+		WHERE
+			catalog_seq=#{catalogSeq}
+  	</select>
+  		<!--카탈로그 가상서버 상세-->
+  		<!-- qkrwlans -->
+    <select id="productView" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+    <![CDATA[
+
+        SELECT
+
+            prod.vmdk_file,
+		 	prod.os_item,
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGLIN100' THEN PRIC.os_lin_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWIN200' THEN PRIC.os_win_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWEB110' THEN PRIC.os_web_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWAS120' THEN PRIC.os_was_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDB130' THEN PRIC.os_db_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDEV140' THEN PRIC.os_dev_quantity
+		 	ELSE 0 END AS os_quantity ,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGLIN100' THEN PRIC.os_lin_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWIN200' THEN PRIC.os_win_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWEB110' THEN PRIC.os_web_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWAS120' THEN PRIC.os_was_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDB130' THEN PRIC.os_db_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDEV140' THEN PRIC.os_dev_monthly_price
+			ELSE 0 END AS os_monthly_price ,
+
+		 	PROD.service_ea,
+		 	prod.service_type,
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '01' THEN PRIC.service_account_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '02' THEN PRIC.service_security_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '03' THEN PRIC.service_backup_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '03' THEN PRIC.service_sw_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '05' THEN PRIC.service_disk_quantity
+		 	ELSE 0 END AS service_quantity ,
+
+			CASE  WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '01' THEN PRIC.service_account_monthly_price
+			         WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '02' THEN PRIC.service_security_monthly_price
+			         WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '03' THEN PRIC.service_backup_monthly_price
+			         WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '04' THEN PRIC.service_sw_monthly_price
+			         WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '05' THEN PRIC.service_disk_monthly_price
+			ELSE 0 END AS service_monthly_price ,
+
+			CAPR.catalog_seq,
+			CAPR.catalog_category,
+			CD.code_name AS catalog_category_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.display_name,
+			CAPR.display_flag,
+			CAPR.recommand_flag,
+            CAPR.image_path,
+			CAPR.image_name,
+		 	CAPR.description,
+		 	CAPR.description_top,
+		 	CAPR.description_list,
+		 	CAPR.display_order,
+		 	CAPR.basic_product_flag,
+		 	PROD.product_category,
+
+		 	PROD.vcpus,
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_quantity ELSE 0 END AS cpu_quantity ,
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_monthly_price ELSE 0 END AS cpu_monthly_price ,
+		 	PROD.mem_gb,
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_quantity ELSE 0 END AS mem_quantity ,
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_monthly_price ELSE 0 END AS mem_monthly_price ,
+		 	PROD.vm_disk_gb,
+			prod.vm_disk_type,
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' THEN PRIC.disk_san_quantity
+		 	      WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' THEN PRIC.disk_sata_quantity
+				  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' THEN PRIC.disk_sas_quantity
+		 	ELSE 0 END AS vm_disk_quantity ,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' THEN PRIC.disk_san_monthly_price
+		 	      WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' THEN PRIC.disk_sata_monthly_price
+				  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' THEN PRIC.disk_sas_monthly_price
+		 	ELSE 0 END AS vm_disk_monthly_price ,
+
+
+
+			prod.vm_image_type,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGLIN100' THEN PRIC.os_lin_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWIN200' THEN PRIC.os_win_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWEB110' THEN PRIC.os_web_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWAS120' THEN PRIC.os_was_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGDB130' THEN PRIC.os_db_quantity
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGDEV140' THEN PRIC.os_dev_quantity
+		 	ELSE 0 END AS vm_os_quantity ,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGLIN100' THEN PRIC.os_lin_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWIN200' THEN PRIC.os_win_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWEB110' THEN PRIC.os_web_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWAS120' THEN PRIC.os_was_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGDB130' THEN PRIC.os_db_monthly_price
+		 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGDEV140' THEN PRIC.os_dev_monthly_price
+			ELSE 0 END AS vm_os_monthly_price ,
+
+			prod.vm_os_name,
+
+		 	PROD.disk_gb,
+            prod.disk_type,
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAN' THEN PRIC.disk_san_quantity
+		 	      WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SATA' THEN PRIC.disk_sata_quantity
+				  WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAS' THEN PRIC.disk_sas_quantity
+		 	ELSE 0 END AS disk_quantity ,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAN' THEN PRIC.disk_san_monthly_price
+		 	      WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SATA' THEN PRIC.disk_sata_monthly_price
+				  WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAS' THEN PRIC.disk_sas_monthly_price
+		 	ELSE 0 END AS disk_monthly_price ,
+
+		 	CASE
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGLIN100' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_lin_quantity * PRIC.os_lin_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGWIN200' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_win_quantity * PRIC.os_win_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGWEB110' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_web_quantity * PRIC.os_web_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGWAS120' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_was_quantity * PRIC.os_was_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGDB130' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_db_quantity * PRIC.os_db_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGDEV140' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_dev_quantity * PRIC.os_dev_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGLIN100' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_lin_quantity * PRIC.os_lin_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGWIN200' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_win_quantity * PRIC.os_win_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGWEB110' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_web_quantity * PRIC.os_web_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGWAS120' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_was_quantity * PRIC.os_was_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGDB130' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_db_quantity * PRIC.os_db_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGDEV140' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_dev_quantity * PRIC.os_dev_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGLIN100' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_lin_quantity * PRIC.os_lin_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGWIN200' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_win_quantity * PRIC.os_win_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGWEB110' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_web_quantity * PRIC.os_web_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGWAS120' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_was_quantity * PRIC.os_was_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGDB130' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_db_quantity * PRIC.os_db_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGDEV140' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_dev_quantity * PRIC.os_dev_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAN' THEN (PROD.disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SATA' THEN (PROD.disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAS' THEN (PROD.disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price
+		  	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '01' THEN (PROD.service_ea / PRIC.service_account_quantity) * PRIC.service_account_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '02' THEN (PROD.service_ea / PRIC.service_security_quantity) * PRIC.service_security_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '03' THEN (PROD.service_ea / PRIC.service_backup_quantity) * PRIC.service_backup_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '04' THEN (PROD.service_ea / PRIC.service_sw_quantity) * PRIC.service_sw_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '05' THEN (PROD.service_ea / PRIC.service_disk_quantity) * PRIC.service_disk_monthly_price
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGLIN100' THEN (PRIC.os_lin_quantity * PRIC.os_lin_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWIN200' THEN (PRIC.os_win_quantity * PRIC.os_win_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWEB110' THEN (PRIC.os_web_quantity * PRIC.os_web_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWAS120' THEN (PRIC.os_was_quantity * PRIC.os_was_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDB130' THEN (PRIC.os_db_quantity * PRIC.os_db_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDEV140' THEN (PRIC.os_dev_quantity * PRIC.os_dev_monthly_price)
+		 	ELSE 0 END AS monthly_price
+
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			cmm_code CD,
+			(
+
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					SER.service_type,
+					DSK.disk_type,
+					VM.disk_type as vm_disk_type,
+					VM.image_type as vm_image_type,
+					OS.item_id as os_item,
+					CD.code_name AS vm_os_name,
+					OS.vm_image_name AS image_name,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(SER.service_ea,0) AS service_ea,
+					DSK.vmdk_file
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_service SER
+				 ON PROD.product_seq = SER.product_seq
+				 LEFT OUTER JOIN bss_product_os OS
+				 ON PROD.product_seq = OS.product_seq
+				 LEFT OUTER JOIN cmm_code CD
+				 ON VM.image_type = CD.code_id
+				 WHERE PROD.del_flag = 'N'
+			) PROD,
+			(
+
+		        SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_san_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_san_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK011' THEN PRIC.monthly_price ELSE 0 END) disk_sata_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK011' THEN ITEM.quantity ELSE 0 END) disk_sata_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK012' THEN PRIC.monthly_price ELSE 0 END) disk_sas_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK012' THEN ITEM.quantity ELSE 0 END) disk_sas_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE010' THEN PRIC.monthly_price ELSE 0 END) service_account_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE010' THEN ITEM.quantity ELSE 0 END) service_account_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE011' THEN PRIC.monthly_price ELSE 0 END) service_security_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE011' THEN ITEM.quantity ELSE 0 END) service_security_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE012' THEN PRIC.monthly_price ELSE 0 END) service_backup_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE012' THEN ITEM.quantity ELSE 0 END) service_backup_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE013' THEN PRIC.monthly_price ELSE 0 END) service_sw_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE013' THEN ITEM.quantity ELSE 0 END) service_sw_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE014' THEN PRIC.monthly_price ELSE 0 END) service_disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE014' THEN ITEM.quantity ELSE 0 END) service_disk_quantity,
+
+				   SUM(CASE ITEM.item_id WHEN 'VMIMGLIN100' THEN PRIC.monthly_price ELSE 0 END) os_lin_monthly_price,
+				   SUM(CASE ITEM.item_id WHEN 'VMIMGLIN100' THEN ITEM.quantity ELSE 0 END) os_lin_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWIN200' THEN PRIC.monthly_price ELSE 0 END) os_win_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWIN200' THEN ITEM.quantity ELSE 0 END) os_win_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWEB110' THEN PRIC.monthly_price ELSE 0 END) os_web_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWEB110' THEN ITEM.quantity ELSE 0 END) os_web_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWAS120' THEN PRIC.monthly_price ELSE 0 END) os_was_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWAS120' THEN ITEM.quantity ELSE 0 END) os_was_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGDB130' THEN PRIC.monthly_price ELSE 0 END) os_db_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGDB130' THEN ITEM.quantity ELSE 0 END) os_db_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGDEV140' THEN PRIC.monthly_price ELSE 0 END) os_dev_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGDEV140' THEN ITEM.quantity ELSE 0 END) os_dev_quantity
+
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <=  #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN (SELECT item_id FROM bill_product)
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+
+			) PRIC
+
+
+		WHERE	CATA.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bss_product_catalog A
+						WHERE	A.apply_date <= #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.product_seq = PROD.product_seq
+		AND CAPR.catalog_category = CD.code_id
+		AND CD.code_key_id = 'CATALOG_CATEGORY'
+		AND CAPR.catalog_category = #{catalogCategory}
+		AND CAPR.product_seq = #{productSeq}
+		AND CAPR.catalog_seq = #{catalogSeq}
+		ORDER BY CAPR.catalog_category, CAPR.display_order
+	]]>
+  	</select>
+  		<!--카탈로그 운영체제 상세-->
+    <select id="osView" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+		SELECT
+			catalog_seq,
+			product_seq,
+			display_name,
+			(SELECT product_name FROM  bss_product WHERE product_seq =a.product_seq)AS product_name,
+			image_path,
+			image_name,
+			description,
+			hot_badge,
+			display_order,
+			catalog_category,
+			display_flag,
+			reg_datetime,
+			reg_user_id,
+			mod_datetime,
+			mod_user_id
+		FROM
+			bss_product_catalog_item a
+		WHERE
+			product_seq =#{productSeq}
+		AND
+			catalog_category=#{catalogCategory}
+		AND
+			catalog_seq=#{catalogSeq}
+  	</select>
+  	  	<!-- 가상서버 상세 내용수정 -->
+    <update id="update" parameterType="CustomBssCatalogVO" >
+		UPDATE bss_product_catalog_item
+			SET
+				display_name=#{displayName},
+				description = #{description},
+				description_list = #{descriptionList},
+				description_top = #{descriptionTop},
+<!-- 				display_order = #{displayOrder}, -->
+				display_flag = #{displayFlag},
+				recommand_flag = #{recommandFlag},
+				basic_product_flag = #{basicProductFlag}
+		WHERE
+				product_seq = #{productSeq}
+		AND
+				catalog_seq=#{catalogSeq}
+  	</update>
+
+  	  	  	<!-- os 상세 내용수정 -->
+    <update id="osUpdate" parameterType="CustomBssCatalogVO" >
+		UPDATE bss_product_catalog_item
+			SET
+				display_name=#{displayName},
+<!-- 				display_order = #{displayOrder}, -->
+				display_flag = #{displayFlag}
+		WHERE
+				product_seq = #{productSeq}
+		AND
+				catalog_seq=#{catalogSeq}
+  	</update>
+
+
+
+  	<!-- 가상서버 등록-->
+    <update id="productInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				image_path,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{imagePath},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+
+			)
+  	</update>
+
+    	<!-- OS 등록-->
+    <update id="osInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+			)
+  	</update>
+
+  	<update id="appInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+			)
+  	</update>
+
+     	<!-- disk 등록-->
+    <update id="diskInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+			)
+  	</update>
+
+      	<!-- lb 등록-->
+    <update id="lbInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+
+			)
+  	</update>
+
+      	<!-- lb 등록-->
+    <update id="envInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+			)
+  	</update>
+
+  	     	<!-- nas 등록-->
+    <update id="nasInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+
+			)
+  	</update>
+
+  	     	<!-- ip 등록-->
+    <update id="ipInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+
+			)
+  	</update>
+
+    <!-- lb 등록-->
+    <!--
+    <update id="scmInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+
+			)
+  	</update>
+-->
+  	<!-- lb 등록-->
+<!--
+    <update id="bkInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+			)
+  	</update>
+-->
+
+  	<update id="serviceInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+			)
+  	</update>
+
+    <!-- lb 등록-->
+<!--
+    <update id="serInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+			)
+  	</update>
+-->
+  	<!-- lb 등록-->
+<!--
+    <update id="mcaInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+			(
+				product_seq,
+				catalog_seq,
+				display_name,
+				description,
+				description_top,
+				description_list,
+				display_order,
+				catalog_category,
+				display_flag,
+				reg_datetime,
+				reg_user_id,
+				recommand_flag,
+				basic_product_flag
+			)
+		VALUES
+			(
+				#{productSeq},
+				#{catalogSeq},
+				#{displayName},
+				#{description},
+				#{descriptionTop},
+				#{descriptionList},
+				#{displayOrder},
+				#{catalogCategory},
+				#{displayFlag},
+				NOW(),
+				#{regUserId},
+				#{recommandFlag},
+				#{basicProductFlag}
+			)
+  	</update>
+-->
+  	<!-- 카탈로그 등록-->
+    <update id="setCatalog" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog
+			(
+				catalog_seq,
+				cloud_id,
+				catalog_name,
+				apply_date,
+				reg_datetime,
+				reg_user_id,
+				mod_datetime,
+				mod_user_id
+			)
+		VALUES
+			(
+				#{catalogSeq},
+				#{cloudId},
+				#{catalogName},
+				#{applyDate},
+				NOW(),
+				#{regUserId},
+				NOW(),
+				#{modUserId}
+			)
+  	</update>
+
+  	<!-- 카탈로그 등록-->
+    <update id="setCatalogNewInsert" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog
+			(
+				catalog_seq,
+				catalog_name,
+				apply_date,
+				reg_datetime,
+				reg_user_id,
+				mod_datetime,
+				mod_user_id
+			)
+		VALUES
+			(
+				#{catalogSeq},
+				#{catalogName},
+				#{applyDate},
+				NOW(),
+				#{userId},
+				NOW(),
+				#{userId}
+			)
+  	</update>
+
+   	<!-- 카탈로그 프로덕트 등록-->
+    <update id="setCatalogProduct" parameterType="CustomBssCatalogVO" >
+		INSERT INTO bss_product_catalog_item
+		(
+			catalog_seq,
+			product_seq,
+			display_name,
+			image_path,
+			image_name,
+			description,
+			description_top,
+			description_list,
+			hot_badge,
+			display_order,
+			catalog_category,
+			display_flag,
+			reg_datetime,
+			reg_user_id,
+			recommand_flag,
+			basic_product_flag
+		)
+		(
+			SELECT
+				#{catalogSeq},
+				product_seq,
+				display_name,
+				image_path,
+				image_name,
+				description,
+				description_top,
+				description_list,
+				hot_badge,
+				display_order,
+				catalog_category,
+				display_flag,
+				NOW(),
+				#{regUserId},
+				recommand_flag,
+				basic_product_flag
+			FROM
+				bss_product_catalog_item
+			WHERE
+				catalog_seq = #{beforeCatalogSeq}
+		)
+  	</update>
+
+	<!-- 카탈로그 수정-->
+    <update id="catalogUpdate" parameterType="CustomBssCatalogVO" >
+		UPDATE
+				bss_product_catalog
+		SET
+				<if test="catalogName != '' ">
+						catalog_name = #{catalogName},
+				</if>
+				apply_date = #{applyDate},
+				mod_datetime = NOW(),
+				mod_user_id = #{regUserId}
+		WHERE
+				catalog_seq = #{catalogSeq}
+  	</update>
+ 		<!--카탈로그 복사 리스트 체크-->
+    <select id="getCopyCataloginfo" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+ 	<![CDATA[
+		SELECT
+			BCP.*
+		FROM
+			bss_product_catalog BC,bss_product_catalog_item BCP
+		WHERE
+			BC.del_flag='N'
+		AND
+			BC.apply_date=
+			(
+			SELECT MAX(apply_date)
+			FROM
+			bss_product_catalog
+			WHERE catalog_seq=#{catalogSeq} and del_flag='N'
+			)
+		AND
+			BC.catalog_seq =BCP.catalog_seq
+		]]>
+  	</select>
+
+  	<!--카탈로그 중복 리스트 체크-->
+     <select id="getCatalogCnt" resultType="int" parameterType="CustomBssCatalogVO">
+    	SELECT
+			COUNT(*)
+    	FROM bss_product_catalog
+    	WHERE apply_date = #{applyDate} AND del_flag = 'N' AND cloud_id = #{cloudId}
+    </select>
+
+	<!--카탈로그 등록 리스트 체크-->
+    <select id="getOldCataloginfo" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+		<![CDATA[
+		SELECT
+			BCP.*
+		FROM
+			bss_product_catalog BC,bss_product_catalog_item BCP
+		WHERE
+			BC.del_flag='N'
+		AND
+			BC.apply_date=
+			(
+			SELECT MAX(apply_date)
+			FROM
+			bss_product_catalog
+			WHERE apply_date <= #{applyDate} and del_flag='N'
+			)
+		AND
+			BC.catalog_seq =BCP.catalog_seq
+		]]>
+  	</select>
+
+  	<!-- 진열상품 등록 - 상품검색 - 팝업리스트(가상서버) -->
+	<select id="productPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.vcpus,
+			PRO.mem_gb,
+			PRO.disk_gb,
+			PRO.disk_type,
+			PRO.image_type
+		FROM
+		(
+			SELECT
+				BPR.product_seq,
+				BPR.product_name,
+				BPR.product_category,
+				BPR.reg_user_id,
+				BPR.mod_datetime,
+				BPR.mod_user_id,
+				BPR.del_flag,
+				BVM.vcpus,
+				BVM.mem_gb,
+				BVM.disk_gb,
+				BVM.disk_type,
+				BVM.image_type
+			FROM
+				bss_product BPR , bss_product_vm BVM
+			WHERE
+				BPR.product_seq = BVM.product_seq
+		) PRO
+			LEFT JOIN
+		( SELECT * FROM bss_product_catalog_item WHERE catalog_seq = #{catalogSeq} ) CAT
+			ON PRO.product_seq =CAT.product_seq
+
+		WHERE
+			CAT.product_seq IS NULL
+			AND PRO.product_category = 'PRODCATE_VM'
+			AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+	</select>
+
+	<!-- 진열상품 관리 - 진열상품 등록 - disk 상품 팝업 리스트 -->
+    <select id="diskPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.disk_gb,
+			PRO.disk_type,
+			PRO.vmdk_file
+		FROM
+		(
+			SELECT
+				BPR.product_seq,
+				BPR.product_name,
+				BPR.product_category,
+				BPR.reg_user_id,
+				BPR.mod_datetime,
+				BPR.mod_user_id,
+				BPR.del_flag,
+				BDI.disk_gb,
+				BDI.disk_type,
+				BDI.vmdk_file
+			FROM
+				bss_product BPR , bss_product_disk BDI
+			WHERE
+				BPR.product_seq = BDI.product_seq
+		) PRO
+			LEFT JOIN
+			( SELECT * FROM bss_product_catalog_item WHERE catalog_seq =#{catalogSeq}) CAT
+			ON  PRO.product_seq =CAT.product_seq
+
+		WHERE
+			CAT.product_seq IS NULL
+			AND PRO.product_category = 'PRODCATE_DISK'
+		AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+
+  	<!-- os 팝업 리스트 -->
+    <select id="osPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.item_id
+		FROM
+		(
+			SELECT
+				BPR.product_seq,
+				BPR.product_name,
+				BPR.product_category,
+				BPR.reg_user_id,
+				BPR.mod_datetime,
+				BPR.mod_user_id,
+				BPR.del_flag,
+				BOS.item_id
+			FROM
+				bss_product BPR , bss_product_os BOS
+			WHERE
+				BPR.product_seq = BOS.product_seq
+		) PRO
+			LEFT JOIN
+			(SELECT * FROM bss_product_catalog_item WHERE catalog_seq =#{catalogSeq}) CAT
+			ON PRO.product_seq =CAT.product_seq
+
+		WHERE
+			CAT.product_seq IS NULL
+			AND PRO.product_category = 'PRODCATE_OS'
+			AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+
+	<select id="templatePopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.item_id,
+			PRO.template_vcpus,
+			PRO.template_mem,
+			PRO.template_pod
+		FROM
+		(
+			SELECT
+				BPR.product_seq,
+				BPR.product_name,
+				BPR.product_category,
+				BPR.reg_user_id,
+				BPR.mod_datetime,
+				BPR.mod_user_id,
+				BPR.del_flag,
+				BPA.item_id,
+				BPA.pod_cpu as template_vcpus,
+				BPA.pod_mem as template_mem,
+				BPA.pod_cnt as template_pod
+			FROM
+				bss_product BPR, bss_product_app BPA
+			WHERE
+				BPR.product_seq = BPA.product_seq
+		) PRO
+			LEFT JOIN
+			(SELECT * FROM bss_product_catalog_item WHERE catalog_seq =#{catalogSeq}) CAT
+			ON PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+			AND PRO.product_category = 'PRODCATE_APP'
+			AND	(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+	</select>
+
+  	<!-- 서비스 팝업 리스트 -->
+    <select id="servicePopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.service_ea,
+			PRO.service_type
+		FROM
+		(
+			SELECT
+				BPR.product_seq,
+				BPR.product_name,
+				BPR.product_category,
+				BPR.reg_user_id,
+				BPR.mod_datetime,
+				BPR.mod_user_id,
+				BPR.del_flag,
+				BBK.service_ea,
+				BBK.service_type
+			FROM
+				bss_product BPR , bss_product_service BBK
+			WHERE
+				BPR.product_seq = BBK.product_seq
+		) PRO
+			LEFT JOIN
+		(SELECT * FROM bss_product_catalog_item WHERE catalog_seq =#{catalogSeq} ) CAT
+			ON PRO.product_seq =CAT.product_seq
+
+		WHERE
+			CAT.product_seq IS NULL
+			--AND PRO.product_category = 'PRODCATE_SERVICE'
+			AND
+				(
+					PRO.product_name like CONCAT('%',#{searchValue},'%')
+				)
+  	</select>
+
+	<!-- disk 팝업 리스트 -->
+    <select id="nasPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.nas_gb
+		FROM
+		(SELECT
+			BPR.product_seq,
+			BPR.product_name,
+			BPR.product_category,
+			BPR.reg_user_id,
+			BPR.mod_datetime,
+			BPR.mod_user_id,
+			BPR.del_flag,
+			BNA.nas_gb
+
+		FROM
+			bss_product BPR , bss_product_nas BNA
+		WHERE
+			BPR.product_seq = BNA.product_seq) PRO
+		LEFT JOIN
+		(SELECT
+			*
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_seq =#{catalogSeq}) CAT
+
+		ON
+			PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+		AND
+			PRO.product_category = 'PRODCATE_NAS'
+		AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+
+	<!-- disk 팝업 리스트 -->
+    <select id="ipPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.publicip_ea
+		FROM
+		(SELECT
+			BPR.product_seq,
+			BPR.product_name,
+			BPR.product_category,
+			BPR.reg_user_id,
+			BPR.mod_datetime,
+			BPR.mod_user_id,
+			BPR.del_flag,
+			BIP.publicip_ea
+
+		FROM
+			bss_product BPR , bss_product_publicip BIP
+		WHERE
+			BPR.product_seq = BIP.product_seq) PRO
+		LEFT JOIN
+		(SELECT
+			*
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_seq =#{catalogSeq}) CAT
+
+		ON
+			PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+		AND
+			PRO.product_category = 'PRODCATE_PUBLICIP'
+		AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+
+	<!-- disk 팝업 리스트 -->
+    <select id="lbPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.loadbalancer_ea
+		FROM
+		(SELECT
+			BPR.product_seq,
+			BPR.product_name,
+			BPR.product_category,
+			BPR.reg_user_id,
+			BPR.mod_datetime,
+			BPR.mod_user_id,
+			BPR.del_flag,
+			BLB.loadbalancer_ea
+
+		FROM
+			bss_product BPR , bss_product_loadbalancer BLB
+		WHERE
+			BPR.product_seq = BLB.product_seq) PRO
+		LEFT JOIN
+		(SELECT
+			*
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_seq =#{catalogSeq}) CAT
+
+		ON
+			PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+		AND
+			PRO.product_category = 'PRODCATE_LOADBALANCER'
+		AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+
+    <select id="envPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.env_ea
+		FROM
+		(SELECT
+			BPR.product_seq,
+			BPR.product_name,
+			BPR.product_category,
+			BPR.reg_user_id,
+			BPR.mod_datetime,
+			BPR.mod_user_id,
+			BPR.del_flag,
+			BLB.env_ea
+		FROM
+			bss_product BPR , bss_product_env BLB
+		WHERE
+			BPR.product_seq = BLB.product_seq) PRO
+		LEFT JOIN
+		(SELECT
+			*
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_seq =#{catalogSeq}) CAT
+		ON
+			PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+		AND
+			PRO.product_category = 'PRODCATE_ENV'
+		AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+<!--
+    <select id="scmPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.scm_ea
+		FROM
+		(SELECT
+			BPR.product_seq,
+			BPR.product_name,
+			BPR.product_category,
+			BPR.reg_user_id,
+			BPR.mod_datetime,
+			BPR.mod_user_id,
+			BPR.del_flag,
+			BSC.scm_ea
+
+		FROM
+			bss_product BPR , bss_product_scm BSC
+		WHERE
+			BPR.product_seq = BSC.product_seq) PRO
+		LEFT JOIN
+		(SELECT
+			*
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_seq =#{catalogSeq}) CAT
+
+		ON
+			PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+		AND
+			PRO.product_category = 'PRODCATE_SCM'
+		AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+-->
+<!--
+    <select id="bkPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.backup_gb
+		FROM
+		(SELECT
+			BPR.product_seq,
+			BPR.product_name,
+			BPR.product_category,
+			BPR.reg_user_id,
+			BPR.mod_datetime,
+			BPR.mod_user_id,
+			BPR.del_flag,
+			BBK.backup_gb
+
+		FROM
+			bss_product BPR , bss_product_backup BBK
+		WHERE
+			BPR.product_seq = BBK.product_seq) PRO
+		LEFT JOIN
+		(SELECT
+			*
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_seq =#{catalogSeq}) CAT
+
+		ON
+			PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+		AND
+			PRO.product_category = 'PRODCATE_BACKUP'
+		AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+-->
+<!--
+    <select id="serPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.security_ea
+		FROM
+		(SELECT
+			BPR.product_seq,
+			BPR.product_name,
+			BPR.product_category,
+			BPR.reg_user_id,
+			BPR.mod_datetime,
+			BPR.mod_user_id,
+			BPR.del_flag,
+			BSE.security_ea
+
+		FROM
+			bss_product BPR , bss_product_security BSE
+		WHERE
+			BPR.product_seq = BSE.product_seq) PRO
+		LEFT JOIN
+		(SELECT
+			*
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_seq =#{catalogSeq}) CAT
+
+		ON
+			PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+		AND
+			PRO.product_category = 'PRODCATE_SECURITY'
+		AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+-->
+<!--
+    <select id="mcaPopList" parameterType="CustomBssCatalogVO" resultType="CustomBssCatalogVO">
+		SELECT
+			PRO.product_seq,
+			PRO.product_name,
+			PRO.product_category,
+			PRO.reg_user_id,
+			PRO.mod_datetime,
+			PRO.mod_user_id,
+			PRO.del_flag,
+			PRO.mca_ea
+		FROM
+		(SELECT
+			BPR.product_seq,
+			BPR.product_name,
+			BPR.product_category,
+			BPR.reg_user_id,
+			BPR.mod_datetime,
+			BPR.mod_user_id,
+			BPR.del_flag,
+			BMC.mca_ea
+
+		FROM
+			bss_product BPR , bss_product_mca BMC
+		WHERE
+			BPR.product_seq = BMC.product_seq) PRO
+		LEFT JOIN
+		(SELECT
+			*
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_seq =#{catalogSeq}) CAT
+
+		ON
+			PRO.product_seq =CAT.product_seq
+		WHERE
+			CAT.product_seq IS NULL
+		AND
+			PRO.product_category = 'PRODCATE_MCA'
+		AND
+			(
+				PRO.product_name like CONCAT('%',#{searchValue},'%')
+			)
+  	</select>
+-->
+	<!-- 카탈로그 정렬 수정-->
+    <update id="productDisplayUpdate" parameterType="CustomBssCatalogVO" >
+    <![CDATA[
+		UPDATE
+				bss_product_catalog_item
+		SET
+				display_order = display_order+1
+		WHERE
+				catalog_seq = #{catalogSeq}
+		and 	catalog_category = #{catalogCategory}
+		and 	display_order >= #{displayOrder}
+	]]>
+  	</update>
+
+  	<!-- 카탈로그 삭제 상태값 변경-->
+    <update id="productDelchk" parameterType="CustomBssCatalogVO" >
+    <![CDATA[
+		UPDATE
+				bss_product_catalog_item
+		SET
+				del_flag = 'Y'
+		WHERE
+				catalog_seq = #{catalogSeq}
+
+		and 	product_seq = #{productSeq}
+	]]>
+  	</update>
+
+  	<!-- 카탈로그 메인 삭제 상태값 변경-->
+    <update id="catalogDelchkOk" parameterType="CustomBssCatalogVO" >
+    <![CDATA[
+		UPDATE
+				bss_product_catalog
+		SET
+				del_flag = 'Y'
+		WHERE
+				catalog_seq = #{catalogSeq}
+	]]>
+  	</update>
+
+  	<!-- 카탈로그 메인 삭제 -->
+    <delete id="catalogDelOk" parameterType="CustomBssCatalogVO" >
+		DELETE FROM bss_product_catalog
+		WHERE catalog_seq = #{catalogSeq}
+  	</delete>
+
+    <delete id="catalogPproductDelete" parameterType="CustomBssCatalogVO" >
+		DELETE FROM bss_product_catalog_item
+		WHERE catalog_seq = #{catalogSeq}
+  	</delete>
+
+
+
+
+  	<!-- 카탈로그 메인 삭제 -->
+    <delete id="catalogProductDelete" parameterType="CustomBssCatalogVO" >
+		DELETE FROM bss_product_catalog_item
+		WHERE catalog_seq = #{catalogSeq}
+		    AND product_seq = #{productSeq}
+  	</delete>
+
+
+
+  	<!-- 진열상품 관리 - 카탈로그 상세 - 상품목록 조회 -->
+  	<select id="catalogueProductList" resultType="CustomBssCatalogVO" parameterType="CustomBssCatalogVO">
+    <![CDATA[
+	SELECT
+		 	prod.os_item,
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGLIN100' THEN PRIC.os_lin_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWIN200' THEN PRIC.os_win_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWEB110' THEN PRIC.os_web_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWAS120' THEN PRIC.os_was_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDB130' THEN PRIC.os_db_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDEV140' THEN PRIC.os_dev_quantity
+		 	ELSE 0 END AS os_quantity ,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGLIN100' THEN PRIC.os_lin_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWIN200' THEN PRIC.os_win_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWEB110' THEN PRIC.os_web_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWAS120' THEN PRIC.os_was_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDB130' THEN PRIC.os_db_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDEV140' THEN PRIC.os_dev_monthly_price
+			ELSE 0 END AS os_monthly_price ,
+
+		 	PROD.service_ea,
+		 	prod.service_type,
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '01' THEN PRIC.service_account_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '02' THEN PRIC.service_security_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '03' THEN PRIC.service_backup_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '03' THEN PRIC.service_sw_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '05' THEN PRIC.service_disk_quantity
+		 	ELSE 0 END AS service_quantity ,
+
+			CASE WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '01' THEN PRIC.service_account_monthly_price
+		         WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '02' THEN PRIC.service_security_monthly_price
+		         WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '03' THEN PRIC.service_backup_monthly_price
+		         WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '04' THEN PRIC.service_sw_monthly_price
+		         WHEN CAPR.catalog_category = 'CATACATE_SERVICE' AND prod.service_type = '05' THEN PRIC.service_disk_monthly_price
+			ELSE 0 END AS service_monthly_price ,
+
+			CAPR.catalog_seq,
+			CAPR.catalog_category,
+			CD.code_name AS catalog_category_name,
+			PROD.product_seq,
+			PROD.product_name,
+			CAPR.display_name,
+			CAPR.display_flag,
+			CAPR.recommand_flag,
+            CAPR.image_path,
+			CAPR.image_name,
+		 	CAPR.description,
+		 	CAPR.description_top,
+		 	CAPR.description_list,
+		 	CAPR.display_order,
+		 	CAPR.basic_product_flag,
+		 	PROD.product_category,
+
+		 	PROD.vcpus,
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_quantity ELSE 0 END AS cpu_quantity ,
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.cpu_monthly_price ELSE 0 END AS cpu_monthly_price ,
+		 	PROD.mem_gb,
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_quantity ELSE 0 END AS mem_quantity ,
+		 	CASE CAPR.catalog_category  WHEN 'CATACATE_VM' THEN PRIC.mem_monthly_price ELSE 0 END AS mem_monthly_price ,
+		 	PROD.vm_disk_gb,
+			prod.vm_disk_type,
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' THEN PRIC.disk_san_quantity
+		 	      WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' THEN PRIC.disk_sata_quantity
+				  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' THEN PRIC.disk_sas_quantity
+		 	ELSE 0 END AS vm_disk_quantity ,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' THEN PRIC.disk_san_monthly_price
+		 	      WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' THEN PRIC.disk_sata_monthly_price
+				  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' THEN PRIC.disk_sas_monthly_price
+		 	ELSE 0 END AS vm_disk_monthly_price ,
+
+			prod.vm_image_type,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGLIN100' THEN PRIC.os_lin_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWIN200' THEN PRIC.os_win_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWEB110' THEN PRIC.os_web_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWAS120' THEN PRIC.os_was_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGDB130' THEN PRIC.os_db_quantity
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGDEV140' THEN PRIC.os_dev_quantity
+		 	ELSE 0 END AS vm_os_quantity ,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGLIN100' THEN PRIC.os_lin_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWIN200' THEN PRIC.os_win_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWEB110' THEN PRIC.os_web_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGWAS120' THEN PRIC.os_was_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGDB130' THEN PRIC.os_db_monthly_price
+	 	          WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_image_type = 'VMIMGDEV140' THEN PRIC.os_dev_monthly_price
+			ELSE 0 END AS vm_os_monthly_price ,
+
+
+		 	PROD.disk_gb,
+            prod.disk_type,
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAN' THEN PRIC.disk_san_quantity
+		 	      WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SATA' THEN PRIC.disk_sata_quantity
+				  WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAS' THEN PRIC.disk_sas_quantity
+		 	ELSE 0 END AS disk_quantity ,
+
+		 	CASE  WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAN' THEN PRIC.disk_san_monthly_price
+		 	      WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SATA' THEN PRIC.disk_sata_monthly_price
+				  WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAS' THEN PRIC.disk_sas_monthly_price
+		 	ELSE 0 END AS disk_monthly_price ,
+
+		 	ifnull(CASE
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGLIN100' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_lin_quantity * PRIC.os_lin_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGWIN200' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_win_quantity * PRIC.os_win_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGWEB110' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_web_quantity * PRIC.os_web_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGWAS120' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_was_quantity * PRIC.os_was_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGDB130' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_db_quantity * PRIC.os_db_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAN' AND prod.vm_image_type ='VMIMGDEV140' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price) + (PRIC.os_dev_quantity * PRIC.os_dev_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGLIN100' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_lin_quantity * PRIC.os_lin_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGWIN200' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_win_quantity * PRIC.os_win_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGWEB110' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_web_quantity * PRIC.os_web_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGWAS120' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_was_quantity * PRIC.os_was_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGDB130' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_db_quantity * PRIC.os_db_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SATA' AND prod.vm_image_type ='VMIMGDEV140' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price) + (PRIC.os_dev_quantity * PRIC.os_dev_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGLIN100' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_lin_quantity * PRIC.os_lin_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGWIN200' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_win_quantity * PRIC.os_win_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGWEB110' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_web_quantity * PRIC.os_web_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGWAS120' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_was_quantity * PRIC.os_was_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGDB130' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_db_quantity * PRIC.os_db_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_VM' AND prod.vm_disk_type = 'ITEMCATE_DISK_SAS' AND prod.vm_image_type ='VMIMGDEV140' THEN ((PROD.vcpus / PRIC.cpu_quantity) * PRIC.cpu_monthly_price) + ((PROD.mem_gb / PRIC.mem_quantity) * PRIC.mem_monthly_price) + ((PROD.vm_disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price) + (PRIC.os_dev_quantity * PRIC.os_dev_monthly_price)
+		 	WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAN' THEN (PROD.disk_gb / PRIC.disk_san_quantity) * PRIC.disk_san_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SATA' THEN (PROD.disk_gb / PRIC.disk_sata_quantity) * PRIC.disk_sata_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_DISK' AND prod.disk_type = 'ITEMCATE_DISK_SAS' THEN (PROD.disk_gb / PRIC.disk_sas_quantity) * PRIC.disk_sas_monthly_price
+		  	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '01' THEN (PROD.service_ea / PRIC.service_account_quantity) * PRIC.service_account_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '02' THEN (PROD.service_ea / PRIC.service_security_quantity) * PRIC.service_security_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '03' THEN (PROD.service_ea / PRIC.service_backup_quantity) * PRIC.service_backup_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '04' THEN (PROD.service_ea / PRIC.service_sw_quantity) * PRIC.service_sw_monthly_price
+		 	WHEN CAPR.catalog_category = 'CATACATE_SERVICE'  AND prod.service_type = '05' THEN (PROD.service_ea / PRIC.service_disk_quantity) * PRIC.service_disk_monthly_price
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGLIN100' THEN (PRIC.os_lin_quantity * PRIC.os_lin_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWIN200' THEN (PRIC.os_win_quantity * PRIC.os_win_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWEB110' THEN (PRIC.os_web_quantity * PRIC.os_web_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGWAS120' THEN (PRIC.os_was_quantity * PRIC.os_was_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDB130' THEN (PRIC.os_db_quantity * PRIC.os_db_monthly_price)
+			WHEN CAPR.catalog_category = 'CATACATE_OS' AND prod.os_item = 'VMIMGDEV140' THEN (PRIC.os_dev_quantity * PRIC.os_dev_monthly_price)
+		 	ELSE 0 END,'0') AS monthly_price
+
+		FROM	bss_product_catalog CATA,
+			bss_product_catalog_item CAPR,
+			cmm_code CD,
+			(
+
+				SELECT
+					PROD.product_seq,
+					PROD.product_name,
+					PROD.product_category,
+					SER.service_type,
+					DSK.disk_type,
+					VM.disk_type as vm_disk_type,
+					VM.image_type as vm_image_type,
+					OS.item_id as os_item,
+					OS.vm_image_name AS image_name,
+					IFNULL(VM.vcpus,0) AS vcpus ,
+					IFNULL(VM.mem_gb,0) AS mem_gb,
+					IFNULL(VM.disk_gb,0) AS vm_disk_gb,
+					IFNULL(DSK.disk_gb,0) AS disk_gb,
+					IFNULL(SER.service_ea,0) AS service_ea
+				 FROM bss_product PROD
+				 LEFT OUTER JOIN bss_product_vm VM
+				 ON PROD.product_seq = VM.product_seq
+				 LEFT OUTER JOIN bss_product_disk DSK
+				 ON PROD.product_seq = DSK.product_seq
+				 LEFT OUTER JOIN bss_product_service SER
+				 ON PROD.product_seq = SER.product_seq
+				 LEFT OUTER JOIN bss_product_os OS
+				 ON PROD.product_seq = OS.product_seq
+				 WHERE PROD.del_flag = 'N'
+			) PROD,
+			(
+		        SELECT	SUM(CASE ITEM.item_id WHEN 'CPU010' THEN PRIC.monthly_price ELSE 0 END) cpu_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'CPU010' THEN ITEM.quantity ELSE 0 END) cpu_quantity,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN PRIC.monthly_price ELSE 0 END) mem_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'MEM010' THEN ITEM.quantity ELSE 0 END) mem_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN PRIC.monthly_price ELSE 0 END) disk_san_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK010' THEN ITEM.quantity ELSE 0 END) disk_san_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK011' THEN PRIC.monthly_price ELSE 0 END) disk_sata_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK011' THEN ITEM.quantity ELSE 0 END) disk_sata_quantity,
+					SUM(CASE ITEM.item_id WHEN 'DISK012' THEN PRIC.monthly_price ELSE 0 END) disk_sas_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'DISK012' THEN ITEM.quantity ELSE 0 END) disk_sas_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE010' THEN PRIC.monthly_price ELSE 0 END) service_account_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE010' THEN ITEM.quantity ELSE 0 END) service_account_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE011' THEN PRIC.monthly_price ELSE 0 END) service_security_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE011' THEN ITEM.quantity ELSE 0 END) service_security_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE012' THEN PRIC.monthly_price ELSE 0 END) service_backup_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE012' THEN ITEM.quantity ELSE 0 END) service_backup_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE013' THEN PRIC.monthly_price ELSE 0 END) service_sw_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE013' THEN ITEM.quantity ELSE 0 END) service_sw_quantity,
+
+					SUM(CASE ITEM.item_id WHEN 'SERVICE014' THEN PRIC.monthly_price ELSE 0 END) service_disk_monthly_price,
+					SUM(CASE ITEM.item_id WHEN 'SERVICE014' THEN ITEM.quantity ELSE 0 END) service_disk_quantity,
+
+				   SUM(CASE ITEM.item_id WHEN 'VMIMGLIN100' THEN PRIC.monthly_price ELSE 0 END) os_lin_monthly_price,
+				   SUM(CASE ITEM.item_id WHEN 'VMIMGLIN100' THEN ITEM.quantity ELSE 0 END) os_lin_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWIN200' THEN PRIC.monthly_price ELSE 0 END) os_win_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWIN200' THEN ITEM.quantity ELSE 0 END) os_win_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWEB110' THEN PRIC.monthly_price ELSE 0 END) os_web_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWEB110' THEN ITEM.quantity ELSE 0 END) os_web_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWAS120' THEN PRIC.monthly_price ELSE 0 END) os_was_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGWAS120' THEN ITEM.quantity ELSE 0 END) os_was_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGDB130' THEN PRIC.monthly_price ELSE 0 END) os_db_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGDB130' THEN ITEM.quantity ELSE 0 END) os_db_quantity,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGDEV140' THEN PRIC.monthly_price ELSE 0 END) os_dev_monthly_price,
+                   SUM(CASE ITEM.item_id WHEN 'VMIMGDEV140' THEN ITEM.quantity ELSE 0 END) os_dev_quantity
+
+				FROM	bill_product_catalog POLC,
+					bill_policy_item POIT,
+					bill_product ITEM,
+					bill_product_catalog_item PRIC
+				WHERE	POLC.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bill_product_catalog A
+						WHERE	A.apply_date <=  #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+				AND	POLC.policy_seq = POIT.policy_seq
+				AND	POIT.item_id = ITEM.item_id
+				AND	ITEM.item_id IN (SELECT item_id FROM bill_product)
+				AND	POIT.policy_seq = PRIC.policy_seq
+				AND	POIT.item_id = PRIC.item_id
+				AND	POLC.del_flag = 'N'
+				AND  POLC.cloud_id = #{cloudId}
+
+			) PRIC
+
+		WHERE	CATA.apply_date = (
+						SELECT	MAX(A.apply_date)
+						FROM	bss_product_catalog A
+						WHERE	A.apply_date <=  #{applyDate}
+						AND	A.del_flag = 'N'
+					)
+		AND	CATA.catalog_seq = CAPR.catalog_seq
+		AND	CAPR.product_seq = PROD.product_seq
+		AND CAPR.catalog_category = CD.code_id
+		AND CD.code_key_id = 'CATALOG_CATEGORY'
+		AND CAPR.catalog_seq =  #{catalogSeq}
+		AND CAPR.del_flag = 'N'
+
+	]]>
+		<if test="catalogCategory != '' ">
+			AND CAPR.catalog_category = #{catalogCategory}
+		</if>
+		<if test="searchKind == 'product_name' and keyword != ''">
+			AND
+				PROD.product_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'display_name' and keyword != ''">
+			AND
+				CAPR.display_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+    		AND (
+    			PROD.product_name  like CONCAT('%',#{keyword},'%')
+    			OR
+    			CAPR.display_name  like CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+
+		ORDER BY CAPR.catalog_category, CAPR.display_order
+
+
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+  	</select>
+
+  	<!-- 카탈로그 상세 상품 DisplayOrder 수정 -->
+  	<update id="updateDisplayOrder" parameterType="CustomBssCatalogVO">
+  		UPDATE
+  			bss_product_catalog_item
+  		SET
+  			display_order = #{displayOrder}
+  		WHERE
+  			product_seq = #{productSeq}
+  		AND
+  			catalog_seq = #{catalogSeq}
+  	</update>
+  	<!-- 카탈로그 상품별 Count -->
+  	<select id="getDisplayOrderCount" parameterType="CustomBssCatalogVO" resultType="int">
+  		SELECT
+  			COUNT(*)
+		FROM
+			bss_product_catalog_item
+		WHERE
+			catalog_category = #{catalogCategory}
+		AND
+			catalog_seq = #{catalogSeq}
+  	</select>
+</mapper>

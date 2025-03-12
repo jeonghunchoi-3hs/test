@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.productUsageStatus.ip.ProductUsageStatusIpDAO">
+ 	
+    <select id="list" parameterType="CustomProductUsageStatusIpVO" resultType="CustomProductUsageStatusIpVO">
+    	SELECT
+	    		* 
+	    	FROM(
+				SELECT 
+					CC3.company_name AS company_name
+					, CC.customer_id AS customer_id
+					, CC.customer_name AS customer_name
+					, OP.project_id
+					, OP.project_name
+					, OP.project_alias
+					, OIP.hourly_flag
+					, DATE_FORMAT(OIP.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime 
+				FROM (
+					SELECT
+						*
+					FROM oss_publicip
+					WHERE 1=1
+					AND del_flag <![CDATA[<>]]> 'Y'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					<if test="searchKey3 != '' ">
+						AND hourly_flag = #{searchKey3}		
+					</if>				
+				) OIP
+				
+				LEFT JOIN oss_project OP
+				ON OP.project_id = OIP.project_id
+				
+				LEFT JOIN cmm_customer CC
+				ON OP.customer_id=CC.customer_id
+				
+				LEFT JOIN cmm_company CC2
+				ON CC.ref_company_id = CC2.company_id
+				
+				LEFT JOIN cmm_company CC3
+				ON CC2.up_company_id = CC3.company_id
+				
+				WHERE 1=1
+				AND OP.project_id is not null
+				<if test="searchKey0 != '' ">
+					AND CC3.company_name = #{searchKey0}		
+				</if>
+				<if test="searchKey1 != '' ">
+					AND CC.customer_name = #{searchKey1}		
+				</if>		    	
+				<if test="searchKey2 != '' ">
+					AND OP.project_alias = #{searchKey2}		
+				</if>	
+	    	) A
+		WHERE 1=1
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			A.project_alias like CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+    	<if test="searchKind == 'project_alias' and keyword != '' ">
+			AND A.project_alias like CONCAT('%',#{keyword},'%')	
+		</if> 
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>		
+	</select>
+	
+		
+</mapper>

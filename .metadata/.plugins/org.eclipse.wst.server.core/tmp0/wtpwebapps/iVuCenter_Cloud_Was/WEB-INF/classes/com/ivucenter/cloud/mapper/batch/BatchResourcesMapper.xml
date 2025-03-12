@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.batch.resources.BatchResourcesDAO">
+
+	<select id="batchSelectListResources" parameterType="java.util.Map" resultType="BatchResourcesVO">	
+		SELECT	
+			project_id		AS project_id,
+			SUM(servers)		AS servers,
+			SUM(vcpus)		AS vcpus,
+			SUM(mem_gb)		AS mem_gb,
+			SUM(os_disk_gb + add_disk_gb) AS disk_gb
+		FROM
+		(
+			SELECT
+				project_id,
+				COUNT(*) 	AS servers,
+				SUM(vcpus) 	AS vcpus,
+				SUM(mem_gb) 	AS mem_gb,
+				SUM(disk_gb) 	AS os_disk_gb,
+				0		AS add_disk_gb
+			FROM
+				oss_vm
+			WHERE	
+				IFNULL(expire_datetime, '9999-12-31')<![CDATA[>=]]> #{resourcesDate}
+			GROUP BY 
+				project_id
+			
+			UNION ALL
+			
+			SELECT	
+				project_id,
+				0		AS servers,
+				0		AS vcpus,
+				0		AS mem_gb,
+				0		AS os_disk_gb,
+				SUM(size_gb)	AS add_disk_gb
+			FROM
+				oss_disk
+			WHERE
+				IFNULL(expire_datetime, '9999-12-31') <![CDATA[>=]]> #{resourcesDate}
+			GROUP BY 
+				project_id
+			) A
+		GROUP BY project_id	
+		LIMIT 
+			#{_skiprows}, #{_pagesize}
+		
+	</select>
+	
+	<insert id="insertResourcesDay" parameterType="BatchResourcesVO">
+		INSERT  INTO resources_day(
+			resources_date,
+			project_id,
+			servers,
+			vcpus,
+			mem_gb,
+			disk_gb,
+			reg_user_id,
+			reg_datetime
+		)VALUES(
+			#{resourcesDate},
+			#{projectId},
+			#{servers},
+			#{vcpus},
+			#{memGb},
+			#{diskGb},
+			#{regUserId},
+			NOW()
+		)
+		ON DUPLICATE KEY 
+			UPDATE 
+			resources_date = #{resourcesDate},
+			project_id = #{projectId},
+			servers = #{servers},
+			vcpus = #{vcpus},
+			mem_gb = #{memGb},
+			disk_gb = #{diskGb},
+			reg_user_id = #{regUserId},
+			reg_datetime = NOW()
+	</insert>
+	
+	<select id="selectListResourcesDay" parameterType="BatchResourcesVO" resultType="BatchResourcesVO">
+		SELECT *
+		FROM resources_day
+		WHERE resources_date = #{resourcesDate}
+		AND project_id = #{projectId}
+	</select>
+	
+	<update  id="updateResourcesDay" parameterType="BatchResourcesVO"  >
+		UPDATE resources_day
+		SET servers = #{servers} ,
+			vcpus = #{vcpus} ,
+			mem_gb = #{memGb} ,
+			disk_gb = #{diskGb},
+			reg_user_id	=	#{regUserId} ,
+			reg_datetime = NOW()
+		WHERE resources_date = #{resourcesDate}
+		AND project_id = #{projectId}			
+	</update>
+		
+	<select id="selectListResourcesDaySummary" parameterType="BatchResourcesVO" resultType="BatchResourcesVO">
+		SELECT 
+			SUBSTRING(resources_date, 1, 7) AS resources_date,
+			project_id,
+			MIN(servers) 	AS servers_min,
+			MAX(servers) 	AS servers_max,
+			SUM(servers) 	AS servers_sum,
+			AVG(servers) 	AS servers_avg,
+			MIN(vcpus) 		AS vcpus_min,
+			MAX(vcpus) 		AS vcpus_max,
+			SUM(vcpus) 		AS vcpus_sum,
+			AVG(vcpus) 		AS vcpus_avg,
+			MIN(mem_gb) 	AS mem_gb_min,
+			MAX(mem_gb) 	AS mem_gb_max,
+			SUM(mem_gb) 	AS mem_gb_sum,
+			AVG(mem_gb) 	AS mem_gb_avg,
+			MIN(disk_gb) 	AS disk_gb_min,
+			MAX(disk_gb) 	AS disk_gb_max,
+			SUM(disk_gb) 	AS disk_gb_sum,
+			AVG(disk_gb) 	AS disk_gb_avg
+		FROM resources_day
+		WHERE SUBSTRING(resources_date, 1, 7) = #{resourcesDate}
+		GROUP BY SUBSTRING(resources_date, 1, 7), project_id
+		LIMIT #{_skiprows}, #{_pagesize}			
+	</select>		
+
+	<select id="selectListResourcesMonth" parameterType="BatchResourcesVO" resultType="BatchResourcesVO">
+		SELECT *
+		FROM resources_month
+		WHERE resources_date = #{resourcesDate}
+		AND project_id = #{projectId}
+	</select>
+	
+	<insert id="insertResourcesMonth" parameterType="BatchResourcesVO">
+		INSERT  INTO resources_month(
+			resources_date,
+			project_id,
+			servers_min,
+			servers_max,
+			servers_avg,
+			servers_sum,
+			vcpus_min,
+			vcpus_max,
+			vcpus_avg,
+			vcpus_sum,
+			mem_gb_min,
+			mem_gb_max,
+			mem_gb_avg,
+			mem_gb_sum,
+			disk_gb_min,
+			disk_gb_max,
+			disk_gb_avg,
+			disk_gb_sum,
+			reg_user_id,
+			reg_datetime
+		)VALUES(
+			#{resourcesDate},
+			#{projectId},
+			#{serversMin},
+			#{serversMax},
+			#{serversAvg},
+			#{serversSum},
+			#{vcpusMin},
+			#{vcpusMax},
+			#{vcpusAvg},
+			#{vcpusSum},
+			#{memGbMin},
+			#{memGbMax},
+			#{memGbAvg},
+			#{memGbSum},
+			#{diskGbMin},
+			#{diskGbMax},
+			#{diskGbAvg},
+			#{diskGbSum},
+			#{regUserId},
+			NOW()
+		)
+		ON DUPLICATE KEY 
+			UPDATE 
+			resources_date = #{resourcesDate},
+			project_id = #{projectId},
+			servers_min = #{serversMin},
+			servers_max = #{serversMax},
+			servers_avg = #{serversAvg},
+			servers_sum = #{serversSum},
+			vcpus_min = #{vcpusMin},
+			vcpus_max = #{vcpusMax},
+			vcpus_avg = #{vcpusAvg},
+			vcpus_sum = #{vcpusSum},
+			mem_gb_min = #{memGbMin},
+			mem_gb_max = #{memGbMax},
+			mem_gb_avg = #{memGbAvg},
+			mem_gb_sum = #{memGbSum},
+			disk_gb_min = #{diskGbMin},
+			disk_gb_max = #{diskGbMax},
+			disk_gb_avg = #{diskGbAvg},
+			disk_gb_sum = #{diskGbSum},
+			reg_user_id = #{regUserId},
+			reg_datetime = NOW()
+	</insert>	
+	
+	<update  id="updateResourcesMonth" parameterType="BatchResourcesVO"  >
+		UPDATE resources_month
+		SET 
+			servers_min = 	#{serversMin},
+			servers_max =	#{serversMax},
+			servers_avg = 	#{serversAvg},
+			servers_sum = 	#{serversSum},
+			vcpus_min = 	#{vcpusMin},
+			vcpus_max = 	#{vcpusMax},
+			vcpus_avg = 	#{vcpusAvg},
+			vcpus_sum = 	#{vcpusSum},
+			mem_gb_min = 	#{memGbMin},
+			mem_gb_max = 	#{memGbMax},
+			mem_gb_avg = 	#{memGbAvg},
+			mem_gb_sum = 	#{memGbSum},
+			disk_gb_min = 	#{diskGbMin},
+			disk_gb_max = 	#{diskGbMax},
+			disk_gb_avg = 	#{diskGbAvg},
+			disk_gb_sum = 	#{diskGbSum},		
+			reg_user_id	= 	#{regUserId} ,
+			reg_datetime = 	NOW()
+		WHERE resources_date = #{resourcesDate}
+		AND project_id = #{projectId}				
+	</update>
+			
+</mapper>

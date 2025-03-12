@@ -1,0 +1,2058 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.home.PotalHomeDAO">
+
+    <select id="userReVO" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			SUM(A.servers) 		AS server_cnt,
+			SUM(IFNULL(A.vcpus, 0)) 		AS vcpus,
+			SUM(IFNULL(A.mem_gb, 0)) 		AS mem_gb,
+			SUM(IFNULL(A.disk_gb, 0)) 		AS disk_gb
+		FROM	(
+			SELECT  P.project_id,
+				P.project_name,
+				P.project_alias,
+				V.vm_uuid	AS server_id,
+				V.hostname	AS server_name,
+				CASE WHEN V.vm_uuid IS NULL THEN 0 ELSE 1 END		AS servers,
+				V.vcpus	AS vcpus,
+				V.mem_gb	AS mem_gb,
+				V.disk_gb	AS disk_gb
+			FROM 	cmm_customer C
+				INNER JOIN oss_project P
+					ON 	P.customer_id = C.customer_id
+				LEFT OUTER JOIN req_project R
+					ON 	R.req_project_seq = P.program_seq
+				LEFT OUTER JOIN oss_vm V
+					ON 	V.project_id = P.project_id
+					AND 	IFNULL(V.expire_datetime, '9999-12-31') <![CDATA[>=]]> NOW()
+			WHERE 	'X' = 'X'
+			AND	(R.complete_flag = 'Y' OR R.complete_flag IS NULL)
+			<if test="rolechk == 'custom' ">
+				AND	C.customer_id =  (SELECT X.customer_id FROM cmm_user X WHERE X.user_id = #{loginUserId})
+			</if>
+			<if test="rolechk == 'pm'">
+		    	AND P.project_manager_id = #{loginUserId}
+		    </if>
+
+			UNION ALL
+			SELECT  P.project_id,
+				P.project_name,
+				P.project_alias,
+				NULL	AS server_id,
+				NULL	AS server_name,
+				0		AS servers,
+				0		AS vcpus,
+				0		AS mem_gb,
+				D.size_gb	AS disk_gb
+			FROM 	cmm_customer C
+				INNER JOIN oss_project P
+					ON 	P.customer_id = C.customer_id
+				LEFT OUTER JOIN req_project R
+					ON 	R.req_project_seq = P.program_seq
+				LEFT OUTER  JOIN oss_disk D
+					ON	D.project_id = P.project_id
+					AND 	IFNULL(D.expire_datetime, '9999-12-31') <![CDATA[>=]]> NOW()
+			WHERE 	'X' = 'X'
+			AND	(R.complete_flag = 'Y' OR R.complete_flag IS NULL)
+			<if test="rolechk == 'custom' ">
+				AND	C.customer_id =  (SELECT X.customer_id FROM cmm_user X WHERE X.user_id = #{loginUserId})
+			</if>
+			<if test="rolechk == 'pm'">
+		    	AND P.project_manager_id = #{loginUserId}
+		    </if>
+
+			) A
+	</select>
+
+	<select id="userReVOList" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+		A.project_id,
+					A.project_name,
+					A.project_alias,
+			SUM(A.servers) 		AS server_cnt,
+			SUM(IFNULL(A.vcpus, 0)) 		AS vcpus,
+			SUM(IFNULL(A.mem_gb, 0)) 		AS mem_gb,
+			SUM(IFNULL(A.disk_gb, 0)) 		AS disk_gb
+		FROM	(
+			SELECT  P.project_id,
+				P.project_name,
+				P.project_alias,
+				V.vm_uuid	AS server_id,
+				V.hostname	AS server_name,
+				CASE WHEN V.vm_uuid IS NULL THEN 0 ELSE 1 END		AS servers,
+				V.vcpus	AS vcpus,
+				V.mem_gb	AS mem_gb,
+				V.disk_gb	AS disk_gb
+			FROM 	cmm_customer C
+				INNER JOIN oss_project P
+					ON 	P.customer_id = C.customer_id
+				LEFT OUTER JOIN req_project R
+					ON 	R.req_project_seq = P.program_seq
+				LEFT OUTER JOIN oss_vm V
+					ON 	V.project_id = P.project_id
+					AND 	IFNULL(V.expire_datetime, '9999-12-31') <![CDATA[>=]]> NOW()
+			WHERE 	'X' = 'X'
+			AND	(R.complete_flag = 'Y' OR R.complete_flag IS NULL)
+			<if test="rolechk == 'custom' ">
+				AND	C.customer_id =  (SELECT X.customer_id FROM cmm_user X WHERE X.user_id = #{loginUserId})
+			</if>
+			<if test="rolechk == 'pm'">
+		    	AND P.project_manager_id = #{loginUserId}
+		    </if>
+
+			UNION ALL
+			SELECT  P.project_id,
+				P.project_name,
+				P.project_alias,
+				NULL	AS server_id,
+				NULL	AS server_name,
+				0		AS servers,
+				0		AS vcpus,
+				0		AS mem_gb,
+				D.size_gb	AS disk_gb
+			FROM 	cmm_customer C
+				INNER JOIN oss_project P
+					ON 	P.customer_id = C.customer_id
+				LEFT OUTER JOIN req_project R
+					ON 	R.req_project_seq = P.program_seq
+				LEFT OUTER  JOIN oss_disk D
+					ON	D.project_id = P.project_id
+					AND 	IFNULL(D.expire_datetime, '9999-12-31') <![CDATA[>=]]> NOW()
+			WHERE 	'X' = 'X'
+			AND	(R.complete_flag = 'Y' OR R.complete_flag IS NULL)
+			<if test="rolechk == 'custom' ">
+				AND	C.customer_id =  (SELECT X.customer_id FROM cmm_user X WHERE X.user_id = #{loginUserId})
+			</if>
+			<if test="rolechk == 'pm'">
+		    	AND P.project_manager_id = #{loginUserId}
+		    </if>
+
+			) A
+		GROUP BY A.project_id, A.project_alias
+		ORDER BY servers DESC, project_name
+
+		LIMIT 0,3
+	</select>
+
+	<select id="userProcessVO" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			COUNT(*) AS apprv_processing_cnt
+		FROM
+			bss_order OD ,
+			cmm_user CU
+		WHERE CU.user_id = OD.order_user_id
+		<if test="rolechk == 'pm'">
+    	AND CU.user_id = #{loginUserId}
+    	</if>
+		<if test="rolechk == 'custom' ">
+		AND CU.customer_id = (SELECT customer_id FROM cmm_user WHERE user_id=#{loginUserId})
+		</if>
+		AND OD.apprv_state='APPRV_PROCESSING'
+		AND OD.order_datetime BETWEEN ADDDATE( SYSDATETIME , INTERVAL -7 DAY) AND NOW()
+	</select>
+
+	<select id="userWorkProcessVO" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			COUNT(*) AS work_processing_cnt
+		FROM
+			req_work RW,
+			bss_order_product PRD,
+			bss_order OD,
+			cmm_user CU
+		WHERE RW.work_state ='N'
+		AND PRD.order_product_seq = RW.order_product_seq
+		AND OD.order_no = PRD.order_no
+		AND CU.user_id = OD.order_user_id
+		<if test="rolechk == 'pm'">
+    	AND CU.user_id = #{loginUserId}
+    	</if>
+		<if test="rolechk == 'custom' ">
+		AND CU.customer_id = (SELECT customer_id FROM cmm_user WHERE user_id=#{loginUserId})
+		</if>
+		AND RW.reg_datetime BETWEEN ADDDATE( SYSDATETIME , INTERVAL -7 DAY) AND NOW()
+	</select>
+
+	<select id="userCompletedVO" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			COUNT(*) AS apprv_completed_cnt
+		FROM
+			bss_order OD ,
+			cmm_user CU
+		WHERE CU.user_id = OD.order_user_id
+		<if test="rolechk == 'pm'">
+    	AND CU.user_id = #{loginUserId}
+    	</if>
+		<if test="rolechk == 'custom' ">
+		AND CU.customer_id = (SELECT customer_id FROM cmm_user WHERE user_id=#{loginUserId})
+		</if>
+		AND OD.apprv_state='APPRV_COMPLETED'
+		AND OD.order_datetime BETWEEN ADDDATE( SYSDATETIME , INTERVAL -7 DAY) AND NOW()
+	</select>
+
+	<select id="userRejectedVO" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			COUNT(*) AS apprv_rejected_cnt
+		FROM
+			bss_order OD ,
+			cmm_user CU
+		WHERE CU.user_id = OD.order_user_id
+		<if test="rolechk == 'pm'">
+    	AND CU.user_id = #{loginUserId}
+    	</if>
+		<if test="rolechk == 'custom' ">
+		AND CU.customer_id = (SELECT customer_id FROM cmm_user WHERE user_id=#{loginUserId})
+		</if>
+		AND OD.apprv_state='APPRV_REJECTED'
+		AND OD.order_datetime BETWEEN ADDDATE( SYSDATETIME , INTERVAL -7 DAY) AND NOW()
+	</select>
+
+	<select id="userApprvstateList" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			DATE_FORMAT(BOR.order_datetime, '%Y-%m-%d %H:%i') AS order_datetime,
+			PRO.order_count,
+			PRO.amount,
+			BOR.order_no,
+			BOR.order_user_id,
+			CU.user_name AS order_user_name,
+			BOR.apprv_state,
+			CC.code_name AS apprv_state_name,
+			CU.customer_id
+		FROM
+			bss_order BOR
+		LEFT OUTER JOIN cmm_code CC
+		ON CC.code_key_id = 'APPRV_STATE'
+		AND CC.code_id = BOR.apprv_state
+
+		LEFT OUTER JOIN cmm_user CU
+		ON CU.user_id = BOR.order_user_id
+
+		LEFT OUTER JOIN (
+				SELECT
+					order_no,
+					FORMAT(FLOOR(IFNULL(SUM(amount),0)),0) AS amount,
+					CONCAT(IFNULL(COUNT(order_no),0), '건') AS order_count
+				FROM bss_order_product
+				GROUP BY order_no
+				) PRO
+		ON PRO.order_no = BOR.order_no
+		where 1=1
+		<if test="rolechk == 'pm'">
+		  	AND CU.user_id = #{loginUserId}
+		</if>
+		<if test="rolechk == 'custom' ">
+			AND CU.customer_id = (SELECT customer_id FROM cmm_user WHERE user_id=#{loginUserId})
+		</if>
+		AND BOR.order_datetime BETWEEN ADDDATE( SYSDATETIME , INTERVAL -7 DAY) AND NOW()
+		ORDER BY order_datetime DESC
+	</select>
+
+
+	<select id="billInvoiceByProject" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			  A.ALL AS "allText"
+			, A.project_id AS projectId
+			, IF(A.project_alias='', A.project_name, A.project_alias) AS projectName
+			, A.customer_id AS customerId
+			, SUM(A.amount1) AS m01
+			, SUM(A.amount2) AS m02
+			, SUM(A.amount3) AS m03
+			, SUM(A.amount4) AS m04
+			, SUM(A.amount5) AS m05
+			, SUM(A.amount6) AS m06
+			, SUM(A.amount7) AS m07
+			, SUM(A.amount8) AS m08
+			, SUM(A.amount9) AS m09
+			, SUM(A.amount10) AS m10
+			, SUM(A.amount11) AS m11
+			, SUM(A.amount12) AS m12
+		FROM(
+			SELECT
+				  'ALL' AS "ALL"
+				, PJ.project_id
+				, PJ.project_name
+				, PJ.project_alias
+				, PJ.customer_id
+				, IF(BIPD.bill_yyyymm = #{searchMonth01}, (BIPD.amount), 0) AS amount1
+				, IF(BIPD.bill_yyyymm = #{searchMonth02}, (BIPD.amount), 0) AS amount2
+				, IF(BIPD.bill_yyyymm = #{searchMonth03}, (BIPD.amount), 0) AS amount3
+				, IF(BIPD.bill_yyyymm = #{searchMonth04}, (BIPD.amount), 0) AS amount4
+				, IF(BIPD.bill_yyyymm = #{searchMonth05}, (BIPD.amount), 0) AS amount5
+				, IF(BIPD.bill_yyyymm = #{searchMonth06}, (BIPD.amount), 0) AS amount6
+				, IF(BIPD.bill_yyyymm = #{searchMonth07}, (BIPD.amount), 0) AS amount7
+				, IF(BIPD.bill_yyyymm = #{searchMonth08}, (BIPD.amount), 0) AS amount8
+				, IF(BIPD.bill_yyyymm = #{searchMonth09}, (BIPD.amount), 0) AS amount9
+				, IF(BIPD.bill_yyyymm = #{searchMonth10}, (BIPD.amount), 0) AS amount10
+				, IF(BIPD.bill_yyyymm = #{searchMonth11}, (BIPD.amount), 0) AS amount11
+				, IF(BIPD.bill_yyyymm = #{searchMonth12}, (BIPD.amount), 0) AS amount12
+			FROM (
+				SELECT
+					*
+				FROM oss_project
+				WHERE project_manager_id = #{loginUserId}
+			) PJ
+			LEFT JOIN (
+				SELECT
+					*
+				FROM bill_invoice_project_detail
+				WHERE invoice_item  = #{invoiceItem}
+				AND bill_yyyymm  >= #{searchMonth01}
+				AND bill_yyyymm  <![CDATA[<=]]> #{searchMonth12}
+			) BIPD
+			ON PJ.project_id = BIPD.project_id
+		)A
+		<if test="group == 'all' ">
+			GROUP BY allText
+		</if>
+		<if test="group == 'project' ">
+			GROUP BY projectId
+		</if>
+		<if test="group == 'customer' ">
+			GROUP BY customerId
+		</if>
+
+	</select>
+
+	<!-- 회원사 기준 -->
+	<select id="billInvoiceByCustomer" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			  A.ALL AS "allText"
+			, A.customer_id AS customerId
+			, A.customer_name AS projectName
+			, SUM(A.amount1) AS m01
+			, SUM(A.amount2) AS m02
+			, SUM(A.amount3) AS m03
+			, SUM(A.amount4) AS m04
+			, SUM(A.amount5) AS m05
+			, SUM(A.amount6) AS m06
+			, SUM(A.amount7) AS m07
+			, SUM(A.amount8) AS m08
+			, SUM(A.amount9) AS m09
+			, SUM(A.amount10) AS m10
+			, SUM(A.amount11) AS m11
+			, SUM(A.amount12) AS m12
+		FROM(
+			SELECT
+				'ALL' AS "ALL"
+				, CC.customer_id
+				, CC.customer_name
+				, BICD.amount1
+				, BICD.amount2
+				, BICD.amount3
+				, BICD.amount4
+				, BICD.amount5
+				, BICD.amount6
+				, BICD.amount7
+				, BICD.amount8
+				, BICD.amount9
+				, BICD.amount10
+				, BICD.amount11
+				, BICD.amount12
+			FROM cmm_customer CC
+			LEFT JOIN(
+				SELECT
+					customer_id
+					, IF(bill_yyyymm = #{searchMonth01}, (amount), 0) AS amount1
+					, IF(bill_yyyymm = #{searchMonth02}, (amount), 0) AS amount2
+					, IF(bill_yyyymm = #{searchMonth03}, (amount), 0) AS amount3
+					, IF(bill_yyyymm = #{searchMonth04}, (amount), 0) AS amount4
+					, IF(bill_yyyymm = #{searchMonth05}, (amount), 0) AS amount5
+					, IF(bill_yyyymm = #{searchMonth06}, (amount), 0) AS amount6
+					, IF(bill_yyyymm = #{searchMonth07}, (amount), 0) AS amount7
+					, IF(bill_yyyymm = #{searchMonth08}, (amount), 0) AS amount8
+					, IF(bill_yyyymm = #{searchMonth09}, (amount), 0) AS amount9
+					, IF(bill_yyyymm = #{searchMonth10}, (amount), 0) AS amount10
+					, IF(bill_yyyymm = #{searchMonth11}, (amount), 0) AS amount11
+					, IF(bill_yyyymm = #{searchMonth12}, (amount), 0) AS amount12
+				FROM bill_invoice_customer_detail BICD
+				WHERE invoice_item  = #{invoiceItem}
+				AND bill_yyyymm  >= #{searchMonth01}
+				AND bill_yyyymm  <![CDATA[<=]]> #{searchMonth12}
+			) BICD
+			ON CC.customer_id = BICD.customer_id
+			WHERE 1=1
+			<if test="rolechk == 'custom' ">
+				AND CC.customer_id = (SELECT customer_id FROM cmm_user WHERE user_id=#{loginUserId})
+			</if>
+		)A
+		<if test="group == 'all' ">
+			GROUP BY 	allText
+		</if>
+		<if test="group == 'project' ">
+			GROUP BY customerId
+		</if>
+		<if test="group == 'customer' ">
+			GROUP BY customerId
+		</if>
+	</select>
+
+	<select id="customerCnt" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			 COUNT(DISTINCT CC.customer_id) AS customerCnt
+			 , COUNT(DISTINCT OP.project_id) AS projectCnt
+		FROM cmm_customer CC
+		LEFT JOIN oss_project OP
+		ON CC.customer_id = OP.customer_id
+
+	</select>
+
+	<select id="workCnt" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			COUNT(*) AS m01
+			, COUNT(IF(work_state='Y',work_state,NULL)) AS m02 /*'작업완료' */
+			, COUNT(IF(work_state='C',work_state,NULL)) AS m03 /*'작업진행중' */
+			, COUNT(IF(work_state='N',work_state,NULL)) AS m04 /*'작업자확인' */
+		FROM req_work
+	</select>
+
+<select id="userDashboardInfo" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+	SELECT
+		VM.bill_yyyymm  	AS bill_yyyymm,
+		'VM'		AS resource_type,
+		COUNT(VM.vm_uuid)	AS result_value
+	FROM bill_charge_vm VM
+	INNER JOIN oss_project OP
+	ON  OP.project_id = VM.project_id
+	<if test="rolechk == 'pm' ">
+	   AND OP.project_manager_id =  #{loginUserId}
+	</if>
+	<if test="rolechk == 'custom' ">
+	INNER JOIN cmm_customer CC
+	ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */
+	</if>
+	WHERE VM.bill_yyyymm =  #{billYyyymm}
+	GROUP BY bill_yyyymm, resource_type
+
+	UNION ALL
+	SELECT
+		NAS.bill_yyyymm  	AS bill_yyyymm,
+		'NAS'		AS resource_type,
+		SUM(NAS.measure_value)	AS result_value
+	FROM bill_charge_nas_resource_detail NAS
+	INNER JOIN oss_project OP
+	ON  OP.project_id = NAS.project_id
+	<if test="rolechk == 'pm' ">
+	   AND OP.project_manager_id =  #{loginUserId}
+	</if>
+	<if test="rolechk == 'custom' ">
+	INNER JOIN cmm_customer CC
+	ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */
+	</if>
+	WHERE NAS.bill_yyyymm = #{billYyyymm}
+	GROUP BY bill_yyyymm, resource_type
+
+	UNION ALL
+	SELECT
+		LB.bill_yyyymm  	AS bill_yyyymm,
+		'LOADBALANCER'		AS resource_type,
+		SUM(LB.measure_value)	AS result_value
+	FROM bill_charge_loadbalancer_resource_detail LB
+	INNER JOIN oss_project OP
+	ON  OP.project_id = LB.project_id
+	<if test="rolechk == 'pm' ">
+	   AND OP.project_manager_id =  #{loginUserId}
+	</if>
+	<if test="rolechk == 'custom' ">
+	INNER JOIN cmm_customer CC
+	ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */
+	</if>
+	WHERE LB.bill_yyyymm = #{billYyyymm}
+	GROUP BY bill_yyyymm, resource_type
+
+<!-- 	UNION ALL -->
+<!-- 	SELECT -->
+<!-- 		BAK.bill_yyyymm  	AS bill_yyyymm, -->
+<!-- 		'BACKUP'		AS resource_type, -->
+<!-- 		SUM(BAK.measure_value)	AS result_value -->
+<!-- 	FROM bill_charge_backup_resource_detail BAK -->
+<!-- 	INNER JOIN oss_project OP -->
+<!-- 	ON  OP.project_id = BAK.project_id -->
+<!-- 	<if test="rolechk == 'pm' "> -->
+<!-- 	   AND OP.project_manager_id =  #{loginUserId} -->
+<!-- 	</if> -->
+<!-- 	<if test="rolechk == 'custom' "> -->
+<!-- 	INNER JOIN cmm_customer CC -->
+<!-- 	ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */ -->
+<!-- 	</if> -->
+<!-- 	WHERE BAK.bill_yyyymm =  #{billYyyymm} -->
+<!-- 	GROUP BY bill_yyyymm, resource_type -->
+
+	UNION ALL
+	SELECT
+		IP.bill_yyyymm  	AS bill_yyyymm,
+		'PUBLICIP'		AS resource_type,
+		SUM(IP.measure_value)	AS result_value
+	FROM bill_charge_publicip_resource_detail IP
+	INNER JOIN oss_project OP
+	ON  OP.project_id = IP.project_id
+	<if test="rolechk == 'pm' ">
+	   AND OP.project_manager_id =  #{loginUserId}
+	</if>
+	<if test="rolechk == 'custom' ">
+	INNER JOIN cmm_customer CC
+	ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */
+	</if>
+	WHERE IP.bill_yyyymm = #{billYyyymm}
+	GROUP BY bill_yyyymm, resource_type
+
+	UNION ALL
+	SELECT
+		A.bill_yyyymm,
+		A.resource_type,
+		SUM(A.result_value) AS result_value
+	FROM
+	(
+		SELECT
+			DS.bill_yyyymm  	AS bill_yyyymm,
+			'DISK'		AS resource_type,
+			SUM(DS.measure_value)	AS result_value
+		FROM bill_charge_disk_resource_detail DS
+		INNER JOIN oss_project OP
+		ON  OP.project_id = DS.project_id
+		<if test="rolechk == 'pm' ">
+		   AND OP.project_manager_id =  #{loginUserId}
+		</if>
+		<if test="rolechk == 'custom' ">
+		INNER JOIN cmm_customer CC
+		ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */
+		</if>
+		WHERE DS.bill_yyyymm = #{billYyyymm}
+		GROUP BY bill_yyyymm, resource_type
+		UNION ALL
+		SELECT
+			DS.bill_yyyymm  	AS bill_yyyymm,
+			'DISK'		AS resource_type,
+			SUM(DS.measure_value)	AS result_value
+		FROM bill_charge_vm_resource_detail DS
+		INNER JOIN oss_project OP
+		ON  OP.project_id = DS.project_id
+		<if test="rolechk == 'pm' ">
+		   AND OP.project_manager_id =  #{loginUserId}
+		</if>
+		<if test="rolechk == 'custom' ">
+		INNER JOIN cmm_customer CC
+		ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */
+		</if>
+		AND DS.resource_item ='DISK'
+		WHERE DS.bill_yyyymm = #{billYyyymm}
+		GROUP BY bill_yyyymm, resource_type
+	) A
+	GROUP BY bill_yyyymm, resource_type
+<!-- 	UNION ALL -->
+<!-- 	SELECT -->
+<!-- 		MCA.bill_yyyymm  	AS bill_yyyymm, -->
+<!-- 		'MCA'		AS resource_type, -->
+<!-- 		SUM(MCA.measure_value)	AS result_value -->
+<!-- 	FROM bill_charge_mca_resource_detail MCA -->
+<!-- 	INNER JOIN oss_project OP -->
+<!-- 	ON  OP.project_id = MCA.project_id -->
+<!-- 	<if test="rolechk == 'pm' "> -->
+<!-- 	   AND OP.project_manager_id =  #{loginUserId} -->
+<!-- 	</if> -->
+<!-- 	<if test="rolechk == 'custom' "> -->
+<!-- 	INNER JOIN cmm_customer CC -->
+<!-- 	ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */ -->
+<!-- 	</if> -->
+<!-- 	WHERE MCA.bill_yyyymm = #{billYyyymm} -->
+<!-- 	GROUP BY bill_yyyymm, resource_type -->
+<!-- 	UNION ALL -->
+<!-- 	SELECT -->
+<!-- 		SCM.bill_yyyymm  	AS bill_yyyymm, -->
+<!-- 		'SCM'			AS resource_type, -->
+<!-- 		SUM(SCM.measure_value)	AS result_value -->
+<!-- 	FROM bill_charge_scm_resource_detail SCM -->
+<!-- 	INNER JOIN oss_project OP -->
+<!-- 	ON  OP.project_id = SCM.project_id -->
+<!-- 	<if test="rolechk == 'pm' "> -->
+<!-- 	   AND OP.project_manager_id =  #{loginUserId} -->
+<!-- 	</if> -->
+<!-- 	<if test="rolechk == 'custom' "> -->
+<!-- 	INNER JOIN cmm_customer CC -->
+<!-- 	ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */ -->
+<!-- 	</if> -->
+<!-- 	WHERE SCM.bill_yyyymm =  #{billYyyymm} -->
+<!-- 	GROUP BY bill_yyyymm, resource_type -->
+<!-- 	UNION ALL -->
+<!-- 	SELECT -->
+<!-- 		SEC.bill_yyyymm  	AS bill_yyyymm, -->
+<!-- 		'SECURITY'		AS resource_type, -->
+<!-- 		SUM(SEC.measure_value)	AS result_value -->
+<!-- 	FROM bill_charge_security_resource_detail SEC -->
+<!-- 	INNER JOIN oss_project OP -->
+<!-- 	ON  OP.project_id = SEC.project_id -->
+<!-- 	<if test="rolechk == 'pm' "> -->
+<!-- 	   AND OP.project_manager_id =  #{loginUserId} -->
+<!-- 	</if> -->
+<!-- 	<if test="rolechk == 'custom' "> -->
+<!-- 	INNER JOIN cmm_customer CC -->
+<!-- 	ON OP.customer_id = CC.customer_id AND CC.manager_id = #{loginUserId}  /* 회원사 관리자 */ -->
+<!-- 	</if> -->
+<!-- 	WHERE SEC.bill_yyyymm = #{billYyyymm} -->
+<!-- 	GROUP BY bill_yyyymm, resource_type -->
+
+
+	</select>
+	<!-- 공지사항 리스트 -->
+    <select id="userNoticeList" resultType="CustomMbrHomeVO">
+    	SELECT
+				a.notice_no
+				, a.notice_type
+				, a.title
+				, a.content
+				, a.hit_count
+				, a.disp_sdate
+				, a.disp_edate
+				, a.reg_datetime
+				, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2 /* 등록 일시*/
+				, a.reg_user_id
+				, (SELECT user_name FROM cmm_user WHERE user_id=a.reg_user_id) AS user_name
+				, a.mod_datetime
+				, a.mod_user_id
+				, a.del_flag
+				,(SELECT code_name FROM cmm_code WHERE  code_id=a.notice_type AND code_key_id='NOTICE_TYPE' ) AS code_name
+			FROM
+				bbs_notice a
+	    	WHERE a.del_flag = 'N'
+	    	ORDER BY a.reg_datetime DESC
+	    	LIMIT 0, 3
+	</select>
+
+	<!-- Q&A 리스트 -->
+    <select id="userQnaLast" parameterType="java.util.Map" resultType="CustomMbrHomeVO">
+			SELECT
+				a.qna_no
+				, a.qna_type
+				, a.title
+				, a.content
+				, a.reg_datetime
+				, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, a.reg_user_id
+				, a.mod_datetime
+				, a.mod_user_id
+				, (SELECT user_name FROM cmm_user WHERE user_id=a.reg_user_id) AS user_name
+				, a.del_flag
+				, a.secret_flag
+				,(SELECT COUNT(*) FROM bbs_qna WHERE parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS reply_cnt
+				,(SELECT code_name FROM cmm_code WHERE  code_id=a.qna_type AND code_key_id='QNA_TYPE' ) AS code_name
+				, (SELECT b.qna_no FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_qna_no
+				, (SELECT b.content FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_content
+				, (SELECT b.reg_user_id FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_reg_user_id
+				, (SELECT (SELECT d.user_name FROM cmm_user d WHERE user_id=b.reg_user_id) AS re_user_name FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_user_name
+				, (SELECT DATE_FORMAT(b.reg_datetime, '%Y-%m-%d %H:%i') AS re_reg_datetime2 FROM bbs_qna b WHERE b.parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS re_reg_datetime2
+			FROM
+				bbs_qna a
+			WHERE
+				(a.parent_qna_no IS NULL OR a.parent_qna_no=0)
+			AND
+				a.del_flag <![CDATA[<>]]> 'Y'
+			AND
+				(a.secret_flag <![CDATA[<>]]> 'Y' OR a.reg_user_id=#{loginUserId}	)
+			ORDER BY a.reg_datetime DESC
+			LIMIT 0, 3
+	</select>
+
+	<!-- Bill 전월 당월 -->
+    <select id="userBillTwoMonth" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+    	<if test="rolechk == 'custom' ">
+			SELECT
+				DATE_FORMAT(STR_TO_DATE(A.day, '%Y%m'),'%c') AS "month",
+				IFNULL(B.amount, '0') AS amount
+			FROM(
+				SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH), '%Y%m')  AS "day" FROM DB_ROOT
+				UNION
+				SELECT DATE_FORMAT(NOW(), '%Y%m') AS "day" FROM DB_ROOT
+			)A
+			LEFT JOIN (
+				SELECT
+					BM.bill_yyyymm,
+					SUM(BCD.amount) AS amount
+				FROM	bill_master BM
+
+				INNER JOIN bill_invoice_customer BCM
+				ON 	BCM.bill_yyyymm = BM.bill_yyyymm
+
+				INNER JOIN bill_invoice_customer_detail BCD
+				ON 	BCD.bill_yyyymm = BCM.bill_yyyymm
+
+				AND 	BCD.customer_id = BCM.customer_id
+				AND 	BCD.invoice_item = '0000'
+
+				INNER JOIN cmm_customer CM
+				ON	CM.customer_id = BCM.customer_id
+
+				WHERE	BM.bill_yyyymm IN (DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH), '%Y%m'), DATE_FORMAT(NOW(), '%Y%m'))
+				AND	CM.customer_id = (SELECT X.customer_id FROM cmm_user X WHERE X.user_id = #{loginUserId})
+				GROUP BY BM.bill_yyyymm
+			)B
+			ON A.day = B.bill_yyyymm
+			ORDER BY A.day
+		</if>
+		<if test="rolechk == 'pm' ">
+			SELECT
+				DATE_FORMAT(STR_TO_DATE(A.day, '%Y%m'),'%c') AS "month",
+				IFNULL(B.amount, '0') AS amount
+			FROM(
+				SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH), '%Y%m')  AS "day" FROM DB_ROOT
+				UNION
+				SELECT DATE_FORMAT(NOW(), '%Y%m') AS "day" FROM DB_ROOT
+			)A
+			LEFT JOIN (
+				SELECT
+					BM.bill_yyyymm,
+					SUM(BPD.amount) AS amount
+				FROM	bill_master BM
+				INNER JOIN bill_invoice_customer BCM
+				ON 	BCM.bill_yyyymm = BM.bill_yyyymm
+				INNER JOIN bill_invoice_project BPJ
+				ON 	BPJ.bill_yyyymm = BCM.bill_yyyymm
+				AND 	BPJ.customer_id = BCM.customer_id
+				INNER JOIN bill_invoice_project_detail BPD
+				ON 	BPD.bill_yyyymm = BPJ.bill_yyyymm
+				AND 	BPD.customer_id = BPJ.customer_id
+				AND 	BPD.project_id = BPJ.project_id
+				AND 	BPD.invoice_item = '0000'
+				INNER JOIN oss_project OP
+				ON 	OP.project_id = BPJ.project_id
+				AND 	OP.customer_id = BPJ.customer_id
+				INNER JOIN cmm_customer CM
+				ON	CM.customer_id = BCM.customer_id
+				WHERE	BM.bill_yyyymm IN (DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH), '%Y%m'), DATE_FORMAT(NOW(), '%Y%m'))
+				AND	CM.customer_id = (SELECT X.customer_id FROM cmm_user X WHERE X.user_id = #{loginUserId})
+				AND	OP.project_manager_id =  #{loginUserId}
+				GROUP BY BM.bill_yyyymm
+				ORDER BY BM.bill_yyyymm
+			)B
+			ON A.day = B.bill_yyyymm
+			ORDER BY A.day
+		</if>
+	</select>
+
+
+	<select id="timer" resultType="String">
+		SELECT NOW()
+	</select>
+
+	<select id="cloudUsage" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+			OA.project_id
+			, OA.vm_total
+			, OA.vm_used
+			, OA.vm_avail
+			, OA.vcpu_total
+			, OA.vcpu_used
+			, OA.vcpu_avail
+			, ROUND(OA.mem_total /1024,0) AS mem_total
+			, ROUND(OA.mem_used /1024,0) AS mem_used
+			, ROUND(OA.mem_avail /1024,0) AS mem_avail
+			, OA.disk_total
+			, OA.disk_used
+			, OA.disk_avail
+			, OA.nas_total
+			, OA.nas_used
+			, OA.nas_avail
+			, DATE_FORMAT(OA.coll_datetime, '%Y-%m-%d %H:%i') AS collDatetime
+		FROM
+		oss_availability OA
+		WHERE project_id = 'ALL'
+	</select>
+
+	<select id="mngQnaList" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT title, (SELECT user_name FROM cmm_user WHERE user_id = b.reg_user_id) reg_name,
+		DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') reg_datetime, qna_no
+		FROM
+		(
+			SELECT
+			*,(SELECT COUNT(*) FROM bbs_qna WHERE parent_qna_no = a.qna_no AND del_flag <![CDATA[<>]]> 'Y') AS replyCnt
+			FROM
+				bbs_qna a
+			WHERE
+				(a.parent_qna_no IS NULL OR a.parent_qna_no=0)
+			AND
+				a.del_flag <![CDATA[<>]]> 'Y'
+		) b
+		WHERE b.replyCnt = 0
+		ORDER BY qna_no DESC
+		LIMIT 3
+	</select>
+
+	<select id="mngCloudService" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+   			COUNT(project_id) AS projectCnt
+			, IFNULL(FORMAT(SUM(vmCnt), 0), 0) AS vmCnt
+			, IFNULL(FORMAT(SUM(vcpusCnt), 0), 0) AS vcpusCnt
+			, IFNULL(FORMAT(SUM(memCnt), 0), 0) AS memCnt
+			, IFNULL(FORMAT(SUM(diskCnt), 0), 0) AS diskCnt
+			, IFNULL(FORMAT(SUM(sizeCnt), 0), 0) AS sizeCnt
+			, IFNULL(FORMAT(SUM(nasCnt), 0), 0) AS nasCnt
+			, IFNULL(FORMAT(SUM(lbCnt), 0), 0) AS lbCnt
+			, IFNULL(FORMAT(SUM(ipCnt), 0), 0) AS ipCnt
+<!-- 			, IFNULL(FORMAT(SUM(backCnt), 0), 0) AS backCnt -->
+<!-- 			, IFNULL(FORMAT(SUM(mcaCnt), 0), 0) AS mcaCnt -->
+<!-- 			, IFNULL(FORMAT(SUM(scmCnt), 0), 0) AS scmCnt -->
+<!-- 			, IFNULL(FORMAT(SUM(secCnt), 0), 0) AS secCnt -->
+    	FROM(
+			SELECT
+				OP.project_id
+				, OV.vmCnt AS vmCnt
+				, OV.vcpusCnt AS vcpusCnt
+				, OV.memCnt AS memCnt
+				, OV.diskCnt AS diskCnt
+				, OD.sizeCnt AS sizeCnt
+				, ON2.nasCnt AS nasCnt
+				, OL.lbCnt AS lbCnt
+				, OIP.ipCnt AS ipCnt
+<!-- 				, OB.backCnt AS backCnt -->
+<!-- 				, OM.mcaCnt AS mcaCnt -->
+<!-- 				, OS.scmCnt AS scmCnt -->
+<!-- 				, OSEC.secCnt AS secCnt -->
+			FROM oss_project OP
+
+			LEFT JOIN (
+				SELECT
+					project_id
+					, COUNT(*) AS vmCnt
+					, SUM(vcpus) AS vcpusCnt
+					, SUM(mem_gb) AS memCnt
+					, SUM(disk_gb) AS diskCnt
+				FROM oss_vm
+				WHERE del_flag = 'N'
+				AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY project_id
+			) OV
+			ON OP.project_id = OV.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id
+					, COUNT(*) AS sizeCnt
+				FROM oss_disk
+				WHERE del_flag = 'N'
+				AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY project_id
+			) OD
+			ON OP.project_id = OD.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id
+					, COUNT(*) AS nasCnt
+				FROM oss_nas
+				WHERE del_flag = 'N'
+				AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY project_id
+			) ON2
+			ON OP.project_id = ON2.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id
+					, COUNT(*) AS lbCnt
+				FROM oss_loadbalancer
+				WHERE del_flag = 'N'
+				AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY project_id
+			) OL
+			ON OP.project_id = OL.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id
+					, COUNT(*) AS ipCnt
+				FROM oss_publicip
+				WHERE del_flag = 'N'
+				AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY project_id
+			) OIP
+			ON OP.project_id = OIP.project_id
+
+<!-- 			LEFT JOIN ( -->
+<!-- 				SELECT -->
+<!-- 					project_id -->
+<!-- 					, COUNT(*) AS backCnt -->
+<!-- 				FROM oss_backup -->
+<!-- 				WHERE del_flag = 'N' -->
+<!-- 				AND IFNULL(expire_datetime, '9999-12-31') >= NOW() -->
+<!-- 				GROUP BY project_id -->
+<!-- 			) OB -->
+<!-- 			ON OP.project_id = OB.project_id -->
+
+<!-- 			LEFT JOIN ( -->
+<!-- 				SELECT -->
+<!-- 					project_id -->
+<!-- 					, COUNT(*) AS mcaCnt -->
+<!-- 				FROM oss_mca -->
+<!-- 				WHERE del_flag = 'N' -->
+<!-- 				AND IFNULL(expire_datetime, '9999-12-31') >= NOW() -->
+<!-- 				GROUP BY project_id -->
+<!-- 			) OM -->
+<!-- 			ON OP.project_id = OM.project_id -->
+
+<!-- 			LEFT JOIN ( -->
+<!-- 				SELECT -->
+<!-- 					project_id -->
+<!-- 					, COUNT(*) AS scmCnt -->
+<!-- 				FROM oss_scm -->
+<!-- 				WHERE del_flag = 'N' -->
+<!-- 				AND IFNULL(expire_datetime, '9999-12-31') >= NOW() -->
+<!-- 				GROUP BY project_id -->
+<!-- 			) OS -->
+<!-- 			ON OP.project_id = OS.project_id -->
+
+<!-- 			LEFT JOIN ( -->
+<!-- 				SELECT -->
+<!-- 					project_id -->
+<!-- 					, COUNT(*) AS secCnt -->
+<!-- 				FROM oss_security -->
+<!-- 				WHERE del_flag = 'N' -->
+<!-- 				AND IFNULL(expire_datetime, '9999-12-31') >= NOW() -->
+<!-- 				GROUP BY project_id -->
+<!-- 			) OSEC -->
+<!-- 			ON OP.project_id = OSEC.project_id -->
+<!-- 			WHERE 1=1 -->
+		) A
+<!-- 		WHERE 1=1 -->
+	</select>
+
+	<select id="mngCustomerCount" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+				COUNT(DISTINCT OP.customer_id) customerCnt
+			FROM oss_project OP
+			WHERE 1=1
+			AND OP.delete_flag <![CDATA[<>]]> 'Y'
+	</select>
+
+	<select id="mngCustomerAmount" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT
+				bill_yyyymm
+				, SUM(IF(invoice_item='0000',amount,0)) tot_amount
+				, SUM(IF(invoice_item='AAA0',amount,0)) vm_amount
+				, SUM(IF(invoice_item='AEA0',amount,0)) disk_amount
+				, SUM(IF(invoice_item='AEB0',amount,0)) nas_amount
+				, SUM(IF(invoice_item='AED0',amount,0)) ip_amount
+<!-- 				, SUM(IF(invoice_item='AIA0',amount,0)) back_amount -->
+<!-- 				, SUM(IF(invoice_item='AIB0',amount,0)) mca_amount -->
+				, SUM(IF(invoice_item='AEC0',amount,0)) lb_amount
+<!-- 				, SUM(IF(invoice_item='AID0',amount,0)) sec_amount -->
+<!-- 				, SUM(IF(invoice_item='AIC0',amount,0)) scm_amount -->
+				, SUM(IF(invoice_item='E000',amount,0)) dis_amount
+				, SUM(IF(invoice_item='I000',amount,0)) adj_amount
+		  FROM bill_invoice_project_detail
+		 WHERE 1=1
+		   AND invoice_item_sub = '*'
+		   AND bill_yyyymm = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH), '%Y%m')
+		   GROUP BY bill_yyyymm
+	</select>
+
+	<select id="mngCustomerAmount6month" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT a.bill_yyyymm, IFNULL(tot_amount,0) AS tot_amount
+		FROM
+		(
+		SELECT DATE_FORMAT(NOW(), '%Y%m') AS bill_yyyymm
+		UNION
+		SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH), '%Y%m')
+		UNION
+		SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -2 MONTH), '%Y%m')
+		UNION
+		SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -3 MONTH), '%Y%m')
+		UNION
+		SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -4 MONTH), '%Y%m')
+		UNION
+		SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH), '%Y%m')
+		) a LEFT OUTER JOIN (
+		SELECT
+			bill_yyyymm
+			, SUM(amount) AS tot_amount
+		  FROM bill_invoice_project_detail
+		 WHERE 1=1
+		   AND invoice_item = '0000'
+		   AND bill_yyyymm >= DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -6 MONTH), '%Y%m')
+		 GROUP BY bill_yyyymm
+		) b ON a.bill_yyyymm = b.bill_yyyymm
+		ORDER BY a.bill_yyyymm
+	</select>
+
+	<select id="myJobCount" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT SUM(good_count) AS my_good_count, SUM(work_count) AS my_work_count, SUM(bill_count) AS my_bill_count
+		FROM
+		(
+		SELECT
+			'apprv' AS job_type, COUNT(BOR.my_job) AS good_count, 0 AS work_count, 0 AS bill_count
+		FROM (
+			SELECT
+				BO.order_no
+				, IF(BO.apprv_state ='APPRV_COMPLETED', BO.apprv_state, IFNULL(SAS.apprv_state, 'APPRV_COMPLETED')) AS apprv_state
+				, (SELECT IF(COUNT(*) = 1, 'Y', 'N') FROM approval_model_member	WHERE step_id = SAS.step_id AND user_id = #{loginUserId}) AS my_job
+			FROM (
+					SELECT
+						*
+					FROM bss_order
+					WHERE order_datetime <![CDATA[>=]]> ADDDATE( SYSDATETIME , INTERVAL -1 MONTH)
+			) BO
+			LEFT JOIN(
+				SELECT
+					*
+				FROM sr_approval_step
+				WHERE apprv_state<![CDATA[<>]]>'APPRV_COMPLETED'
+				GROUP BY request_seq
+				ORDER BY request_seq DESC, step_level ASC
+			)SAS
+			ON SAS.request_seq = BO.order_no
+		)BOR
+		WHERE 1=1
+			 AND BOR.my_job = 'Y'
+			 AND BOR.apprv_state <![CDATA[<>]]> 'APPRV_REJECTED'
+
+		UNION
+
+		SELECT
+			'work' AS job_type, 0, COUNT(*) AS job_count, 0
+		FROM req_work REQ
+		LEFT OUTER JOIN bss_order_product PRO
+		ON PRO.order_product_seq = REQ.order_product_seq
+
+		LEFT OUTER JOIN bss_order_product_loadbalancer BAL
+		ON REQ.order_product_seq = BAL.order_product_seq
+
+		LEFT OUTER JOIN bss_order_product_nas NAS
+		ON REQ.order_product_seq = NAS.order_product_seq
+
+		LEFT OUTER JOIN bss_order_product_publicip IP
+		ON REQ.order_product_seq = IP.order_product_seq
+
+		WHERE 1=1
+			AND
+			(
+				(
+					(
+						BAL.work_user_id=#{loginUserId}
+						OR NAS.work_user_id=#{loginUserId}
+						OR IP.work_user_id=#{loginUserId}
+					)
+					AND REQ.work_state = 'N'
+				)
+				OR (
+					(SELECT SUBSTR(c.user_authority,3,1) FROM cmm_user c WHERE user_id =  #{loginUserId}) = '1'
+					AND REQ.work_state = 'C'
+				)
+			)
+			AND REQ.reg_datetime <![CDATA[>=]]> ADDDATE( SYSDATETIME , INTERVAL -1 MONTH)
+		UNION
+		SELECT 'bill', 0, 0, COUNT(*)
+		FROM
+		(
+			SELECT bill_proc_stat
+					, (SELECT IF(COUNT(*) = 1, 'Y', 'N') FROM approval_model_member	WHERE step_id = SAS.step_id AND user_id = #{loginUserId}) AS my_job
+			FROM (
+				SELECT
+					*
+				FROM bill_master
+				WHERE bill_yyyymm = DATE_FORMAT(NOW(), '%Y%m')
+				AND apprv_stat = 'APPRV_PROCESSING'
+			) BM
+			LEFT JOIN(
+				SELECT
+					*
+				FROM sr_approval_step
+				WHERE apprv_state = 'APPRV_PROCESSING'
+				GROUP BY request_seq
+				ORDER BY request_seq DESC, step_level ASC
+			)SAS
+			ON SAS.request_seq = BM.bill_yyyymm
+		) BOR
+		WHERE BOR.my_job = 'Y'
+		  AND BOR.bill_proc_stat <![CDATA[<>]]> 'BILLPROCSTAT_REJECTED'
+		) myjob
+	</select>
+
+	<select id="totGoodCount" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT 	 SUM(IF (apprv_state='APPRV_COMPLETED',1,0)) completed_count
+				,SUM(IF (apprv_state='APPRV_REJECTED',1,0)) rejected_count
+				,SUM(IF (apprv_state='APPRV_PROCESSING',1,0)) processing_count
+		FROM
+		(
+			SELECT
+				IF(BO.apprv_state ='APPRV_COMPLETED', BO.apprv_state, IFNULL(SAS.apprv_state, 'APPRV_COMPLETED')) AS apprv_state
+			FROM (
+					SELECT
+						*
+					FROM bss_order
+					WHERE order_datetime <![CDATA[>=]]> ADDDATE( SYSDATETIME , INTERVAL -1 MONTH)
+			) BO
+			LEFT JOIN(
+				SELECT
+					*
+				FROM sr_approval_step
+				WHERE apprv_state<![CDATA[<>]]>'APPRV_COMPLETED'
+				GROUP BY request_seq
+				ORDER BY request_seq DESC, step_level ASC
+			)SAS
+			ON SAS.request_seq = BO.order_no
+		) A
+	</select>
+
+	<select id="totBillCount" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT 	 IFNULL(SUM(IF (apprv_stat='APPRV_COMPLETED',1,0)),0) completed_count
+			,IFNULL(SUM(IF (apprv_stat='APPRV_REJECTED',1,0)),0) rejected_count
+			,IFNULL(SUM(IF (apprv_stat='APPRV_PROCESSING',1,0)),0) processing_count
+		FROM bill_master
+		WHERE bill_yyyymm = DATE_FORMAT(NOW(), '%Y%m')
+		AND apprv_stat IS NOT NULL
+	</select>
+
+	<select id="mbrProjectReq" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT COUNT(*) as projectReqCount
+		FROM req_project
+		WHERE reg_user_id = #{loginUserId}
+		AND ((status_flag  IN ('01','02','03'))
+				OR (DATE_FORMAT(reg_datetime,'%Y') =  DATE_FORMAT(NOW(), '%Y')))
+	</select>
+
+	<select id="mbrProjectApprove" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		  SELECT COUNT(*) AS projecApproveCount
+			FROM req_project
+			WHERE req_project_seq IN
+			  (
+				   SELECT DISTINCT request_seq
+				   FROM sr_approval_step
+				   WHERE apprv_state ='APPRV_PROCESSING'
+				   AND step_level <![CDATA[<=]]> 2
+				   AND apprv_schedule_user_id = #{loginUserId}
+			   )
+	</select>
+
+	<select id="mbrProductReq" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT  COUNT( order_no ) AS productReqCount
+		FROM BSS_ORDER
+		WHERE order_user_id = #{loginUserId}
+		AND (  (apprv_state  IN ('APPRV_PROCESSING','APPRV_WAITING'))
+				OR (DATE_FORMAT(order_datetime,'%Y') =  DATE_FORMAT(NOW(), '%Y')))
+	</select>
+
+
+	<select id="mbrProductApprove" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		  SELECT COUNT(order_no) AS productApproveCount
+		  FROM BSS_ORDER
+		  WHERE order_no IN
+			  (
+				   SELECT DISTINCT request_seq
+				   FROM sr_approval_step
+				   WHERE apprv_state ='APPRV_PROCESSING'
+				   AND step_level <![CDATA[<=]]> 2
+				   AND apprv_schedule_user_id = #{loginUserId}
+			   )
+	</select>
+
+
+	<select id="mbrProjectResources" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+
+	SELECT * FROM (
+
+	SELECT SUM(AA.servers) as server_cnt, SUM(AA.vcpus) as vcpus, SUM(AA.mem_gb)
+	as mem_gb, SUM(AA.os_disk) as os_disk, SUM(AA.data_disk) as
+	data_disk,AA.cloud_id,AA.cloud_name,AA.cloud_type,AA.zone_name,AA.zone_display_name
+	FROM
+	(
+	SELECT
+	ozen.zone_name,
+	ozen.zone_display_name,
+	P.project_id,
+	P.project_name,
+	P.project_alias,
+	V.vm_uuid as server_id,
+	V.hostname AS server_name,
+	CASE
+	WHEN V.vm_uuid IS NULL THEN 0
+	WHEN P.project_id NOT IN ( SELECT project_id FROM oss_project_manager WHERE
+	manager_id = #{loginUserId} ) THEN 0
+	WHEN R.complete_flag = 'N' THEN 0
+	WHEN V.del_flag = 'Y' THEN 0
+	ELSE 1 END AS servers,
+	CASE
+	WHEN V.vcpus IS NULL THEN 0
+	WHEN P.project_id NOT IN ( SELECT project_id FROM oss_project_manager WHERE
+	manager_id = #{loginUserId} ) THEN 0
+	WHEN R.complete_flag = 'N' THEN 0
+	WHEN V.del_flag = 'Y' THEN 0
+	ELSE V.vcpus
+	END AS vcpus,
+	CASE
+	WHEN V.mem_gb IS NULL THEN 0
+	WHEN P.project_id NOT IN ( SELECT project_id FROM oss_project_manager WHERE
+	manager_id = #{loginUserId} ) THEN 0
+	WHEN R.complete_flag = 'N' THEN 0
+	WHEN V.del_flag = 'Y' THEN 0
+	ELSE V.mem_gb
+	END AS mem_gb,
+	0 as os_disk,
+	0 as data_disk,
+	OC.cloud_id,OC.cloud_name,OC.cloud_type
+
+	FROM (SELECT * FROM oss_zone_network WHERE zone_name IN
+	('fa-zone','oa-zone','nova','EM-Mobile','EM-DMZ','PA-mobile','PA-DMZ')
+	) ozen
+
+	LEFT JOIN oss_cloud OC
+	ON ozen.cloud_id = OC.cloud_id
+
+
+	<if test="projectBoxId == 'ALLPROJECT' or projectBoxId == '' or projectBoxId == null">
+	LEFT JOIN oss_project P
+	</if>
+	<if test="projectBoxId != '' and  projectBoxId != null and projectBoxId != 'ALLPROJECT'">
+	LEFT JOIN (select * from oss_project where project_box_id = #{projectBoxId}) P
+	</if>
+
+	ON P.cloud_id = OC.cloud_id
+	LEFT JOIN req_project R
+	ON R.req_project_seq = P.program_seq
+	LEFT JOIN oss_vm V
+	ON P.project_id = V.project_id
+	LEFT JOIN (
+
+	SELECT op.device_id
+	,ozn.zone_name
+	,ozn.zone_display_name
+	FROM oss_port op
+	LEFT JOIN oss_network ot
+	ON op.network_id = ot.network_id
+	LEFT JOIN oss_zone_network ozn
+	ON op.network_id = ozn.network_id
+	WHERE ot.network_name != 'backup-net'
+	) pnz
+	ON V.vm_uuid = pnz.device_id
+
+
+	UNION ALL
+
+	SELECT
+	ozen.zone_name,
+	ozen.zone_display_name,
+	P.project_id,
+	P.project_name,
+	P.project_alias,
+	NULL as server_id,
+	NULL as server_name,
+	0 AS servers,
+	0 AS vcpus,
+	0 AS mem_gb,
+	CASE
+	WHEN D.size_gb IS NULL THEN 0
+	WHEN P.project_id NOT IN ( SELECT project_id FROM oss_project_manager WHERE
+	manager_id = #{loginUserId} ) THEN 0
+	WHEN R.complete_flag = 'N' THEN 0
+	WHEN D.disk_alias NOT LIKE '%_OS' THEN 0
+	WHEN D.del_flag = 'Y' THEN 0
+	ELSE D.size_gb
+	END AS os_disk,
+	0 AS data_disk,
+	OC.cloud_id,
+	OC.cloud_name,
+	OC.cloud_type
+
+	FROM (SELECT * FROM oss_zone_network WHERE zone_name IN
+	('fa-zone','oa-zone','nova','EM-Mobile','EM-DMZ','PA-mobile','PA-DMZ')
+	) ozen
+
+	LEFT JOIN oss_cloud OC
+	ON ozen.cloud_id = OC.cloud_id
+	<if test="projectBoxId == 'ALLPROJECT' or projectBoxId == '' or projectBoxId == null">
+	LEFT JOIN oss_project P
+	</if>
+	<if test="projectBoxId != '' and  projectBoxId != null and projectBoxId != 'ALLPROJECT'">
+	LEFT JOIN (select * from oss_project where project_box_id = #{projectBoxId}) P
+	</if>
+	ON P.cloud_id = OC.cloud_id
+	LEFT JOIN req_project R
+	ON R.req_project_seq = P.program_seq
+	LEFT JOIN oss_disk D
+	ON P.project_id = d.project_id
+
+
+	LEFT JOIN (
+
+	SELECT op.device_id
+	,ozn.zone_name
+	,ozn.zone_display_name
+	FROM oss_port op
+	LEFT JOIN oss_network ot
+	ON op.network_id = ot.network_id
+	LEFT JOIN oss_zone_network ozn
+	ON op.network_id = ozn.network_id
+	WHERE ot.network_name != 'backup-net'
+	) pnz
+	ON D.vm_uuid = pnz.device_id
+
+	UNION ALL
+
+	SELECT
+	ozen.zone_name,
+	ozen.zone_display_name,
+	P.project_id,
+	P.project_name,
+	P.project_alias,
+	NULL as server_id,
+	NULL as server_name,
+	0 AS servers,
+	0 AS vcpus,
+	0 AS mem_gb,
+	0 AS os_disk,
+	CASE
+	WHEN D.size_gb IS NULL THEN 0
+	WHEN P.project_id NOT IN ( SELECT project_id FROM oss_project_manager WHERE
+	manager_id = #{loginUserId} ) THEN 0
+	WHEN R.complete_flag = 'N' THEN 0
+	WHEN D.disk_alias LIKE '%_OS' THEN 0
+	WHEN D.del_flag = 'Y' THEN 0
+	ELSE D.size_gb
+	END AS data_disk,
+	OC.cloud_id,
+	OC.cloud_name,
+	OC.cloud_type
+
+	FROM (SELECT * FROM oss_zone_network WHERE zone_name IN
+	('fa-zone','oa-zone','nova','EM-Mobile','EM-DMZ','PA-mobile','PA-DMZ')
+	) ozen
+
+	LEFT JOIN oss_cloud OC
+	ON ozen.cloud_id = OC.cloud_id
+
+	<if test="projectBoxId == 'ALLPROJECT' or projectBoxId == '' or projectBoxId == null">
+	LEFT JOIN oss_project P
+	</if>
+	<if test="projectBoxId != '' and  projectBoxId != null and projectBoxId != 'ALLPROJECT'">
+	LEFT JOIN (select * from oss_project where project_box_id = #{projectBoxId}) P
+	</if>
+
+	ON P.cloud_id = OC.cloud_id
+	LEFT JOIN req_project R
+	ON R.req_project_seq = P.program_seq
+	LEFT JOIN oss_disk D
+	ON P.project_id = d.project_id
+
+
+	LEFT JOIN (
+
+	SELECT op.device_id
+	,ozn.zone_name
+	,ozn.zone_display_name
+	FROM oss_port op
+	LEFT JOIN oss_network ot
+	ON op.network_id = ot.network_id
+	LEFT JOIN oss_zone_network ozn
+	ON op.network_id = ozn.network_id
+	WHERE ot.network_name != 'backup-net'
+	) pnz
+	ON D.vm_uuid = pnz.device_id
+
+
+
+	) AA GROUP BY AA.zone_name
+
+	) TOT
+
+	WHERE 1=1
+	AND TOT.zone_name IS NOT NULL
+	</select>
+
+
+	<select id="mbrServiceResources" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+
+
+        SELECT	a.zone_name,
+			        a.zone_display_name,
+					IFNULL(b.service_type_account,0) AS service_type_account,
+					IFNULL(b.service_type_security,0) AS service_type_security,
+					IFNULL(b.service_type_backup,0) AS service_type_backup,
+					IFNULL(b.service_type_sw,0) AS service_type_sw,
+					IFNULL(service_type_oracle,0) AS service_type_oracle,
+					IFNULL(service_type_loadbalancer,0) AS service_type_loadbalancer,
+					IFNULL(service_type_snapshot,0) AS service_type_snapshot,
+
+					IFNULL(b.service_type_apache,0) AS service_type_apache,
+					IFNULL(b.service_type_tomcat,0) AS service_type_tomcat,
+					IFNULL(b.service_type_jboss,0) AS service_type_jboss,
+					IFNULL(b.service_type_mariadb,0) AS service_type_mariadb,
+					IFNULL(b.service_type_postgresql,0) AS service_type_postgresql,
+					IFNULL(b.service_type_cubrid,0) AS service_type_cubrid,
+					IFNULL(b.service_type_ascl,0) AS service_type_ascl,
+					IFNULL(b.service_type_ctntrmnl,0) AS service_type_ctntrmnl
+
+ FROM (SELECT * FROM oss_zone_network WHERE zone_name IN ('fa-zone','oa-zone','nova','EM-Mobile','EM-DMZ','PA-mobile','PA-DMZ') GROUP BY zone_name) a
+
+ LEFT JOIN (
+
+    SELECT * FROM (
+
+				 	SELECT
+				 	zone_name,
+			        zone_display_name,
+					sum(service_type_account) AS service_type_account,
+					sum(service_type_security) AS service_type_security,
+					sum(service_type_backup) AS service_type_backup,
+					sum(service_type_sw) AS service_type_sw,
+					sum(service_type_oracle) AS service_type_oracle,
+					sum(service_type_loadbalancer) AS service_type_loadbalancer,
+					sum(service_type_snapshot) AS service_type_snapshot,
+
+					sum(service_type_apache) AS service_type_apache,
+					sum(service_type_tomcat) AS service_type_tomcat,
+					sum(service_type_jboss) AS service_type_jboss,
+					sum(service_type_mariadb) AS service_type_mariadb,
+					sum(service_type_postgresql) AS service_type_postgresql,
+					sum(service_type_cubrid) AS service_type_cubrid,
+					sum(service_type_ascl) AS service_type_ascl,
+					sum(service_type_ctntrmnl) AS service_type_ctntrmnl
+
+			FROM (
+					SELECT
+								f.zone_name,
+			                    f.zone_display_name,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='01',1,0),0),0) AS service_type_account,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='02',1,0),0),0) AS service_type_security,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='03',1,0),0),0) AS service_type_backup,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='04',1,0),0),0) AS service_type_sw,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='05',1,0),0),0) AS service_type_disk,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='09',1,0),0),0) AS service_type_oracle,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='loadbalancer',1,0),0),0) AS service_type_loadbalancer,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='snapshot',1,0),0),0) AS service_type_snapshot,
+
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='20',1,0),0),0) AS service_type_apache,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='21',1,0),0),0) AS service_type_tomcat,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='22',1,0),0),0) AS service_type_jboss,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='23',1,0),0),0) AS service_type_mariadb,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='24',1,0),0),0) AS service_type_postgresql,
+								IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='25',1,0),0),0) AS service_type_cubrid,
+
+                                IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='ASCL',1,0),0),0) AS service_type_ascl,
+                                IF(a.project_id IN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{loginUserId}),IF(a.del_flag = 'N',IF(a.service_type ='SERVICE99',1,0),0),0) AS service_type_ctntrmnl
+
+
+				        FROM oss_service a
+
+						<if test="projectBoxId == 'ALLPROJECT' or projectBoxId == '' or projectBoxId == null">
+	                    INNER JOIN oss_project b
+						</if>
+						<if test="projectBoxId != '' and  projectBoxId != null and projectBoxId != 'ALLPROJECT'">
+						INNER JOIN (select * from oss_project where project_box_id = #{projectBoxId}) b
+						</if>
+
+	                    ON a.project_id = b.project_id
+	                    INNER JOIN oss_vm d
+	                    ON a.vm_uuid = d.vm_uuid
+	                    INNER JOIN oss_vm_network e
+	                    ON a.vm_uuid = e.vm_uuid
+	                    INNER JOIN oss_zone_network f
+					    ON e.network_id = f.network_id
+					    AND d.az_name = f.zone_name
+					)
+				GROUP BY zone_name
+				)
+		     ) b
+
+             ON a.zone_name = b.zone_name
+
+	</select>
+
+
+	<select id="mbrProjectResourcesList" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+			    SELECT * FROM
+				(	SELECT  AA.project_name, AA.project_alias, SUM(AA.servers) AS server_cnt, SUM(AA.vcpus) AS vcpus, SUM(aa.mem_gb) AS mem_gb, SUM(AA.os_disk) AS os_disk, SUM( AA.data_disk) AS data_disk
+					FROM
+					(
+					    SELECT
+						 	IFNULL(P.project_id,'') AS project_id,
+							IFNULL(P.project_name,'') AS project_name,
+						 	IFNULL(P.project_alias,'') AS project_alias,
+						 	V.vm_uuid as server_id,
+						 	V.hostname AS server_name,
+							CASE
+								WHEN V.vm_uuid IS NULL THEN 0
+								WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id = #{loginUserId} ) THEN 0
+								WHEN R.complete_flag = 'N' THEN 0
+								WHEN V.del_flag = 'Y' THEN 0
+							ELSE 1 END AS servers,
+							CASE
+								WHEN V.vcpus IS NULL THEN 0
+								WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id = #{loginUserId} ) THEN 0
+								WHEN R.complete_flag = 'N' THEN 0
+								WHEN V.del_flag = 'Y' THEN 0
+								ELSE V.vcpus
+							END AS vcpus,
+							CASE
+								WHEN V.mem_gb IS NULL THEN 0
+								WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id =#{loginUserId} ) THEN 0
+								WHEN R.complete_flag = 'N' THEN 0
+								WHEN V.del_flag = 'Y' THEN 0
+								ELSE V.mem_gb
+							END AS mem_gb,
+							0 as os_disk,
+							0 as data_disk,
+							project_box_id
+						FROM oss_project P
+						LEFT JOIN req_project R
+						ON R.req_project_seq = P.program_seq
+						LEFT  JOIN oss_vm V
+						ON P.project_id = V.project_id
+
+					    UNION ALL
+
+						SELECT
+						IFNULL(P.project_id,'') AS project_id,
+						IFNULL(P.project_name,'') AS project_name,
+						IFNULL(P.project_alias,'') AS project_alias,
+						NULL as server_id,
+						NULL as server_name,
+					    0 AS servers,
+					    0 AS vcpus,
+					    0 AS mem_gb,
+					    CASE
+							WHEN D.size_gb IS NULL THEN 0
+							WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id = #{loginUserId} ) THEN 0
+							WHEN R.complete_flag = 'N' THEN 0
+							WHEN D.disk_alias NOT LIKE '%_OS' THEN 0
+							WHEN D.del_flag = 'Y' THEN 0
+							ELSE D.size_gb
+						END AS os_disk,
+					     0 AS data_disk,
+					     project_box_id
+						FROM oss_project P
+						LEFT JOIN req_project R
+						ON R.req_project_seq = P.program_seq
+						LEFT JOIN oss_disk D
+						ON P.project_id = d.project_id
+
+					    UNION ALL
+
+						SELECT
+						IFNULL(P.project_id,'') AS project_id,
+						IFNULL(P.project_name,'') AS project_name,
+						IFNULL(P.project_alias,'') AS project_alias,
+						NULL as server_id,
+						NULL as server_name,
+					    0 AS servers,
+					    0 AS vcpus,
+					    0 AS mem_gb,
+					    0 AS os_disk,
+					     CASE
+							WHEN D.size_gb IS NULL THEN 0
+							WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id = #{loginUserId} ) THEN 0
+							WHEN R.complete_flag = 'N' THEN 0
+							WHEN D.disk_alias LIKE '%_OS' THEN 0
+							WHEN D.del_flag = 'Y' THEN 0
+							ELSE D.size_gb
+						END AS data_disk,
+					    project_box_id
+						FROM oss_project P
+						LEFT JOIN req_project R
+						ON R.req_project_seq = P.program_seq
+						LEFT JOIN oss_disk D
+						ON P.project_id = d.project_id
+
+
+					) AA
+					WHERE AA.project_box_id IN (SELECT project_id FROM oss_project_manager WHERE  manager_id = 'admin')
+					GROUP BY AA.project_box_id
+					ORDER BY AA.servers desc
+				)WHERE
+	ROWNUM BETWEEN 1 AND 3;
+
+	</select>
+
+
+	<select id="mbrProjectResourcesListTotal" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+			    SELECT * FROM
+				(	SELECT  AA.project_name, AA.project_alias, SUM(AA.servers) AS server_cnt, SUM(AA.vcpus) AS vcpus, SUM(aa.mem_gb) AS mem_gb, SUM(AA.os_disk) AS os_disk, SUM( AA.data_disk) AS data_disk
+					FROM
+					(
+					    SELECT
+						 	IFNULL(P.project_id,'') AS project_id,
+							IFNULL(P.project_name,'') AS project_name,
+						 	IFNULL(P.project_alias,'') AS project_alias,
+						 	V.vm_uuid as server_id,
+						 	V.hostname AS server_name,
+							CASE
+								WHEN V.vm_uuid IS NULL THEN 0
+								WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id = #{loginUserId} ) THEN 0
+								WHEN R.complete_flag = 'N' THEN 0
+								WHEN V.del_flag = 'Y' THEN 0
+							ELSE 1 END AS servers,
+							CASE
+								WHEN V.vcpus IS NULL THEN 0
+								WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id = #{loginUserId} ) THEN 0
+								WHEN R.complete_flag = 'N' THEN 0
+								WHEN V.del_flag = 'Y' THEN 0
+								ELSE V.vcpus
+							END AS vcpus,
+							CASE
+								WHEN V.mem_gb IS NULL THEN 0
+								WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id =#{loginUserId} ) THEN 0
+								WHEN R.complete_flag = 'N' THEN 0
+								WHEN V.del_flag = 'Y' THEN 0
+								ELSE V.mem_gb
+							END AS mem_gb,
+							0 as os_disk,
+							0 as data_disk,
+							project_box_id
+						FROM oss_project P
+						LEFT JOIN req_project R
+						ON R.req_project_seq = P.program_seq
+						LEFT  JOIN oss_vm V
+						ON P.project_id = V.project_id
+
+					    UNION ALL
+
+						SELECT
+						IFNULL(P.project_id,'') AS project_id,
+						IFNULL(P.project_name,'') AS project_name,
+						IFNULL(P.project_alias,'') AS project_alias,
+						NULL as server_id,
+						NULL as server_name,
+					    0 AS servers,
+					    0 AS vcpus,
+					    0 AS mem_gb,
+					    CASE
+							WHEN D.size_gb IS NULL THEN 0
+							WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id = #{loginUserId} ) THEN 0
+							WHEN R.complete_flag = 'N' THEN 0
+							WHEN D.disk_alias NOT LIKE '%_OS' THEN 0
+							WHEN D.del_flag = 'Y' THEN 0
+							ELSE D.size_gb
+						END AS os_disk,
+					     0 AS data_disk,
+					     project_box_id
+						FROM oss_project P
+						LEFT JOIN req_project R
+						ON R.req_project_seq = P.program_seq
+						LEFT JOIN oss_disk D
+						ON P.project_id = d.project_id
+
+					    UNION ALL
+
+						SELECT
+						IFNULL(P.project_id,'') AS project_id,
+						IFNULL(P.project_name,'') AS project_name,
+						IFNULL(P.project_alias,'') AS project_alias,
+						NULL as server_id,
+						NULL as server_name,
+					    0 AS servers,
+					    0 AS vcpus,
+					    0 AS mem_gb,
+					    0 AS os_disk,
+					     CASE
+							WHEN D.size_gb IS NULL THEN 0
+							WHEN P.project_box_id NOT IN (  SELECT project_id FROM oss_project_manager WHERE  manager_id = #{loginUserId} ) THEN 0
+							WHEN R.complete_flag = 'N' THEN 0
+							WHEN D.disk_alias LIKE '%_OS' THEN 0
+							WHEN D.del_flag = 'Y' THEN 0
+							ELSE D.size_gb
+						END AS data_disk,
+					    project_box_id
+						FROM oss_project P
+						LEFT JOIN req_project R
+						ON R.req_project_seq = P.program_seq
+						LEFT JOIN oss_disk D
+						ON P.project_id = d.project_id
+
+
+					) AA
+					WHERE AA.project_box_id IN (SELECT project_id FROM oss_project_manager WHERE  manager_id = 'admin')
+					GROUP BY AA.project_box_id
+					ORDER BY AA.servers desc
+				)
+	</select>
+
+	<select id="mngProjectApprove" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+
+			SELECT
+			   COUNT(AA.running_pj_seq) AS running_cnt,
+			   COUNT(AA.reject_pj_seq) AS reject_cnt,
+			   COUNT(AA.end_pj_seq) AS end_cnt
+			FROM
+			(
+				SELECT CASE WHEN status_flag in ('01','02') THEN req_project_seq END AS running_pj_seq,
+				CASE WHEN status_flag = '03' THEN req_project_seq END AS reject_pj_seq,
+				CASE WHEN status_flag = '04' THEN req_project_seq END AS end_pj_seq
+				FROM req_project
+				WHERE DATE_FORMAT(reg_datetime,'%Y') =  DATE_FORMAT(NOW(), '%Y')
+			)  AA
+
+	</select>
+
+	<select id="mngProductApprove" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		  SELECT
+					COUNT(AA.running_order_no) AS running_cnt,
+				    COUNT(AA.reject_order_no) AS reject_cnt,
+				    COUNT(AA.end_order_no) AS end_cnt
+			FROM
+			(
+				SELECT CASE WHEN apprv_state ='APPRV_PROCESSING' THEN order_no END AS running_order_no,
+				CASE WHEN apprv_state = 'APPRV_REJECTED' THEN order_no END AS reject_order_no,
+				CASE WHEN apprv_state = 'APPRV_COMPLETED' THEN order_no END AS end_order_no
+				FROM bss_order
+							WHERE DATE_FORMAT(order_datetime,'%Y') =  DATE_FORMAT(NOW(), '%Y')
+			)  AA
+
+	</select>
+
+	<select id="mngMyWork" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+
+         	SELECT
+					COUNT(AA.running_user) AS running_cnt,
+				    COUNT(AA.end_user) AS end_cnt
+			FROM (
+           SELECT CASE WHEN work_state ='N' THEN req_work_seq END AS running_user,
+				      CASE WHEN work_state = 'Y' THEN req_work_seq END AS end_user
+           FROM req_work
+           	WHERE DATE_FORMAT(reg_datetime,'%Y') =  DATE_FORMAT(NOW(), '%Y')
+			AND order_product_seq IN (
+			SELECT order_product_seq FROM bss_order_product_service
+			)
+			) AA
+
+	</select>
+	<select id="mngUserApprove" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		  SELECT
+					COUNT(AA.running_user) AS running_cnt,
+				    COUNT(AA.end_user) AS end_cnt,
+				    (select count(*) from cmm_user where del_flag='N') as user_count
+			FROM
+			(
+				SELECT CASE WHEN apprv_flag ='N' THEN req_user_seq END AS running_user,
+				CASE WHEN apprv_flag = 'Y' THEN req_user_seq END AS end_user
+				FROM req_user
+					WHERE DATE_FORMAT(reg_datetime,'%Y') =  DATE_FORMAT(NOW(), '%Y')
+			)  AA
+	</select>
+
+	<select id="myAllWork" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+
+			SELECT '프로젝트승인' as gubn, COUNT(req_project_seq) AS my_cnt FROM
+			req_project
+			WHERE req_project_seq IN
+			(
+				SELECT DISTINCT request_seq FROM sr_approval_step
+				WHERE apprv_state ='APPRV_PROCESSING'
+				AND step_level <![CDATA[>]]> 2
+				AND apprv_schedule_user_id = #{loginUserId}
+			)
+
+			UNION ALL
+
+			SELECT '상품승인' AS gubn, COUNT(order_no) AS my_cnt FROM bss_order
+			WHERE order_no IN
+			(
+				SELECT DISTINCT request_seq FROM sr_approval_step
+				WHERE apprv_state ='APPRV_PROCESSING'
+				AND step_level <![CDATA[>]]> 2
+				AND apprv_schedule_user_id = #{loginUserId}
+			)
+			UNION ALL
+
+			SELECT '사용자승인' as gubn, COUNT(req_user_seq) AS my_cnt FROM req_user
+			WHERE apprv_flag ='N'
+
+			UNION ALL
+
+			SELECT '내작업' as gubn, COUNT(req_work_seq) AS my_cnt FROM req_work
+			WHERE work_state ='N'
+			AND order_product_seq IN
+			(
+				SELECT order_product_seq FROM bss_order_product_service
+				WHERE work_user_id = #{loginUserId}
+			)
+
+	</select>
+
+
+	<select id="mngCloudProduct" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+	SELECT *
+			FROM
+			(select count(*) as company_cnt from cmm_company ) ,
+			(
+			SELECT
+			(SELECT COUNT(*) AS project_cnt FROM oss_project_box WHERE delete_flag = 'N') AS project_cnt,
+			SUM(IFNULL(OVOD.vmcnt,0)) as vm_cnt,
+			SUM(IFNULL(OVOD.vcpucnt,0)) as vcpu_cnt,SUM(IFNULL(OVOD.memGB,0)) as mem_gb,
+			SUM(IFNULL(OVOD.os_disk_cnt,0)) as os_disk_cnt, SUM(IFNULL(OVOD.os_disk_size_gb,0)) as os_disk_size_gb,
+			SUM(IFNULL(OVOD.data_disk_cnt,0)) as data_disk_cnt, SUM(IFNULL(OVOD.data_disk_size_gb,0)) as data_disk_size_gb,
+			SUM(IFNULL(OS.hiware_service_cnt,0)) as hiware_service_cnt, SUM(IFNULL(OS.tivoli_service_cnt,0)) as tivoli_service_cnt,
+			SUM(IFNULL(OS.backup_service_cnt,0)) as backup_service_cnt, SUM(IFNULL(OS.sw_service_cnt,0)) as sw_service_cnt,
+			SUM(IFNULL(OS.disk_service_cnt,0)) as disk_service_cnt,
+			OC.cloud_id,
+			OC.cloud_name
+			FROM
+			oss_project OP
+			LEFT JOIN oss_cloud OC ON OC.cloud_id = OP.cloud_id
+			LEFT JOIN
+			(
+				SELECT OV.project_id, OV.vmcnt as vmcnt, OV.vcpucnt as vcpucnt, OV.memGB as memGB, OD.os_disk_cnt as os_disk_cnt,
+				OD.os_disk_size_gb as os_disk_size_gb,  OD.data_disk_cnt as data_disk_cnt, OD.data_disk_size_gb as data_disk_size_gb
+				FROM
+				  (
+					SELECT project_id, COUNT(vm_uuid) AS vmcnt, SUM(vcpus) AS vcpucnt, SUM(mem_gb) AS memGB
+					FROM oss_vm
+					WHERE del_flag = 'N'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					GROUP BY project_id ) OV
+					LEFT JOIN
+				   (
+
+					SELECT oss_disk_sum.project_id,
+						COUNT(oss_disk_sum.os_disk_id) AS os_disk_cnt,
+						SUM(oss_disk_sum.os_disk_size_gb) AS os_disk_size_gb,
+						COUNT(oss_disk_sum.data_disk_id) AS data_disk_cnt,
+						SUM(oss_disk_sum.data_disk_size_gb) AS data_disk_size_gb
+					FROM
+					   (
+						SELECT  project_id, disk_id, disk_alias,
+						CASE WHEN disk_alias LIKE '%_OS' THEN disk_id END os_disk_id,
+						CASE WHEN disk_alias NOT LIKE '%_OS' THEN disk_id END data_disk_id,
+						size_gb,
+						CASE WHEN disk_alias LIKE '%_OS' THEN size_gb END os_disk_size_gb,
+						CASE WHEN disk_alias NOT LIKE '%_OS' THEN size_gb END data_disk_size_gb
+						FROM oss_disk
+						WHERE del_flag = 'N'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					    )  oss_disk_sum
+					GROUP BY oss_disk_sum.project_id
+
+					) OD
+					ON OV.project_id = OD.project_id
+				) OVOD ON OP.project_id = OVOD.project_id
+			LEFT JOIN
+				(
+			     SELECT oss_service_sum.project_id,
+				     COUNT(oss_service_sum.hiware_service_id) AS hiware_service_cnt,
+				     COUNT(oss_service_sum.tivoli_service_id) AS tivoli_service_cnt,
+				     COUNT(oss_service_sum.backup_service_id) AS backup_service_cnt,
+				     COUNT(oss_service_sum.sw_service_id) AS sw_service_cnt,
+				     COUNT(oss_service_sum.disk_service_id) AS disk_service_cnt
+			     FROM
+			     (
+					SELECT  project_id,
+					CASE WHEN service_type ='01'  THEN service_id END hiware_service_id,
+					CASE WHEN service_type ='02'  THEN service_id END tivoli_service_id,
+					CASE WHEN service_type ='03'  THEN service_id END backup_service_id,
+					CASE WHEN service_type ='04'  THEN service_id END sw_service_id,
+					CASE WHEN service_type ='05'  THEN service_id END disk_service_id
+					FROM oss_service
+					WHERE del_flag = 'N'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				  ) oss_service_sum
+				  GROUP BY oss_service_sum.project_id ) OS
+			ON OVOD.project_id = OS.project_id
+
+			GROUP BY OC.cloud_id ) B
+			WHERE 1 = 1
+
+	</select>
+
+	<select id="mngProductAvr" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+
+		SELECT
+				OC.cloud_name
+				, OC.cloud_type
+				, OC.cloud_id
+		        , SUM(CAST(OA.vm_used AS DOUBLE)) / SUM(CAST(OA.vm_total AS DOUBLE)) * 100 AS vm_avr
+		        , SUM(CAST(OA.vcpu_used AS DOUBLE)) / SUM(CAST(OA.vcpu_total AS DOUBLE)) * 100 AS vcpu_avr
+		        , SUM(CAST(mem_used AS DOUBLE)) / SUM(CAST(mem_total AS DOUBLE)) * 100 AS mem_avr
+		        , SUM(CAST(OA.disk_used AS DOUBLE)) / SUM(CAST(OA.disk_total AS DOUBLE)) * 100 AS disk_avr
+				, OA.project_id
+				, SUM(OA.vm_total) AS vm_total
+				, SUM(OA.vm_used) AS vm_used
+				, SUM(OA.vm_avail) AS vm_avail
+				, SUM(OA.vcpu_total) AS vcpu_total
+				, SUM(OA.vcpu_used) AS vcpu_used
+				, SUM(OA.vcpu_avail) AS vcpu_avail
+				, SUM(ROUND(OA.mem_total /1024,0)) AS mem_total
+				, SUM(ROUND(OA.mem_used /1024,0)) AS mem_used
+				, SUM(ROUND(OA.mem_avail /1024,0)) AS mem_avail
+				, SUM(OA.disk_total) AS disk_total
+				, SUM(OA.disk_used) AS disk_used
+				, SUM(OA.disk_avail) AS disk_avail
+				, SUM(OA.nas_total) AS nas_total
+				, SUM(OA.nas_used) AS nas_used
+				, SUM(OA.nas_avail) AS nas_avail
+				, DATE_FORMAT(OA.coll_datetime, '%Y-%m-%d %H:%i') AS collDatetime
+		FROM
+		oss_availability OA
+		LEFT JOIN oss_cloud OC ON OA.cloud_id = OC.cloud_id
+		WHERE project_id = 'ALL'
+		GROUP BY OC.cloud_id
+	</select>
+
+
+	<select id="mngCloudAmount" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+
+		SELECT a.tot_amount,
+		           a.vm_amount,
+		           a.disk_amount,
+		           b.amount_account,
+		           b.amount_security,
+		           b.amount_backup,
+		           b.amount_sw,
+		           b.amount_disk
+		FROM
+			         (
+					 SELECT
+								  bill_yyyymm
+								, SUM(IF(invoice_item='0000',amount,0)) AS tot_amount
+								, SUM(IF(invoice_item='AAA0',amount,0)) AS vm_amount
+								, SUM(IF(invoice_item='AEA0',amount,0)) AS disk_amount
+						  FROM bill_invoice_project_detail
+						WHERE 1=1
+						   AND invoice_item_sub = '*'
+						   AND bill_yyyymm = DATE_FORMAT(NOW(), '%Y%m')
+				   GROUP BY bill_yyyymm
+			           ) a
+
+			   INNER JOIN
+
+					  (
+					  SELECT
+							       bill_yyyymm,
+							       SUM(IF(service_type='01',amount,0)) AS amount_account,
+							       SUM(IF(service_type='02',amount,0)) AS amount_security,
+							       SUM(IF(service_type='03',amount,0)) AS amount_backup,
+							       SUM(IF(service_type='04',amount,0)) AS amount_sw,
+							       SUM(IF(service_type='05',amount,0)) AS amount_disk
+						     FROM bill_charge_service_resource_detail
+						   WHERE  bill_yyyymm = DATE_FORMAT(NOW(), '%Y%m')
+					   GROUP BY bill_yyyymm
+					   ) b
+			     ON a.bill_yyyymm = b.bill_yyyymm
+
+	</select>
+	<select id="availHistoryAvr" parameterType="CustomMbrHomeVO" resultType="CustomMbrHomeVO">
+		SELECT * FROM
+				(SELECT
+		          CAST(OA.vm_used AS DOUBLE) / if(CAST(OA.vm_total AS DOUBLE)=0,1,CAST(OA.vm_total AS DOUBLE)) * 100 AS vm_avr
+		        , CAST(OA.vcpu_used AS DOUBLE) / if(CAST(OA.vcpu_total AS DOUBLE)=0,1,CAST(OA.vcpu_total AS DOUBLE)) * 100 AS vcpu_avr
+		        , CAST(mem_used AS DOUBLE) / if(CAST(mem_total AS DOUBLE)=0,1,CAST(mem_total AS DOUBLE)) * 100 AS mem_avr
+		        , CAST(OA.disk_used AS DOUBLE) / if(CAST(OA.disk_total AS DOUBLE)=0,1,CAST(OA.disk_total AS DOUBLE)) * 100 AS disk_avr
+				, OA.project_id
+				, OA.vm_total
+				, OA.vm_used
+				, OA.vm_avail
+				, OA.vcpu_total
+				, OA.vcpu_used
+				, OA.vcpu_avail
+				, ROUND(OA.mem_total /1024,0) AS mem_total
+				, ROUND(OA.mem_used /1024,0) AS mem_used
+				, ROUND(OA.mem_avail /1024,0) AS mem_avail
+				, OA.disk_total
+				, OA.disk_used
+				, OA.disk_avail
+				, OA.nas_total
+				, OA.nas_used
+				, OA.nas_avail
+				, DATE_FORMAT(OA.coll_datetime, '%Y-%m-%d %H:%i') AS collDatetime
+				, OA.cloud_id
+				, OC.cloud_name
+				, 'current' AS viewPoint
+					FROM
+				oss_availability_history OA
+					LEFT JOIN
+				oss_cloud OC
+					ON OA.cloud_id = OC.cloud_id
+				WHERE project_id = 'ALL'
+				AND DATE_FORMAT(coll_datetime,'%Y-%M-%D') BETWEEN ADDDATE(CURDATE() -  0 , - WEEKDAY(CURDATE()) + 0 ) AND ADDDATE(CURDATE()-  0 , - WEEKDAY(CURDATE()) + 6)
+				UNION ALL
+				SELECT
+		          CAST(OA.vm_used AS DOUBLE) / if(CAST(OA.vm_total AS DOUBLE)=0,1,CAST(OA.vm_total AS DOUBLE)) * 100 AS vm_avr
+		        , CAST(OA.vcpu_used AS DOUBLE) / if(CAST(OA.vcpu_total AS DOUBLE)=0,1,CAST(OA.vcpu_total AS DOUBLE)) * 100 AS vcpu_avr
+		        , CAST(mem_used AS DOUBLE) / if(CAST(mem_total AS DOUBLE)=0,1,CAST(mem_total AS DOUBLE)) * 100 AS mem_avr
+		        , CAST(OA.disk_used AS DOUBLE) / if(CAST(OA.disk_total AS DOUBLE)=0,1,CAST(OA.disk_total AS DOUBLE)) * 100 AS disk_avr
+				, OA.project_id
+				, OA.vm_total
+				, OA.vm_used
+				, OA.vm_avail
+				, OA.vcpu_total
+				, OA.vcpu_used
+				, OA.vcpu_avail
+				, ROUND(OA.mem_total /1024,0) AS mem_total
+				, ROUND(OA.mem_used /1024,0) AS mem_used
+				, ROUND(OA.mem_avail /1024,0) AS mem_avail
+				, OA.disk_total
+				, OA.disk_used
+				, OA.disk_avail
+				, OA.nas_total
+				, OA.nas_used
+				, OA.nas_avail
+				, DATE_FORMAT(OA.coll_datetime, '%Y-%m-%d %H:%i') AS collDatetime
+				, OA.cloud_id
+				, OC.cloud_name
+				, 'last' AS viewPoint
+					FROM
+				oss_availability_history OA
+					LEFT JOIN
+				oss_cloud OC
+					ON OA.cloud_id = OC.cloud_id
+				WHERE project_id = 'ALL'
+				AND DATE_FORMAT(coll_datetime,'%Y-%M-%D') BETWEEN ADDDATE(CURDATE() -  7 /**P*/, - WEEKDAY(CURDATE()) + 0 ) AND ADDDATE(CURDATE()-  7 /**P*/, - WEEKDAY(CURDATE()) + 6)
+				) result
+	</select>
+
+	<select id="vmUsedHistory" resultType="CustomMbrHomeVO">
+	SELECT * FROM (
+		SELECT
+		 (SELECT COUNT(*) FROM oss_project where DATE_FORMAT(reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  0 , - WEEKDAY(CURDATE()) + 6)) AS project
+		,(SELECT COUNT(*) FROM oss_project where DATE_FORMAT(reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  7 , - WEEKDAY(CURDATE()) + 6)) AS l_project
+		,(SELECT COUNT(*) FROM oss_vm A LEFT JOIN oss_port B ON A.vm_uuid = B.device_id where DATE_FORMAT(A.reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  0 , - WEEKDAY(CURDATE()) + 6) AND A.del_flag = 'N' AND   LEFT(B.fixed_ips,9) IN ('100.1.221','100.1.222','100.1.223','100.1.224','100.1.225')) AS vm_used
+		,(SELECT COUNT(*) FROM oss_vm A LEFT JOIN oss_port B ON A.vm_uuid = B.device_id where DATE_FORMAT(A.reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  7 , - WEEKDAY(CURDATE()) + 6) AND A.del_flag = 'N' AND   LEFT(B.fixed_ips,9) IN ('100.1.221','100.1.222','100.1.223','100.1.224','100.1.225')) AS l_vm_used
+		,'OA' AS viewPoint
+		UNION ALL
+		SELECT
+		 (SELECT COUNT(*) FROM oss_project where DATE_FORMAT(reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  0 , - WEEKDAY(CURDATE()) + 6)) AS project
+		,(SELECT COUNT(*) FROM oss_project where DATE_FORMAT(reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  7 , - WEEKDAY(CURDATE()) + 6)) AS l_project
+		,(SELECT COUNT(*) FROM oss_vm A LEFT JOIN oss_port B ON A.vm_uuid = B.device_id where DATE_FORMAT(A.reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  0 , - WEEKDAY(CURDATE()) + 6) AND A.del_flag = 'N' AND  (LEFT(B.fixed_ips,10) = '120.180.40')) AS vm_used
+		,(SELECT COUNT(*) FROM oss_vm A LEFT JOIN oss_port B ON A.vm_uuid = B.device_id where DATE_FORMAT(A.reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  7 , - WEEKDAY(CURDATE()) + 6) AND A.del_flag = 'N' AND  (LEFT(B.fixed_ips,10) = '120.180.40')) AS l_vm_used
+		,'FA' AS viewPoint
+		UNION ALL
+		SELECT
+		 (SELECT COUNT(*) FROM oss_project where DATE_FORMAT(reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  0 , - WEEKDAY(CURDATE()) + 6)) AS project
+		,(SELECT COUNT(*) FROM oss_project where DATE_FORMAT(reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  7 , - WEEKDAY(CURDATE()) + 6)) AS l_project
+		,(SELECT COUNT(*) FROM oss_vm A LEFT JOIN oss_port B ON A.vm_uuid = B.device_id where DATE_FORMAT(A.reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  0 , - WEEKDAY(CURDATE()) + 6) AND A.del_flag = 'N' AND   LEFT(B.fixed_ips,10) IN ('168.78.241','168.78.242')) AS vm_used
+		,(SELECT COUNT(*) FROM oss_vm A LEFT JOIN oss_port B ON A.vm_uuid = B.device_id where DATE_FORMAT(A.reg_datetime,'%Y-%M-%D')  <![CDATA[<=]]>  ADDDATE(CURDATE()-  7 , - WEEKDAY(CURDATE()) + 6) AND A.del_flag = 'N' AND   LEFT(B.fixed_ips,10) IN ('168.78.241','168.78.242')) AS l_vm_used
+		,'DMZ' AS viewPoint
+	)
+	</select>
+
+	<select id="monthVm" resultType="CustomMbrHomeVO">
+		SELECT a.reg_month, IFNULL(tot_amount,0) AS tot_amount
+		FROM
+		(
+		SELECT DATE_FORMAT(NOW(), '%Y-%m') AS reg_month
+		UNION
+		SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH), '%Y-%m')
+		UNION
+		SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -2 MONTH), '%Y-%m')
+		UNION
+		SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -3 MONTH), '%Y-%m')
+		UNION
+		SELECT DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -4 MONTH), '%Y-%m')
+		) a LEFT OUTER JOIN (
+		SELECT
+			DATE_FORMAT(reg_datetime,'%Y-%m') AS reg_datetime,
+			COUNT(*) AS tot_amount
+		  FROM oss_vm
+		 WHERE 1=1
+		   AND reg_datetime <![CDATA[>=]]> DATE_ADD(NOW(), INTERVAL -6 MONTH)
+		 GROUP BY DATE_FORMAT(reg_datetime,'%Y-%m')
+		) b ON a.reg_month = b.reg_datetime
+		GROUP BY a.reg_month
+		ORDER BY a.reg_month
+
+	</select>
+
+	 <select id="getStorageList" parameterType="String" resultType="CustomStorageVO">
+	 	SELECT
+	 		*
+	 	FROM
+	 		oss_storage_availability
+	 	WHERE
+	 		cloud_id = #{cloudId}
+	 </select>
+</mapper>

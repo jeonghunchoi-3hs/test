@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hq.itrm.kepco.monitoring.status.MonitoringEventDAO">
+
+	<select id="list" resultType="CustomMonitoringStatusVO" parameterType="CustomMonitoringStatusVO">
+		<foreach collection="list" item="item" open="SELECT * FROM (" close=") HO LEFT JOIN (" separator="union all">
+			SELECT #{item.hostname} as hostname, #{item.hostnameAlias} as hostname_alias, #{item.fixedIps} as fixed_ips FROM DUAL
+		</foreach>
+		SELECT
+			upper(HOSTNAME) HOSTNAME,
+	        CPU_USAGE AS CPU_USED_PCT,
+	        MEM_USAGE AS MEM_USED_PCT,
+	        FILESYSTEM_NAME AS FS_NAME,
+	        DISK_USAGE AS SPACE_USED_PCT
+		FROM
+			ITMUSER.CLOUD_SVTOT
+		<if test="list.size != 0">
+		) TOT
+		ON
+			UPPER(HO.hostname) = UPPER(TOT.HOSTNAME)
+		WHERE
+			1=1
+			<if test="searchKind == 'searchAll' and keyword != null and keyword != ''  ">
+    		AND (
+    			UPPER(HO.hostname_alias) like '%' || UPPER(#{keyword}) ||'%'
+    			OR UPPER(HO.hostname) like '%' || UPPER(#{keyword}) || '%'
+    			)
+    		</if>
+
+		<if test="searchKind == 'hostname_alias' and keyword != ''">
+			AND
+				UPPER(HO.hostname_alias) like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'hostname' and keyword != ''">
+			AND
+				UPPER(HO.hostname) like CONCAT('%',#{keyword},'%')
+		</if>
+		</if>
+    </select>
+
+
+	<select id="getCpuUsaged" resultType="CustomMonitoringStatusVO" parameterType="CustomMonitoringStatusVO">
+		SELECT
+			substr("Timestamp", 8, 4) DATETIME,
+			100-"Idle_CPU" CPU_USED_PCT
+		FROM
+			ITMUSER."KLZ_CPU"
+		WHERE
+			CPU_ID = -1
+			AND upper(SUBSTR("System_Name", 0, instr("System_Name", ':LZ')-1 )) = #{hostname}
+			AND "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24, 'yymmddhh24miss') ||'000' FROM dual)
+		UNION ALL
+		SELECT
+			substr("Timestamp", 8, 4) DATETIME,
+			"%_Processor_Time" CPU_USED_PCT
+		FROM
+			ITMUSER."NT_Processor"
+		WHERE
+			"Processor" IN ('_Total','0,_Total')
+			AND upper(SUBSTR("Server_Name", LENGTH('Primary:')+1, instr("Server_Name", 'NT')-LENGTH('Primary:')-2 )) = #{hostname}
+			AND "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24, 'yymmddhh24miss') ||'000' FROM dual)
+
+	</select>
+
+	<select id="getMemUsaged" resultType="CustomMonitoringStatusVO" parameterType="CustomMonitoringStatusVO">
+		SELECT
+			substr("Timestamp", 8, 4) DATETIME,
+			"Memory_Used_Pct" MEM_USED_PCT
+		FROM
+			ITMUSER."KLZ_VM_Stats"
+		WHERE
+			upper(SUBSTR("System_Name", 0, instr("System_Name", ':LZ')-1 )) = #{hostname}
+			AND "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24, 'yymmddhh24miss') ||'000' FROM dual)
+		UNION ALL
+		SELECT
+			substr("Timestamp", 8, 4) DATETIME,
+			"Memory_Usage_Percentage" MEM_USED_PCT
+		FROM
+			ITMUSER."NT_Memory"
+		WHERE
+			upper(SUBSTR("Server_Name", LENGTH('Primary:')+1, instr("Server_Name", 'NT')-LENGTH('Primary:')-2 )) = #{hostname}
+			AND "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24, 'yymmddhh24miss') ||'000' FROM dual)
+	</select>
+
+	<select id="getDiskUsaged" resultType="CustomMonitoringStatusVO" parameterType="CustomMonitoringStatusVO">
+		SELECT
+			substr("Timestamp", 8, 4) DATETIME,
+			"Mount_Point" FS_NAME,
+			"Disk_Used_Percent" SPACE_USED_PCT
+		FROM
+			ITMUSER."KLZ_Disk"
+		WHERE
+			upper(SUBSTR("System_Name", 0, instr("System_Name", ':LZ')-1 )) = #{hostname}
+			AND "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24, 'yymmddhh24miss') ||'000' FROM dual)
+
+		UNION ALL
+
+		SELECT
+			substr("Timestamp", 8, 4) DATETIME,
+			"Disk_Name" FS_NAME,
+			"%_Used" SPACE_USED_PCT
+		FROM
+			ITMUSER."NT_Logical_Disk"
+		WHERE
+			upper(SUBSTR("Server_Name", LENGTH('Primary:')+1, instr("Server_Name", 'NT')-LENGTH('Primary:')-2 )) = #{hostname}
+			AND "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24, 'yymmddhh24miss') ||'000' FROM dual)
+	</select>
+
+	<select id="getNetworkUsaged" resultType="CustomMonitoringStatusVO" parameterType="CustomMonitoringStatusVO">
+		SELECT
+			substr("Timestamp", 8, 4) DATETIME,
+			"Packets_Received_per_sec" RECEIVED_MB,
+			"Packets_Transmitted_per_sec" SENT_MB
+		FROM
+			ITMUSER."Linux_Network"
+		WHERE
+			upper(SUBSTR("System_Name", 0, instr("System_Name", ':LZ')-1 )) = #{hostname}
+			AND "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24, 'yymmddhh24miss') ||'000' FROM dual)
+	</select>
+
+	<select id="getCpuTopX" resultType="CustomMonitoringStatusVO" parameterType="CustomMonitoringStatusVO">
+		SELECT
+	        HO.HOSTNAME AS HOSTNAME
+	        ,NVL(TOT.CPU_USED_PCT,0) AS CPU_USED_PCT
+		FROM
+		(
+			SELECT '' HOSTNAME, '' hostname_alias from dual
+			<foreach collection="list" item="item">
+			UNION ALL
+			SELECT #{item.hostname} as hostname, #{item.hostnameAlias} as hostname_alias FROM DUAL
+			</foreach>
+		) HO
+		LEFT JOIN
+		(
+			SELECT
+	            SUBSTR(U."System_Name", 0, instr(U."System_Name", ':LZ')-1 ) hostname,
+	            100-"Idle_CPU"                                               CPU_USED_PCT
+	        FROM
+		       	(
+		       		SELECT
+		                *
+		            FROM
+		                ITMUSER."KLZ_CPU"
+		            WHERE
+		                CPU_ID = -1
+		            AND "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24/6, 'yymmddhh24miss') ||'000' FROM dual)
+				) U,
+				(
+					SELECT
+					    "System_Name",
+					    MAX("Timestamp") "Timestamp"
+					FROM
+					    ITMUSER."KLZ_CPU"
+					WHERE
+					    "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24/6, 'yymmddhh24miss') ||'000' FROM dual)
+					GROUP BY
+						"System_Name"
+				) T
+	        WHERE
+				U."System_Name" = T."System_Name"
+	        	AND U."Timestamp" = T."Timestamp"
+
+			UNION ALL
+
+			SELECT
+			    SUBSTR(T."Server_Name", LENGTH('Primary:')+1, instr(T."Server_Name", 'NT')-LENGTH ('Primary:')-2 )   hostname,
+			    "%_Processor_Time" CPU_USED_PCT
+			FROM
+			(
+				SELECT
+				    *
+				FROM
+				    ITMUSER."NT_Processor"
+				WHERE
+				    "Processor" IN ('_Total', '0,_Total')
+					AND "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24/6, 'yymmddhh24miss') ||'000' FROM dual)
+			) U ,
+			(
+				SELECT
+				    "Server_Name",
+				    MAX("Timestamp") "Timestamp"
+				FROM
+				    ITMUSER."NT_Processor"
+				WHERE
+				    "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24/6, 'yymmddhh24miss') ||'000' FROM dual)
+				GROUP BY
+					"Server_Name"
+			) T
+			WHERE
+				U."Server_Name" = T."Server_Name"
+				AND U."Timestamp" = T."Timestamp"
+		) TOT
+		ON
+			UPPER(HO.hostname) = UPPER(TOT.HOSTNAME)
+		ORDER BY
+			CPU_USED_PCT DESC
+	</select>
+
+	<select id="getMemTopX" resultType="CustomMonitoringStatusVO" parameterType="CustomMonitoringStatusVO">
+		SELECT
+	        HO.HOSTNAME AS HOSTNAME
+	        ,NVL(TOT.MEM_USED_PCT,0) AS MEM_USED_PCT
+		FROM
+		(
+			SELECT '' HOSTNAME, '' hostname_alias from dual
+			<foreach collection="list" item="item">
+			UNION ALL
+			SELECT #{item.hostname} as hostname, #{item.hostnameAlias} as hostname_alias FROM DUAL
+			</foreach>
+		) HO
+		LEFT JOIN
+		(
+			SELECT
+	            SUBSTR(T."System_Name", 0, instr(T."System_Name", ':LZ')-1 ) hostname,
+	            "Memory_Used_Pct"                                            MEM_USED_PCT
+	        FROM
+			(
+                SELECT
+                    *
+                FROM
+                    ITMUSER."KLZ_VM_Stats"
+                WHERE
+                    "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24/6, 'yymmddhh24miss') ||'000' FROM dual)
+			) U,
+			(
+                SELECT
+                    "System_Name",
+                    MAX("Timestamp") "Timestamp"
+                FROM
+                    ITMUSER."KLZ_VM_Stats"
+                WHERE
+                    "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24/6, 'yymmddhh24miss') ||'000' FROM dual)
+				GROUP BY
+	                    "System_Name"
+			) T
+	        WHERE
+	            U."System_Name" = T."System_Name"
+	        	AND U."Timestamp" = T."Timestamp"
+
+			UNION ALL
+
+			SELECT
+	            SUBSTR(T."Server_Name", LENGTH('Primary:')+1, instr(T."Server_Name", 'NT')-LENGTH
+	            ('Primary:')-2 )          hostname,
+	            "Memory_Usage_Percentage" MEM_USED_PCT
+	        FROM
+            (
+                SELECT
+                    *
+                FROM
+                    ITMUSER."NT_Memory"
+                WHERE
+                    "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24/6, 'yymmddhh24miss') ||'000' FROM dual)
+			) U ,
+            (
+	            SELECT
+	                "Server_Name",
+	                MAX("Timestamp") "Timestamp"
+	            FROM
+	                ITMUSER."NT_Memory"
+	            WHERE
+	                "Timestamp" > (SELECT '1' || TO_CHAR(systimestamp - 1/24/6, 'yymmddhh24miss') ||'000' FROM dual)
+				GROUP BY
+					"Server_Name"
+			) T
+			WHERE
+	            U."Server_Name" = T."Server_Name"
+				AND U."Timestamp" = T."Timestamp"
+		) TOT
+		ON
+			UPPER(HO.hostname) = UPPER(TOT.HOSTNAME)
+		ORDER BY
+			MEM_USED_PCT DESC
+	</select>
+
+	<select id="listKvm" resultType="CustomMonitoringKvmStatusVO">
+		SELECT * FROM
+
+			(SELECT
+				NUM,
+		        NODE.host_name,
+		        NODE.host_alias,
+		        NODE.ip_address,
+		        USED_CPU_PCT,
+				MEM_USED_PCT
+			FROM
+		        (
+		        <foreach collection="list" item="item" open="SELECT ROWNUM AS NUM,HOST_NAME,HOST_ALIAS,IP_ADDRESS FROM (" close=")" separator="union all">
+				SELECT #{item.hostName} as host_name, #{item.hostAlias} as host_alias, #{item.ipAddress} as ip_address FROM DUAL
+				</foreach>
+		        ) NODE
+			LEFT OUTER JOIN
+		        (
+		        SELECT
+					P."CustomSlot1" AS host_name,
+					P."Timestamp" AS "Timestamp",
+					P."CustomSlot2" AS IP_ADDR,
+					P."CustomSlot4" AS USED_CPU_PCT,
+					P."CustomSlot9" AS MEM_USED_PCT
+				FROM
+					ITMUSER.KLO_LOGFILEPROFILEEVENTS P ,
+					(SELECT "CustomSlot1", MAX("Timestamp") "Timestamp" FROM ITMUSER.KLO_LOGFILEPROFILEEVENTS GROUP BY "CustomSlot1") T
+				WHERE
+					P."CustomSlot1" = T."CustomSlot1"
+					AND P."Timestamp" = T."Timestamp"
+
+				) PERF
+
+				ON (NODE.host_name = PERF.host_name)
+
+			WHERE
+				1=1
+				<if test="searchKind == 'searchAll' and keyword != null and keyword != ''  ">
+	    		AND UPPER(NODE.host_name) like '%' || UPPER(#{keyword}) || '%'
+	    		</if>
+
+	    		<if test="searchKind != 'searchAll' and keyword != null and keyword != '' ">
+				AND UPPER(NODE.host_name) like '%' || UPPER(#{keyword}) || '%'
+				</if>
+				order by host_name
+			)
+			WHERE
+				1=1
+			<if test="!size.equals(0)">
+				<![CDATA[
+				AND NUM BETWEEN ( 0) AND ( 5000)
+				]]>
+			</if>
+
+	</select>
+
+</mapper>

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.cmm.company.CmmCompanyDAO">
+ 	
+    <select id="list" resultType="CustomCmmCompanyVO" parameterType="CustomCmmCompanyVO">
+		SELECT 
+			*
+		FROM (
+			SELECT
+				CC2.company_name AS up_company_name
+				, CC2.company_id AS up_company_id
+				, CC1.company_name AS company_name
+				, CC1.company_id AS company_id
+				, CUST.customer_name AS customer_name
+				, CUST.customer_id AS customer_id
+				, DATE_FORMAT(CC1.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime
+				, CC1.reg_user_id AS reg_user_id
+			FROM (
+				SELECT  
+					*
+				FROM cmm_company
+				WHERE up_company_id <![CDATA[<>]]> '*'
+			)CC1
+			LEFT JOIN (
+				SELECT 
+					*
+				FROM cmm_company
+				WHERE up_company_id = '*'
+			)CC2
+			ON CC1.up_company_id = CC2.company_id
+	
+			LEFT JOIN cmm_customer CUST
+			ON CUST.ref_company_id = CC1.company_id			
+		) A
+		WHERE 1=1
+		<if test="keyword != '' ">
+    	 	<if test="searchKind != '' ">
+    		AND (
+    				A.company_name like CONCAT('%',#{keyword},'%')
+    				or 
+    				A.company_name like CONCAT('%',#{keyword},'%')
+    			)
+    	 	</if>
+    	 	<if test="searchKind == '' ">
+    	 		AND (
+    	 			A.company_name like CONCAT('%',#{keyword},'%')
+    	 			OR A.customer_name like CONCAT('%',#{keyword},'%')
+    	 		)
+    	 	</if>
+		</if>
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+				ORDER BY A.company_name ASC
+			</if>
+		</if>
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+    
+    <!-- 계열사 관리 화면에서 사용 -->
+    <select id="affilateList" resultType="CustomCmmCompanyVO" parameterType="CustomCmmCompanyVO">
+		SELECT	U.company_id		AS up_company_id,
+				U.company_name		AS up_company_name,
+				C.company_id		AS company_id,
+				C.company_name		AS company_name,
+				IFNULL(DATE_FORMAT(C.mod_datetime, '%Y-%m-%d %H:%i'), DATE_FORMAT(C.reg_datetime, '%Y-%m-%d %H:%i'))
+																	AS reg_datetime,
+				IFNULL(C.mod_user_id, C.reg_user_id)				AS reg_user_id,
+				IFNULL(M.user_name, R.user_name)					AS reg_user_name,
+				DATE_FORMAT(C.mod_datetime, '%Y-%m-%d %H:%i')		AS mod_datetime,
+				C.mod_user_id,
+				IFNULL(M.user_name, C.mod_user_id) 					AS mod_user_name
+		FROM	cmm_company U
+				INNER JOIN cmm_company C
+					ON	C.up_company_id = U.company_id
+				LEFT OUTER JOIN cmm_user R
+					ON	C.reg_user_id = R.user_id
+				LEFT OUTER JOIN cmm_user M
+					ON	C.mod_user_id = M.user_id
+		WHERE	1 = 1
+		AND		U.up_company_id = '*'
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    				U.company_name like CONCAT('%',#{keyword},'%')
+    				or 
+    				C.company_name like CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+    	<if test="searchKind == 'up_company_name'">
+			AND U.company_name like CONCAT('%',#{keyword},'%')	
+		</if> 
+    	<if test="searchKind == 'company_name'">
+			AND C.company_name like CONCAT('%',#{keyword},'%')	
+		</if> 
+		ORDER BY U.company_name, C.company_name
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+    
+    <select id="companylist" resultType="CustomCmmCompanyVO" parameterType="CustomCmmCompanyVO">
+		SELECT  
+			*
+			, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+		FROM cmm_company
+		WHERE 1=1
+		<if test="searchKind == 'selectBox' "> 
+			AND up_company_id = '*'
+    	</if>		
+    	<if test="searchKind == 'company_name' ">
+			AND company_name = #{companyName}
+			AND up_company_id = #{upCompanyId}
+    	</if>		
+		ORDER BY company_name asc
+    </select>    
+    
+    <select id="detail" resultType="CustomCmmCompanyVO" parameterType="CustomCmmCompanyVO">
+		SELECT  
+			CC.up_company_Id 		AS company_id
+			, CC.company_name 		AS customer_name
+			, CC.company_id 		AS customer_id
+			, IFNULL(DATE_FORMAT(CC.mod_datetime, '%Y-%m-%d %H:%i'), DATE_FORMAT(CC.reg_datetime, '%Y-%m-%d %H:%i'))
+									AS reg_datetime2
+			, CU.user_name
+		FROM cmm_company CC
+		LEFT JOIN cmm_user CU
+		ON CC.reg_user_id = CU.user_id
+		WHERE CC.company_id = #{companyId}
+    </select>  	
+	
+    <insert id="insert" parameterType="CustomCmmCompanyVO">
+   		INSERT INTO cmm_company (
+			company_id
+			, company_name
+			, up_company_id
+			, reg_datetime
+			, reg_user_id   		
+		) values (
+			#{companyId}
+			, #{companyName}
+			, #{upCompanyId}
+			, NOW()
+			, #{regUserId}
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomCmmCompanyVO">
+        UPDATE cmm_company SET
+        	company_name = #{companyName}
+			, up_company_id = #{upCompanyId}
+			, mod_datetime = NOW()
+			, mod_user_id = #{modUserId}       
+        WHERE company_id = #{companyId}
+    </update>  	
+</mapper>

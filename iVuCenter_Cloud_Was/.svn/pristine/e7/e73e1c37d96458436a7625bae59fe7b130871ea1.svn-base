@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+     xmlns="http://www.springframework.org/schema/beans"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:aop="http://www.springframework.org/schema/aop"
+     xmlns:tx="http://www.springframework.org/schema/tx"
+     xmlns:batch="http://www.springframework.org/schema/batch"
+     xmlns:context="http://www.springframework.org/schema/context"
+     xmlns:util="http://www.springframework.org/schema/util"
+    
+     xsi:schemaLocation="
+         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+         http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+         http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch-2.2.xsd
+         http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd
+     http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+    ">
+    
+    
+     <!-- *********************************************************** -->
+     <!-- ********** Job 선언 ********** -->
+     <!-- *********************************************************** -->
+     <batch:job id="resourcesMonthJob">
+     
+     	<!-- jobContextStep -->
+    	<batch:step id="resourcesMonthJobContextStep" next="resourcesMonthStep">
+			<batch:tasklet ref="resourcesMonthJobContextTasklet" />
+		</batch:step>
+		
+		<batch:step id="resourcesMonthStep" >
+			<batch:tasklet>
+				<batch:chunk reader="resourcesMonthReader" 
+							writer="resourcesMonthWriter"
+	                        commit-interval="10">
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>     
+     	
+     </batch:job>
+	
+	<!-- *********************************************************** -->
+	<!-- ********** 변수 선언 ********** -->
+	<!-- *********************************************************** -->
+
+	<!-- 입력변수 -->
+	<util:map id="resourcesMonthJobParams" key-type="java.lang.String" scope="step" >
+		<entry key="runtime" value="#{jobParameters['runtime']}" />
+		<entry key="resourcesDate" value="#{jobParameters['resourcesDate']}" />
+	</util:map>
+	
+	<!-- 스텝간 동적 변수 -->
+	<util:map id="resourcesMonthStepParams" key-type="java.lang.String" scope="step">
+		<entry key="resourcesDate" value="#{jobExecutionContext['resourcesDate']}" />
+	</util:map>
+	
+	
+     <!-- *********************************************************** -->
+     <!-- ********** Bean 선언 ********** -->
+     <!-- *********************************************************** -->
+
+    <bean id="resourcesMonthJobContextTasklet" class="com.ivucenter.cloud.batch.resources.month.ResourcesMonthJobContextTasklet">
+	    <property name="parameterValues" ref="resourcesMonthJobParams"/>
+    </bean> 
+    
+	<bean id="resourcesMonthReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">  	  	
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.resources.BatchResourcesDAO.selectListResourcesDaySummary"/>
+	    <property name="parameterValues" ref="resourcesMonthStepParams"/>
+    </bean>
+            
+    <bean id="resourcesMonthWriter" class="com.ivucenter.cloud.batch.resources.month.ResourcesMonthWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />	
+	    <property name="parameterValues" ref="resourcesMonthStepParams"/>
+    </bean>
+     
+    
+</beans>

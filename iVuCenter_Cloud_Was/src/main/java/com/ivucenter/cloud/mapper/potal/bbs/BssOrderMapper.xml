@@ -1,0 +1,502 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bss.order.BssOrderDAO">
+
+  	<select id="countBssOrderProductVm" resultType="Int" parameterType="CustomReqOrderVO">
+		SELECT
+			COUNT(*)
+		FROM (
+			SELECT
+				d.order_no
+			FROM (
+				SELECT
+					order_product_seq
+				FROM bss_order_product_vm
+				WHERE vm_uuid = #{vmUuid}
+			) c
+			LEFT JOIN bss_order_product d
+			ON c.order_product_seq = d.order_product_seq
+		) a
+		LEFT JOIN (
+			SELECT
+				order_no
+			FROM bss_order
+			WHERE apprv_state = 'APPRV_PROCESSING'
+		) b
+		ON a.order_no = b.order_no
+    </select>
+
+    <insert id="insertBssOrder" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order(
+			order_no
+			, order_user_id
+			, order_name
+			, description
+			, apprv_state
+			, order_datetime
+			, order_summary
+		)VALUES(
+			#{orderNo}
+			, #{orderUserId}
+			, #{orderName}
+			, #{description}
+			, #{apprvState}
+			, NOW()
+			, #{orderSummary}
+		)
+    </insert>
+
+    <insert id="insertBssOrderProduct" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product(
+			order_product_seq
+			, order_no
+			, request_type
+			, product_category
+			, order_summary
+			, hourly_flag
+			, amount
+			, cloud_id
+		)VALUES(
+			#{orderProductSeq}
+			, #{orderNo}
+			, #{requestType}
+			, #{productCategory}
+			, #{orderSummary}
+			, #{hourlyFlag}
+			, #{amount}
+			, #{cloudId}
+		)
+    </insert>
+
+    <insert id="insertBssOrderProductVm" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_vm(
+			order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, vm_uuid
+			, default_network_id
+			, default_network_name
+			, default_network_alias
+			, hostname
+			, hostname_alias
+			, flavor_id
+			, before_flavor_id
+			, vcpus
+			, before_vcpus
+			, mem_gb
+			, before_mem_gb
+			, disk_gb
+			, az_name
+			, image_id
+			, description
+			, vm_catalog_seq
+			, vm_product_seq
+			, os_product_seq
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{vmUuid}
+			, #{defaultNetworkId}
+			, #{defaultNetworkName}
+			, #{defaultNetworkAlias}
+			, #{hostname}
+			, #{hostnameAlias}
+			, #{flavorId}
+			, #{beforeFlavorId}
+			, #{vcpus}
+			, #{beforeVcpus}
+			, #{memGb}
+			, #{beforeMemGb}
+			, #{diskGb}
+			, #{azName}
+			, #{imageId}
+			, #{description}
+			, #{vmCatalogSeq}
+			, #{vmProductSeq}
+			, #{osProductSeq}
+		)
+    </insert>
+
+     <insert id="insertBssOrderProductDisk" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_disk(
+			order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, disk_name
+			, disk_gb
+			, before_disk_gb
+			, description
+			, disk_id
+			, disk_catalog_seq
+			, disk_product_seq
+			, vm_uuid
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{diskAlias}
+			, #{diskGb}
+			, #{beforeDiskGb}
+			, #{description}
+			, #{diskId}
+			, #{diskCatalogSeq}
+			, #{diskProductSeq}
+			, #{vmUuid}
+		)
+    </insert>
+
+<!--      <insert id="insertBssOrderProductNas" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_nas(
+			order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, nas_name
+			, nas_gb
+			, before_nas_gb
+			, description
+			, work_user_id
+			, nas_catalog_seq
+			, nas_product_seq
+			, nas_id
+			, vm_name
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{nasName}
+			, #{nasGb}
+			, #{beforeNasGb}
+			, #{description}
+			, #{workUserId}
+			, #{nasCatalogSeq}
+			, #{nasProductSeq}
+			, #{nasId}
+			, #{vmName}
+		)
+    </insert> -->
+
+        <insert id="insertBssOrderProductNas" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_nas(
+			order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, nas_name
+			, nas_alias
+			, nas_id
+			, nas_file_system_path
+			, nas_nfs_object_id
+			, nas_gb
+			, before_nas_gb
+			, description
+			, nas_catalog_seq
+			, nas_product_seq
+			, vm_name
+			, work_user_id
+			, default_network_id
+			, default_network_name
+			, default_network_alias
+			, default_network_ip
+			, az_name
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{nasName}
+			, #{nasAlias}
+			, #{nasId}
+			, #{nasFileSystemPath}
+			, #{nasNfsObjectId}
+			, #{nasGb}
+			, #{beforeNasGb}
+			, #{description}
+			, #{nasCatalogSeq}
+			, #{nasProductSeq}
+			, #{vmName}
+			, #{workUserId}
+			, #{defaultNetworkId}
+			, #{defaultNetworkName}
+			, #{defaultNetworkAlias}
+			, #{defaultNetworkIp}
+			, #{azName}
+		)
+    </insert>
+
+    <insert id="insertBssOrderProductNasVm" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_nas_vm (
+				order_product_seq,
+				vm_uuid
+		    )
+		    VALUES (
+				#{orderProductSeq},
+				#{vmUuid}
+			 )
+    </insert>
+
+     <insert id="insertBssOrderProductIp" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_publicip(
+			order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, vm_uuid
+			, publicip_ea
+			, description
+			, work_user_id
+			, publicip_catalog_seq
+			, publicip_product_seq
+			, publicip_id
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{vmUuid}
+			, #{publicipEa}
+			, #{description}
+			, #{workUserId}
+			, #{publicipCatalogSeq}
+			, #{publicipProductSeq}
+			, #{publicipId}
+		)
+    </insert>
+<!--
+     <insert id="insertBssOrderProductBack" parameterType="CustomReqOrderVO">
+
+		INSERT INTO bss_order_product_backup(
+			order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, description
+			, backup_gb
+			, backup_catalog_seq
+			, backup_product_seq
+			, work_user_id
+			, backup_id
+			, vm_uuid
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{description}
+			, #{backupGb}
+			, #{backupCatalogSeq}
+			, #{backupProductSeq}
+			, #{workUserId}
+			, #{backupId}
+			, #{vmUuid}
+		)
+    </insert>
+ -->
+
+    <insert id="insertBssOrderProductService" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_service(
+			  order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, description
+			, service_ea
+			, service_catalog_seq
+			, service_product_seq
+			, work_user_id
+			, service_id
+			, service_type
+			, vm_uuid
+			, service_name
+			, bastion_vm_user_id
+			, bastion_vm_user_password
+			, env_type
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{description}
+			, #{serviceEa}
+			, #{serviceCatalogSeq}
+			, #{serviceProductSeq}
+			, #{workUserId}
+			, #{serviceId}
+			, #{serviceType}
+			, #{vmUuid}
+			, #{serviceName}
+			, #{bastionVmUserId}
+			, #{bastionVmUserPassword}
+			, #{envType}
+		)
+    </insert>
+
+    <insert id="insertBssOrderProductApp" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_app (
+			order_product_seq,
+			project_id,
+			template_product_seq,
+			template_catalog_seq,
+			app_name,
+			pod_cnt,
+			cpu_limit,
+			mem_limit,
+			on_demand_flag,
+			app_uid,
+			os_product_seq
+		)
+		VALUES
+		(
+			#{orderProductSeq},
+			#{projectId},
+			#{templateProductSeq},
+			#{templateCatalogSeq},
+			#{appName},
+			#{podCnt},
+			#{cpuLimit},
+			#{memLimit},
+			'Y',
+			#{appUid},
+			#{appOsProductSeq}
+		)
+    </insert>
+
+<!--
+
+     <insert id="insertBssOrderProductMca" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_mca(
+			order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, description
+			, mca_ea
+			, mca_catalog_seq
+			, mca_product_seq
+			, work_user_id
+			, mca_id
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{description}
+			, #{mcaEa}
+			, #{mcaCatalogSeq}
+			, #{mcaProductSeq}
+			, #{workUserId}
+			, #{mcaId}
+		)
+    </insert>
+-->
+<!--
+         <insert id="insertBssOrderProductScm" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_scm(
+			order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, description
+			, scm_ea
+			, scm_catalog_seq
+			, scm_product_seq
+			, work_user_id
+			, scm_id
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{description}
+			, #{scmEa}
+			, #{scmCatalogSeq}
+			, #{scmProductSeq}
+			, #{workUserId}
+			, #{scmId}
+		)
+    </insert>
+-->
+<!--
+     <insert id="insertBssOrderProductSec" parameterType="CustomReqOrderVO">
+		INSERT INTO bss_order_product_security(
+			order_product_seq
+			, on_demand_flag
+			, apply_datetime
+			, hourly_flag
+			, project_id
+			, security_ea
+			, description
+			, security_catalog_seq
+			, security_product_seq
+			, work_user_id
+			, security_id
+		)VALUES(
+			#{orderProductSeq}
+			, #{onDemandFlag}
+			, #{applyDatetime}
+			, #{hourlyFlag}
+			, #{projectId}
+			, #{securityEa}
+			, #{description}
+			, #{securityCatalogSeq}
+			, #{securityProductSeq}
+			, #{workUserId}
+			, #{securityId}
+		)
+    </insert>
+-->
+
+  	<select id="selectByOrderProductSeq" resultType="CustomReqOrderVO" parameterType="String">
+		SELECT
+			BO.order_no
+			, BO.order_user_id
+		FROM bss_order_product BOP
+		LEFT JOIN bss_order BO
+		ON BOP.order_no = BO.order_no
+		WHERE BOP.order_product_seq = #{orderProductSeq}
+    </select>
+
+    <select id="selectCloudId" resultType="String" parameterType="CustomReqOrderVO">
+    	SELECT
+    		cloud_id
+    	FROM
+    		oss_project
+    	where
+    		project_id = #{projectId}
+    </select>
+
+    <select id="selectServiceSeq" resultType="CustomReqOrderVO" parameterType="String">
+    	SELECT *
+    	FROM bss_order_product a
+		INNER JOIN bss_order_product_service b
+		ON a.order_product_seq = b.order_product_seq
+		WHERE a.order_product_seq IN (SELECT req_service_product_seq FROM oss_service WHERE vm_uuid = #{vmUuid})
+    </select>
+
+</mapper>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans:beans
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:beans="http://www.springframework.org/schema/beans"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+                        http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/billing/billing-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/provisioning/provisioning-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/metering/metering-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/metering/realtime/metering-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/resources/day/resourcesday-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/resources/month/resourcesMonth-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/InsaSystem/InsaSystem-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/metering/nutanix/metering-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/InsaSystem/realtime/InsaUserSystem-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/logincheck/logincheck-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/sendmail/sendmail-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/sendsms/sendsms-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/sendKepco/sendKepco-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/sendStatus/sendStatus-job-config.xml" />
+   <beans:import resource="classpath:com/ivucenter/cloud/batch/metering/cicdApplication/application-job-config.xml" />
+
+<!--    <beans:import resource="classpath:com/ivucenter/cloud/batch/hrsystem/hrsystem-job-config.xml" /> -->
+</beans:beans>

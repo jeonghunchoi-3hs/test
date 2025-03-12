@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.req.user.ReqUserDAO">
+  	  	
+	<select id="list" resultType="CustomReqUserVO" parameterType="CustomReqUserVO">		
+    	SELECT  
+    		CU.customer_name
+    		, IFNULL(TRIM(CD.dept_name), '-') AS dept_name
+    		, RU.*
+		FROM 	req_user RU  
+		INNER JOIN cmm_customer CU
+		        ON RU.customer_id = CU.customer_id
+		LEFT JOIN (SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD
+		ON RU.dept_code = CD.dept_code
+		WHERE 	   RU.del_flag <![CDATA[<>]]> 'Y'
+		
+		<if test="searchAll == 'my' ">
+		AND RU.apprv_flag = 'N'
+		</if>
+		
+		<if test="searchKind == 'customer_name' and keyword != ''">
+			AND
+				CU.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'user_id' and keyword != ''">
+			AND
+				RU.user_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'user_name' and keyword != ''">
+			AND
+				RU.user_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+					CU.customer_name like CONCAT('%',#{keyword},'%')
+					OR
+					RU.user_id like CONCAT('%',#{keyword},'%')
+					OR
+					RU.user_name like CONCAT('%',#{keyword},'%')
+				)
+		</if>		
+		ORDER BY RU.req_user_seq DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+    
+    <select id="listByCustomer" resultType="CustomReqUserVO" parameterType="CustomReqUserVO">
+    	SELECT 
+			*
+    	FROM req_user      	
+    	where customer_id = #{customerId} 
+    </select>
+    
+	<select id="detail" resultType="CustomReqUserVO" parameterType="CustomReqUserVO">
+    	SELECT 
+			*
+    	FROM req_user
+		WHERE user_id = #{userId}    	
+    </select>
+    
+  	<!--사용자 리스트 -->
+    <select id="getUserList" resultType="CustomReqUserVO">
+		SELECT
+			CU.customer_name,
+			, TRIM(CD.dept_name) AS dept_name 	
+			, RU.*		 
+		 FROM      req_user RU
+		INNER JOIN cmm_customer CU
+		        ON RU.customer_id = CU.customer_id
+		INNER JOIN cmm_department CD
+		        ON RU.dept_code = CD.dept_code 
+		WHERE RU.del_flag <![CDATA[<>]]> 'Y' 
+		ORDER BY RU.req_user_seq DESC		
+  	</select>
+  	
+   	<!--사용자 상세화면 -->
+    <select id="getUserView" resultType="CustomReqUserVO" parameterType="CustomReqUserVO">
+		SELECT
+			CU.customer_name
+			, TRIM(CD.dept_name) AS dept_name 	
+			, RU.*
+		FROM  req_user RU
+		INNER JOIN cmm_customer CU
+		        ON RU.customer_id = CU.customer_id
+		INNER JOIN cmm_department CD
+		        ON RU.dept_code = CD.dept_code 
+		WHERE RU.del_flag <![CDATA[<>]]> 'Y' 
+		  AND RU.req_user_seq=#{reqUserSeq}
+  	</select>
+  	
+  	<!-- userId로 검색한 회원가입 신청자 정보 -->
+  	<select id="getReqUserById" resultType="CustomReqUserVO" parameterType="CustomReqUserVO">
+		SELECT
+			CU.customer_name
+			, TRIM(CD.dept_name) AS dept_name 	
+			, RU.*
+		FROM  req_user RU
+		INNER JOIN cmm_customer CU
+		        ON RU.customer_id = CU.customer_id
+		INNER JOIN cmm_department CD
+		        ON RU.dept_code = CD.dept_code 
+		WHERE RU.user_id=#{userId}
+  	</select>
+  	
+  	<!-- 사용자 신청 내용 사용자테이블로 내용입력 -->
+    <insert id="setUserInsert" parameterType="CustomReqUserVO">
+    	INSERT INTO  req_user 
+			(
+				req_user_seq
+				, user_id
+				, user_name 
+				, user_password				
+				, customer_id
+				, dept_code
+				, user_level
+				, user_phone 
+				, user_tel
+				, user_tel_ex 
+				, user_mail 
+				, sms_recv_flag
+				, mail_recv_flag
+				, reg_datetime
+				, reg_user_id
+				, apprv_flag
+				, del_flag
+			)
+			VALUES
+			(
+				#{reqUserSeq}
+				, #{userId}
+				, #{userName}
+				, #{userPassword}
+				, #{customerId}
+				, #{deptCode}
+				, #{userLevel}
+				, #{userPhone} 
+				, #{userTel}
+				, #{userTelEx}
+				, #{userMail}
+				, #{smsRecvFlag} 
+				, #{mailRecvFlag}				
+				, NOW()
+				, #{userId}
+				, 'N' 
+				, 'N'
+			)
+  	</insert>  	
+  	
+  	<!-- 아이디 중복 체크 -->
+  	<select id="setMbrFormchk" parameterType="CustomReqUserVO" resultType="Integer" >
+  		SELECT
+  			COUNT(user_id)
+  		FROM
+  			req_user
+  		WHERE user_id=#{userId}
+  		  AND del_flag = 'N'
+  		  AND apprv_flag = 'N'
+  	</select>
+  	
+  	<!-- 회원사 목록조회 -->
+  	<select id="selectCustomerList" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO" >
+  		SELECT
+  			customer_id ,
+			customer_name,
+			user_id_pattern
+		FROM 
+			cmm_customer
+		WHERE
+			del_flag = 'N'
+		<if test="keyword != '' ">
+			AND customer_name LIKE CONCAT('%',#{keyword},'%')	
+		</if>		
+  	</select>
+  	
+  	<!-- 사용자 신청 내용 사용자테이블로 내용입력 -->
+    <insert id="copyUserInfoToCmm" parameterType="CustomReqUserVO">
+    	INSERT INTO  cmm_user  
+			(
+				user_id 
+				, user_name 
+				, user_password 
+				, customer_id 
+				, dept_code
+				, user_level
+				, user_phone 
+				, user_tel 
+				, user_tel_ex 
+				, user_mail 
+				, sms_recv_flag 
+				, mail_recv_flag 
+				, pwd_init_flag
+				, user_status
+				, user_authority 
+				, reg_datetime
+				, reg_user_id
+				, del_flag
+			)
+		SELECT 	user_id
+				, user_name
+				, user_password
+				, customer_id
+				, dept_code
+				, user_level
+				, user_phone
+				, user_tel
+				, user_tel_ex
+				, user_mail
+		   		, sms_recv_flag
+		   		, mail_recv_flag
+		   		, 'N'
+		   		, 'USER_USING'
+		   		, '0000000000000001'
+		   		, NOW()
+		   		, #{userId}
+		   		, 'N'
+		FROM req_user
+		WHERE req_user_seq = #{reqUserSeq} 
+  	</insert>  
+  	 <update id="setUserConfirm" parameterType="CustomReqProductVO" >
+		UPDATE req_user 
+		   SET apprv_user_id = #{userId}
+			   , apprv_flag = #{apprvFlag}
+			   , apprv_datetime = now()
+			   , description = #{description}
+		 WHERE req_user_seq = #{reqUserSeq}
+  	</update>
+  	<delete id="delete" parameterType="String">
+  		DELETE FROM req_user
+  		 WHERE user_id = #{userId}
+  	</delete> 
+</mapper>

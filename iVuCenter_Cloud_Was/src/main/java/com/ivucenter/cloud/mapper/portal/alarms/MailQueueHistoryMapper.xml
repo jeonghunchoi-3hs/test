@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.mail.queue.history.MailQueueHistoryDAO">
+
+    <select id="list" resultType="CustomMailQueueHistoryVO" parameterType="CustomMailQueueHistoryVO">
+		SELECT 
+			z.*
+			, DATE_FORMAT(z.result_datetime, '%Y-%m-%d %H:%i') AS result_datetime2
+		FROM
+		( 
+			SELECT 
+				a.*
+				,b.template_name
+				, (CASE 
+					WHEN a.receiver_flg = 'U' 
+					THEN (
+						SELECT 
+							cc.customer_name 
+						FROM cmm_user cu, cmm_customer cc 
+						WHERE cu.customer_id=cc.customer_id
+						AND cu.user_id=a.receiver_id
+						)
+					WHEN a.receiver_flg = 'C' 
+					THEN (SELECT cc2.customer_name FROM cmm_customer cc2 WHERE cc2.customer_id=a.receiver_id)
+					ELSE '' END
+				) AS customer
+			FROM mail_queue_history a
+			
+			LEFT JOIN mail_template b 
+				ON a.template_id = b.template_id
+		) z
+		WHERE 1=1
+    	AND
+			DATE_FORMAT(z.result_datetime, '%Y%m%')  >= #{startYm}
+		AND
+			DATE_FORMAT(z.result_datetime, '%Y%m%') <![CDATA[<=]]> #{endYm}
+		<if test="searchKind == 'template_id' and keyword != ''">
+			AND
+				z.template_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'template_name' and keyword != ''">
+			AND
+				z.template_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+					z.template_id like CONCAT('%',#{keyword},'%')
+					OR
+					z.template_name like CONCAT('%',#{keyword},'%')
+				)
+		</if> 
+    	ORDER BY result_datetime DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+
+	<select id="detail" resultType="CustomMailQueueHistoryVO" parameterType="CustomMailQueueHistoryVO">
+    	SELECT 
+			*
+			, DATE_FORMAT(result_datetime, '%Y-%m-%d %H:%i') AS result_datetime2
+    	FROM mail_queue_history
+    	WHERE mail_seq = #{mailSeq}    	
+    </select>
+    
+    <insert id="insert" parameterType="CustomMailQueueHistoryVO">
+   		INSERT INTO mail_queue_history (
+			template_id
+			, mail_seq
+			, title
+			, content
+			, sender_name
+			, sender_mail
+			, receiver_flg
+			, receiver_id
+			, receiver_name
+			, receiver_mail
+			, retry_count
+			, result_flg
+			, result_datetime
+			, redirect_url
+		) values (
+			#{templateId}
+			, #{mailSeq}
+			, #{title}
+			, #{content}
+			, #{senderName}
+			, #{senderMail}
+			, #{receiverFlg}
+			, #{receiverId}
+			, #{receiverName}
+			, #{receiverMail}
+			, #{retryCount}
+			, 'Y'
+			, now()
+			, #{redirectUrl}	
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomMailQueueHistoryVO">
+        UPDATE mail_queue_history SET
+			template_id = #{templateId}
+			, mail_seq = #{mailSeq}
+			, title = #{title}
+			, content = #{content}
+			, sender_name = #{senderName}
+			, sender_mail = #{senderMail}
+			, receiver_flg = #{receiverFlg}
+			, receiver_id = #{receiverId}
+			, receiver_name = #{receiverName}
+			, receiver_mail = #{receiverMail}
+			, retry_count = #{retryCount}
+        WHERE mail_seq = #{mailSeq}    	
+    </update>
+    
+    <delete id="delete" parameterType="CustomMailQueueHistoryVO">
+    	DELETE FROM mail_queue_history 
+    	WHERE mail_seq = #{mailSeq}    	
+    </delete>
+    
+</mapper>

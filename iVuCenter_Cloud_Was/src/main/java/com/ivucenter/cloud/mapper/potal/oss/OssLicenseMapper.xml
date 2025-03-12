@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.cmm.cloud.OssLicenseDao">
+	<select id="view" parameterType="CustomOssLicenseVO" resultType="CustomOssLicenseVO">
+		SELECT
+			license_id
+			, license_type
+			, license_name
+			, license_avail
+			, (select count(*) from oss_license_detail where license_id = ol.license_id) as licenseUse
+			, license_regdate
+			, license_moddate
+		FROM
+			oss_license ol
+		WHERE
+			license_id = #{licenseId}
+    </select>
+    <select id="detailView" parameterType="CustomOssLicenseVO" resultType="CustomOssLicenseVO">
+		SELECT
+			old.license_detail_id
+			, old.license_id
+			, old.license_detail_regdate
+			, old.license_detail_moddate
+			, old.vm_uuid
+			, old.detail_reg_user_id
+			, cu.user_name
+			, ov.hostname
+			, ov.hostname_alias
+			, ov.project_id
+		FROM
+			oss_license_detail old
+		LEFT JOIN
+			oss_vm ov ON old.vm_uuid = ov.vm_uuid
+		LEFT JOIN
+			cmm_user cu ON old.detail_reg_user_id = cu.user_id
+		where
+			old.license_detail_id = #{licenseDetailId}
+    </select>
+	<select id="list" parameterType="CustomOssLicenseVO" resultType="CustomOssLicenseVO">
+		SELECT
+			license_id
+			, license_type
+			, license_name
+			, license_avail
+			, (select count(*) from oss_license_detail where license_id = ol.license_id) as licenseUse
+			, license_regdate
+			, license_moddate
+		FROM
+			oss_license ol
+		WHERE
+			del_flag = 'N'
+    </select>
+    <select id="detailList" parameterType="CustomOssLicenseVO" resultType="CustomOssLicenseVO">
+		SELECT
+			old.license_detail_id
+			, old.license_id
+			, old.license_detail_regdate
+			, old.license_detail_moddate
+			, old.vm_uuid
+			, old.detail_reg_user_id
+			, cu.user_name
+			, ov.hostname
+			, ov.hostname_alias
+		FROM
+			oss_license_detail old
+		LEFT JOIN
+			oss_vm ov ON old.vm_uuid = ov.vm_uuid
+		LEFT JOIN
+			cmm_user cu ON old.detail_reg_user_id = cu.user_id
+		WHERE
+			old.license_id = #{licenseId}
+		AND
+			old.del_flag = 'N'
+    </select>
+    <insert id="insert" parameterType="CustomOssLicenseVO">
+
+		INSERT INTO oss_license
+			(
+				license_id
+				, license_type
+				, license_name
+				, license_avail
+				, reg_user_id
+				, license_regdate
+				, del_flag
+			)
+		VALUES
+			(
+				#{licenseId}
+				, #{licenseType}
+				, #{licenseName}
+				, #{licenseAvail}
+				, #{regUserId}
+				, now()
+				, 'N'
+	       )
+
+	</insert>
+	
+	<insert id="detailInsert" parameterType="CustomOssLicenseVO">
+
+		INSERT INTO oss_license_detail
+			(
+				license_detail_id
+				, license_id
+				, vm_uuid
+				, detail_reg_user_id
+				, license_detail_regdate
+				, del_flag
+			)
+		VALUES
+			(
+				#{licenseDetailId}
+				, #{licenseId}
+				, #{vmUuid}
+				, #{detailRegUserId}
+				, now()
+				, 'N'
+	       )
+
+	</insert>
+	
+	<insert id="update" parameterType="CustomOssLicenseVO">
+
+		UPDATE oss_license
+			SET
+		license_type = #{licenseType}
+		, license_name = #{licenseName}
+		, license_avail =  #{licenseAvail}
+		, mod_user_id = #{modUserId}
+		, license_moddate = now()
+			WHERE
+		license_id = #{licenseId}
+
+	</insert>
+	
+	<insert id="detailUpdate" parameterType="CustomOssLicenseVO">
+
+		UPDATE oss_license_detail
+			SET
+		vm_uuid = #{vmUuid}
+		, detail_mod_user_id = #{detailRegUserId}
+		, license_detail_moddate = now()
+			WHERE
+		license_detail_id = #{licenseDetailId}
+
+	</insert>
+	
+	<insert id="delete" parameterType="CustomOssLicenseVO">
+
+		UPDATE oss_license
+			SET
+		del_flag = 'Y'
+			WHERE
+		license_id = #{licenseId}
+	</insert>
+	
+	<insert id="detailDelete" parameterType="CustomOssLicenseVO">
+
+		UPDATE oss_license_detail
+			SET
+		del_flag = 'Y'
+			WHERE
+		license_detail_id = #{licenseDetailId}
+	</insert>
+</mapper>

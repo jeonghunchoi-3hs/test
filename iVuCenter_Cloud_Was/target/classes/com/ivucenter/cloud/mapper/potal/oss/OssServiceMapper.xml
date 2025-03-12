@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.service.OssServiceDAO">
+
+    <select id="list" parameterType="CustomOssServiceVO" resultType="CustomOssServiceVO">
+	  	SELECT
+			OV.*
+			, DATE_FORMAT(OV.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+	    FROM (
+	    	SELECT
+	    		*
+	    	FROM oss_vm
+	    	WHERE project_id = #{projectId}
+	    	AND expire_datetime IS NULL
+	    	AND del_flag = 'N'
+	     	<if test="searchKind == 'searchAll' and keyword != ''">
+	    		AND (
+	    			hostname_alias  like CONCAT('%',#{keyword},'%')
+	    			OR
+	    			hostname  like CONCAT('%',#{keyword},'%')
+	    			)
+	    	</if>
+			<if test="searchKind == 'hostname_alias' and keyword != ''">
+				AND
+					hostname_alias like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'hostname' and keyword != ''">
+				AND
+					hostname like CONCAT('%',#{keyword},'%')
+			</if>
+			ORDER BY hostname_alias asc
+	    ) OV
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+    <select id="detail" parameterType="CustomOssVmVO" resultType="CustomOssVmVO">
+	  	SELECT
+				*
+				, DATE_FORMAT(reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+	    FROM oss_vm
+    	WHERE vm_uuid = #{vmUuid}
+	</select>
+
+    <update id="update" parameterType="CustomOssVmVO">
+        UPDATE oss_vm SET
+			hostname_alias	= #{hostnameAlias}
+		    , mod_datetime = now()
+		    , mod_user_id = #{modUserId}
+        WHERE vm_uuid = #{vmUuid}
+    </update>
+
+    <update id="vmHistoryInsert" parameterType="CustomOssVmVO">
+
+		INSERT INTO
+			oss_vm_history (
+				vm_uuid,
+				ip,
+				user_id,
+				user_name,
+				action_type,
+				action_datetime,
+				description
+			)
+		VALUES
+			(
+				#{vmUuid},
+				#{ip},
+				#{userId},
+				#{userName},
+				#{actionType},
+				now(),
+				#{description}
+			);
+
+    </update>
+
+
+    <select id="serviceDetailList" parameterType="CustomOssServiceVO" resultType="CustomOssServiceVO">
+
+					SELECT
+								a.service_id,
+								a.service_type,
+								a.service_name,
+								a.vm_uuid,
+								a.project_id,
+								DATE_FORMAT(a.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2,
+								IFNULL(b.hostname_alias,OA.app_name) AS resource_name,
+								c.code_name AS service_type_name,
+								e.cloud_name
+
+					  FROM  (SELECT * FROM oss_service WHERE del_flag = 'N') a
+			    LEFT JOIN  (SELECT * FROM oss_vm WHERE del_flag = 'N') b
+					      ON  a.vm_uuid = b.vm_uuid
+	 			 LEFT OUTER JOIN (SELECT * FROM cmm_code WHERE code_key_id ='SERVICE_TYPE') c
+					      ON  a.service_type = c.code_id
+				LEFT JOIN oss_project d
+						  ON a.project_id = d.project_id
+				LEFT JOIN oss_cloud e
+						  ON e.cloud_id = d.cloud_id
+				 LEFT JOIN oss_app OA
+			              ON a.app_uuid = OA.app_uid
+					WHERE d.project_box_id = #{projectBoxId}
+		<if test="searchKind == 'service_type_name' and keyword != ''">
+			AND
+				c.code_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'service_name' and keyword != ''">
+			AND
+				a.service_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+					c.code_name like CONCAT('%',#{keyword},'%')
+					OR
+					a.service_name like CONCAT('%',#{keyword},'%')
+				)
+		</if>
+	</select>
+
+
+	<select id="mbrServiceDetailList" parameterType="CustomOssServiceVO" resultType="CustomOssServiceVO">
+
+					SELECT
+								a.service_id,
+								a.service_type,
+								a.service_name,
+								a.vm_uuid,
+								a.project_id,
+								b.hostname,
+								DATE_FORMAT(a.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2,
+								IFNULL(b.hostname_alias,OA.app_name) AS resource_name,
+								c.code_name AS service_type_name,
+								OC.cloud_name
+
+					  FROM  (SELECT * FROM oss_service WHERE del_flag='N') a
+			    LEFT JOIN  (SELECT * FROM oss_vm WHERE del_flag='N') b
+					      ON  a.vm_uuid = b.vm_uuid
+	  			LEFT OUTER JOIN (SELECT * FROM cmm_code WHERE code_key_id ='SERVICE_TYPE') c
+					      ON  a.service_type = c.code_id
+				LEFT JOIN oss_project d
+						  ON a.project_id = d.project_id
+			    LEFT JOIN oss_cloud OC
+			    		  ON d.cloud_id = OC.cloud_id
+			    LEFT JOIN oss_app OA
+			              ON a.app_uuid = OA.app_uid
+
+				WHERE d.project_box_id = #{projectBoxId}
+	</select>
+
+
+	 <select id="serviceDetailInfo" parameterType="CustomOssServiceVO" resultType="CustomOssServiceVO">
+
+					SELECT
+								a.service_id,
+								a.service_type,
+								a.service_name,
+								a.vm_uuid,
+								a.project_id,
+								a.description,
+								DATE_FORMAT(a.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2,
+								d.project_name,
+								IFNULL(b.hostname_alias,OA.app_name) AS resource_name,
+								c.code_name AS service_type_name,
+								e.cloud_name
+					  FROM  oss_service a
+			    LEFT JOIN  oss_vm b
+					      ON  a.vm_uuid = b.vm_uuid
+	  LEFT  JOIN (SELECT * FROM cmm_code WHERE code_key_id ='SERVICE_TYPE') c
+					      ON  a.service_type = c.code_id
+	  LEFT  JOIN oss_project d
+	                     ON  a.project_id = d.project_id
+	  LEFT JOIN oss_cloud e
+	  					 ON d.cloud_id = e.cloud_id
+	  LEFT JOIN oss_app OA
+			             ON a.app_uuid = OA.app_uid
+					WHERE a.project_id = #{projectId}
+					    AND a.service_id = #{serviceId}
+
+	</select>
+
+
+	<select id="mbrServiceDetailInfo" parameterType="CustomOssServiceVO" resultType="CustomOssServiceVO">
+
+					SELECT
+								a.service_id,
+								a.service_type,
+								a.service_name,
+								a.vm_uuid,
+								a.project_id,
+								a.description,
+								b.hostname,
+								DATE_FORMAT(a.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2,
+								d.project_name,
+								d.project_alias,
+								IFNULL(b.hostname_alias,OA.app_name) AS resource_name,
+								c.code_name AS service_type_name,
+								e.cloud_name
+					  FROM  oss_service a
+     			  LEFT JOIN  oss_vm b
+					      ON  a.vm_uuid = b.vm_uuid
+				  LEFT  JOIN (SELECT * FROM cmm_code WHERE code_key_id ='SERVICE_TYPE') c
+						  ON  a.service_type = c.code_id
+				  LEFT  JOIN oss_project d
+				          ON  a.project_id = d.project_id
+				  LEFT JOIN oss_cloud e
+				  		  ON d.cloud_id = e.cloud_id
+				  LEFT JOIN oss_app OA
+			              ON a.app_uuid = OA.app_uid
+
+
+					WHERE a.project_id = #{projectId}
+					    AND a.service_Id = #{serviceId}
+
+	</select>
+
+
+	<select id="getServiceList" parameterType="CustomOssServiceVO" resultType="CustomOssServiceVO">
+	<![CDATA[
+		SELECT
+		    OS.service_name
+			, OS.service_id
+			, OS.project_id
+			, OS.service_ea
+			, OS.description
+			, DATE_FORMAT(OS.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime
+			, OS.expire_datetime
+			, OS.delete_datetime
+			, OS.reg_datetime
+			, OS.hourly_flag
+			, OS.reg_user_id
+			, OS.mod_datetime
+			, OS.mod_user_id
+			, OS.del_flag
+			, OS.service_catalog_seq
+			, OS.service_product_seq
+			, OS.service_type
+			, OV.hostname_alias
+			, OV.vm_uuid
+			, CASE
+				WHEN OS.service_type = '01' THEN '계정관리'
+				WHEN OS.service_type = '02' THEN '보안관제'
+				WHEN OS.service_type = '03' THEN '백업'
+				WHEN OS.service_type = '04' THEN 'SW설치'
+				WHEN OS.service_type = '05' THEN '디스크관리'
+				ELSE '' END AS service_type_name
+		FROM
+			oss_service OS
+		LEFT OUTER JOIN oss_vm OV
+   	        ON OS.vm_uuid = OV.vm_uuid AND OV.del_flag = 'N'
+		WHERE
+			OS.project_id = #{projectId}
+			AND OS.del_flag = 'N'
+			AND ( OS.expire_datetime IS NULL OR OS.expire_datetime  >  #{expireDatetime} )
+ 	]]>
+		<if test="searchKind == 'service_id' and keyword != ''">
+			AND
+				OS.service_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+
+</mapper>

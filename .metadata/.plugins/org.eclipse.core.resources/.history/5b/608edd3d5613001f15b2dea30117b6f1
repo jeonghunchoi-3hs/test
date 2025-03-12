@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+	<beans:beans xmlns="http://www.springframework.org/schema/security"
+				 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+				 xmlns:beans="http://www.springframework.org/schema/beans"
+				 xsi:schemaLocation="http://www.springframework.org/schema/beans
+				 					 http://www.springframework.org/schema/beans/spring-beans.xsd
+									 http://www.springframework.org/schema/security
+									 http://www.springframework.org/schema/security/spring-security.xsd">
+
+	<global-method-security secured-annotations="enabled" pre-post-annotations="enabled" />
+
+	<http pattern="/mng/**" auto-config="true" disable-url-rewriting="true" use-expressions="true" create-session="never" authentication-manager-ref="mngAuthenticationManager">
+		<intercept-url pattern="/resources/**" access="permitAll" />
+		<intercept-url pattern="/mng/" access="permitAll" />
+		<intercept-url pattern="/mng/login/**" access="permitAll" />
+		<intercept-url pattern="/mng/alarms/**" access="permitAll" />
+		<intercept-url pattern="/mng/bss/batch/**" access="permitAll" />		
+		<intercept-url pattern="/mng/batch/**" access="permitAll" />								
+ 		<intercept-url pattern="/mng/**" access="authenticated" />
+<!--  		<intercept-url pattern="/mng/check/**" access="authenticated" /> -->
+ 		
+		<form-login username-parameter="j_username"
+					password-parameter="j_password"
+					login-page="/mng/login/"
+					default-target-url="/mng/check"
+					authentication-success-handler-ref="mngLoginSuccessHandler"
+					login-processing-url="/mng/j_spring_security_check"	/>
+
+		<logout invalidate-session="true" logout-url="/mng/login/j_spring_security_logout" delete-cookies="JSESSIONID" logout-success-url="/mng/login"/>
+
+		<session-management>
+			<concurrency-control max-sessions="1" error-if-maximum-exceeded="false" expired-url="/mng/expired" />
+		</session-management>
+
+		<access-denied-handler ref="mngAccessDeniedHandler"/>
+
+		<http-basic />
+
+		<csrf disabled="true"/>
+	</http>
+
+	<beans:bean id="customMngAuthenticationProvider" 	class="com.ivucenter.cloud.portal.login.MngAuthenticationProvider"/>
+	<beans:bean id="mngAccessDeniedHandler"  				class="com.ivucenter.cloud.portal.login.UserAccessDeniedHandler"/>
+	<beans:bean id="mngLoginSuccessHandler"  				class="com.ivucenter.cloud.portal.login.MngLoginSuccessHandler"/>
+
+	<authentication-manager id="mngAuthenticationManager">
+		<authentication-provider ref="customMngAuthenticationProvider"/>
+    </authentication-manager>
+
+
+  	<http pattern="/mbr/**" auto-config="true" disable-url-rewriting="true" use-expressions="true" create-session="never" authentication-manager-ref="mbrAuthenticationManager">
+		<intercept-url pattern="/resources/**" 		access="permitAll" />
+		<intercept-url pattern="/mbr/" 				access="permitAll" />
+		<intercept-url pattern="/mbr/login" 		access="permitAll" />
+		<intercept-url pattern="/mbr/alarams/**"	access="permitAll" />
+		<intercept-url pattern="/mbr/mbrinfo/**" 	access="permitAll" />
+		<intercept-url pattern="/mbr/req/user/**" 	access="permitAll" />
+						
+		<intercept-url pattern="/mbr/mbrinfo" 		access="authenticated" />
+		<intercept-url pattern="/mbr/cmm/user/**" 	access="authenticated" />
+		<intercept-url pattern="/mbr/**" 			access="authenticated" />
+		
+		<form-login username-parameter="j_username"
+					password-parameter="j_password"
+					login-page="/mbr/"
+					default-target-url="/mbr/main"
+					login-processing-url="/mbr/j_spring_security_check"
+					/>
+
+		<logout invalidate-session="true" logout-url="/mbr/j_spring_security_logout"  delete-cookies="JSESSIONID" logout-success-url="/mbr"/>
+
+		<session-management>
+			<concurrency-control max-sessions="1" expired-url="/mbr/expired" error-if-maximum-exceeded="false"/>
+		</session-management>
+
+		<custom-filter after="EXCEPTION_TRANSLATION_FILTER" ref="ajaxSessionCheckFilter"/>
+						
+		<access-denied-handler ref="mbrAccessDeniedHandler"/>
+
+		<http-basic />
+
+		<csrf disabled="true"/>
+	</http>
+
+    <beans:bean id="ajaxSessionCheckFilter" 			class="com.ivucenter.cloud.portal.login.AjaxSessionCheckFilter"/>
+    <beans:bean id="customMbrAuthenticationProvider" 	class="com.ivucenter.cloud.portal.login.MbrAuthenticationProvider"/>
+    <beans:bean id="mbrAccessDeniedHandler"  			class="com.ivucenter.cloud.portal.login.UserAccessDeniedHandler"/>
+
+	<authentication-manager id="mbrAuthenticationManager">
+    	<authentication-provider ref="customMbrAuthenticationProvider"/>
+    </authentication-manager>
+
+</beans:beans>
+

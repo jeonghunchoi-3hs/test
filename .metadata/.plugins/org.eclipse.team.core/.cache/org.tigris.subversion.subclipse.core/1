@@ -1,0 +1,51 @@
+package com.ivucenter.cloud.batch.InsaSystem;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.springframework.batch.item.ItemWriter;
+
+import com.ivucenter.cloud.entity.CmmDepartmentVO;
+
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class InsaSystemDeptWriter implements ItemWriter<CmmDepartmentVO> {
+	
+	private final String batchDAO = "com.ivucenter.cloud.batch.resources.BatchInsaSystemDAO.";
+		
+	private final String insertInsaDept = batchDAO + "insertInsaDept";
+	private final String updateInsaDeptSetNull = batchDAO + "updateInsaDeptSetNull";
+	private final String deleteInsaDeptNotUse = batchDAO + "deleteInsaDeptNotUse";
+
+	@Setter
+	private SqlSessionFactory sqlSessionFactory;
+    
+    @Setter
+	private Map<String, Object> parameterValues;
+	
+	private SqlSessionTemplate sqlSessionTemplate;
+	
+	@Override
+	public void write(List<? extends CmmDepartmentVO> items) throws Exception {
+		
+		this.sqlSessionTemplate = new SqlSessionTemplate(sqlSessionFactory, ExecutorType.SIMPLE);
+				
+		for (CmmDepartmentVO item : items) { // kepco 부서 정보			
+			if(item != null){				
+				log.debug("BATCH INSA DEPT :" + item.toString());
+				if(item.getDelFlag() == "N") {
+					item.setDelFlag(null);
+				}
+				this.sqlSessionTemplate.update(insertInsaDept, item);
+			}
+		}
+		
+		this.sqlSessionTemplate.update(updateInsaDeptSetNull);
+		this.sqlSessionTemplate.delete(deleteInsaDeptNotUse);		
+	}
+}

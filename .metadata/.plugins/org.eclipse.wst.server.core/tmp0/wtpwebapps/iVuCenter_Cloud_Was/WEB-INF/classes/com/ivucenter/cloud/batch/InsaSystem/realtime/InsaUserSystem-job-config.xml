@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:batch="http://www.springframework.org/schema/batch"
+	   xmlns:util="http://www.springframework.org/schema/util"
+	   xsi:schemaLocation=
+	   		"http://www.springframework.org/schema/beans 
+	   		 http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+         	 http://www.springframework.org/schema/batch 
+         	 http://www.springframework.org/schema/batch/spring-batch-3.0.xsd
+         	 http://www.springframework.org/schema/util 
+         	 http://www.springframework.org/schema/util/spring-util.xsd">
+
+	<!-- *********************************************************** -->
+	<!-- ********** 변수 선언 ********** -->
+	<!-- *********************************************************** -->
+	<!-- 입력변수 -->
+	<util:map id="InsaSystemJobParams" key-type="java.lang.String" scope="step" >
+		<entry key="runtime" value="#{jobParameters['runtime']}" />
+		<entry key="standardDate" value="#{jobParameters['standardDate']}" />
+	</util:map>
+	
+	<!-- 스텝간 동적 변수 -->
+	<util:map id="InsaSystemStepParams" key-type="java.lang.String" scope="step">
+		<entry key="standardDate" value="#{jobParameters['standardDate']}" />		
+	</util:map>
+	
+	<!-- *********************************************************** -->
+	<!-- ********** Bean 선언 ********** -->
+	<!-- *********************************************************** -->
+	 <bean id="InsaUserSystemJobContextTasklet" class="com.ivucenter.cloud.batch.InsaSystem.realtime.JobContextTasklet">
+	 	<property name="sqlSessionFactory" 	ref="sqlSessionFactory" />
+	    <property name="parameterValues" 	ref="InsaSystemJobParams"/>
+    </bean> 
+    
+	<bean id="InsaUserTmpReader" 			class="org.mybatis.spring.batch.MyBatisPagingItemReader">				
+		<property name="sqlSessionFactory" 	ref="sqlSessionFactory3" />
+		<property name="queryId" 			value="com.ivucenter.cloud.batch.resources.BatchInsaSystemDAO.selectUserTbl" /> 		                                		
+ 		<property name="pageSize" 			value="30"/>
+	</bean>
+
+	<bean id="InsaUserTmpWriter"			class="com.ivucenter.cloud.batch.InsaSystem.realtime.InsaSystemUserWriter">
+		<property name="sqlSessionFactory" 	ref="sqlSessionFactory" />		
+	</bean>	
+	
+	
+	<bean id="InsaUserReader" 				class="org.mybatis.spring.batch.MyBatisPagingItemReader">				
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />
+		<property name="queryId" 			value="com.ivucenter.cloud.batch.resources.BatchInsaSystemDAO.selectUserTmp" /> 		                                		
+ 		<property name="pageSize" 			value="30"/>
+	</bean>
+	
+	<bean id="InsaUserWriter" 				class="org.mybatis.spring.batch.MyBatisBatchItemWriter"> 
+ 		<property name="sqlSessionFactory" 	ref="sqlSessionFactory" />
+ 		<property name="statementId" 		value="com.ivucenter.cloud.batch.resources.BatchInsaSystemDAO.updateInsaUser" />
+ 	</bean>
+
+	<!-- *********************************************************** -->
+	<!-- ********** Job 선언 ********** -->
+	<!-- *********************************************************** -->
+	<batch:job id="InsaUserSystemJob">
+	
+		<batch:step id="InsaUserSystemStep" next="InsaUserTmpStep">
+			<batch:tasklet ref="InsaUserSystemJobContextTasklet" />
+		</batch:step>
+		
+		<batch:step id="InsaUserTmpStep" next="InsaUserStep">
+			<batch:tasklet>
+				<batch:chunk 
+					reader="InsaUserTmpReader"
+					writer="InsaUserTmpWriter" 
+					commit-interval="30"
+					reader-transactional-queue="true"
+					skip-limit="30">
+					<batch:skippable-exception-classes>
+					<batch:include class="cubrid.jdbc.driver.CUBRIDException" />
+					<batch:exclude class="java.io.FileNotFoundException" />
+					</batch:skippable-exception-classes>
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		
+		<batch:step id="InsaUserStep">
+			<batch:tasklet transaction-manager="transactionManager">
+				<batch:chunk 
+					reader="InsaUserReader"
+					writer="InsaUserWriter" 
+					commit-interval="30"
+					reader-transactional-queue="true"
+					skip-limit="30">
+					<batch:skippable-exception-classes>
+					<batch:include class="cubrid.jdbc.driver.CUBRIDException" />
+					<batch:exclude class="java.io.FileNotFoundException" />
+					</batch:skippable-exception-classes>
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+	</batch:job>
+</beans>

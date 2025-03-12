@@ -1,0 +1,1257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.project.OssProjectDAO">
+    <select id="list" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+
+			SELECT *
+				  , DATE_FORMAT(reg_datetime, '%Y-%m-%d') AS create_datetime
+			FROM (
+					 SELECT  CU2.user_name AS reg_user_name
+					    , CC.customer_name AS project_customer_name
+					    , TRIM(CD.dept_name) AS dept_name
+					    , CU.user_id AS manager_id
+					    , CU.user_name AS manager_name
+					    , CU.user_tel AS manager_tel
+					    , CU.user_tel_ex AS manager_tel_ex
+					    , CU.user_phone AS manager_phone
+					    , IFNULL(OV.vm_cn, 0) AS vm_cnt
+					    , IFNULL(OD.disk_cn, 0) AS disk_cnt
+					    , IFNULL(OD.disk_gb, 0) AS disk_gb
+					    , IFNULL(AP.app_cnt, 0) AS app_cnt
+					    , IFNULL((SELECT COUNT(*) FROM cicd_project WHERE project_box_id = OP.project_box_id AND del_flag = 'N'), 0) AS env_cnt
+					    , OP.*
+					    , CD2.dept_name AS dept_name2
+			 	   FROM oss_project_box OP
+		   INNER JOIN oss_project_manager OPM  ON OP.project_box_id = OPM.project_id AND manager_type = '01'
+			 LEFT JOIN cmm_user CU ON OPM.manager_id=CU.user_id
+			 LEFT JOIN cmm_user CU2 ON OP.reg_user_id=CU2.user_id
+			 LEFT JOIN cmm_customer CC ON OP.customer_id = CC.customer_id
+			 LEFT JOIN cmm_department CD ON OP.dept_code = CD.dept_code
+			 LEFT JOIN (SELECT project_box_id, COUNT(*) AS disk_cn , SUM (size_gb) AS disk_gb FROM oss_disk A LEFT JOIN oss_project B ON A.project_id = B.project_id
+			 			WHERE IFNULL(expire_datetime, '9999-12-31') >= NOW() AND del_flag != 'Y'
+			 			GROUP BY project_box_id ) OD ON OP.project_box_id = OD.project_box_id
+			 LEFT JOIN (SELECT project_box_id, COUNT(*) AS vm_cn
+
+			                    FROM (SELECT *
+			                                 FROM oss_vm
+			                             <if test="instanceType != null and instanceType != ''">
+			                              WHERE instance_type = #{instanceType}
+			                              </if>
+			                    ) A
+
+			              LEFT JOIN oss_project B
+			                        ON A.project_id = B.project_id
+			 			WHERE IFNULL(expire_datetime, '9999-12-31') >= NOW() AND del_flag != 'Y'
+			 			GROUP BY project_box_id ) OV ON OP.project_box_id = OV.project_box_id
+			  LEFT JOIN (SELECT project_box_id, COUNT(*) AS app_cnt FROM oss_app A LEFT JOIN oss_project B ON A.project_id = B.project_id
+				 			WHERE  del_flag != 'Y'
+				 			GROUP BY project_box_id ) AP ON OP.project_box_id = AP.project_box_id
+			 LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+			 WHERE
+				OP.project_name not in ('service', 'demo')
+			) TOT
+			WHERE 1=1
+			AND TOT.delete_flag != 'Y'
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			TOT.project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_alias like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_customer_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.manager_name like CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				TOT.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				TOT.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_customer_name' and keyword != ''">
+			AND
+				TOT.project_customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'manager_name' and keyword != ''">
+			AND
+				TOT.manager_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<!-- <if test="listZeroKind != '' ">
+			AND TOT.${listZeroKind} != 0
+		</if> -->
+		ORDER BY create_datetime desc
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="getOssProjectName" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		SELECT
+			project_name
+		FROM oss_project
+		WHERE project_id = #{projectId}
+
+	</select>
+
+	<select id="mbrList" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		SELECT
+			TOT.*
+		FROM
+		(
+			SELECT
+				  CU2.user_name AS reg_user_name
+			    , CC.customer_name AS project_customer_name
+			    , TRIM(CD.dept_name) AS dept_name
+			    , CU.user_id AS manager_id
+			    , CU.user_name AS manager_name
+			    , CU.user_tel AS manager_tel
+			    , CU.user_tel_ex AS manager_tel_ex
+			    , CU.user_phone AS manager_phone
+			    , SUM(IFNULL(OV.vm_cn, 0)) AS vm_cnt
+			    , SUM(IFNULL(OD.disk_cn, 0)) AS disk_cnt
+			    , SUM(IFNULL(OD.disk_gb, 0)) AS disk_gb
+			    , SUM(IFNULL(OA.app_cn, 0)) AS app_cnt
+			    , SUM(IFNULL(VS.service_cn, 0)) AS service_cnt
+			    , OP.project_box_id
+			    , OP.project_name
+			    , OP.project_alias
+			    , OP.delete_flag
+			    , (SELECT COUNT(*) FROM oss_loadbalancer WHERE project_id = OP.project_box_id AND del_flag = 'N') AS loadbalancer_ea
+			    , (SELECT COUNT(*) FROM cicd_project WHERE project_box_id = OP.project_box_id AND del_flag = 'N') AS env_cnt
+			    , IFNULL(CD2.dept_name,'-') AS dept_name2
+			FROM
+				oss_project_box OP
+			INNER JOIN
+				oss_project OPJ
+				ON OP.project_box_id = OPJ.project_box_id
+			INNER JOIN
+				oss_project_manager OPM
+				ON OP.project_box_id = OPM.project_id
+			 LEFT JOIN
+			 	cmm_user CU
+			 	ON OPM.manager_id=CU.user_id
+			 LEFT JOIN
+			 	cmm_user CU2
+			 	ON OP.reg_user_id=CU2.user_id
+			 LEFT JOIN
+			 	cmm_customer CC
+			 	ON OP.customer_id = CC.customer_id
+			 LEFT JOIN
+			 	cmm_department CD
+			 	ON OP.dept_code = CD.dept_code
+			 LEFT JOIN
+			 	(SELECT project_id, COUNT(*) AS disk_cn , SUM (size_gb) AS disk_gb FROM oss_disk WHERE IFNULL(expire_datetime, '9999-12-31') >= NOW() AND del_flag = 'N' GROUP BY project_id ) OD
+			 	ON OPJ.project_id = OD.project_id
+			 LEFT JOIN
+					 	(SELECT project_id, COUNT(*) AS vm_cn
+					 	    FROM oss_vm
+					 	  WHERE IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					 	      AND del_flag = 'N'
+
+					 	      <if test="instanceType != null and instanceType != '' ">
+					 	      AND instance_type = #{instanceType}
+    		                  </if>
+
+					  GROUP BY project_id
+					      ) OV
+			 	ON OPJ.project_id = OV.project_id
+			 LEFT JOIN
+			 	(SELECT project_id, COUNT(*) AS app_cn FROM oss_app WHERE del_flag = 'N'  GROUP BY project_id ) OA
+			 	ON OPJ.project_id = OA.project_id
+			 LEFT JOIN (SELECT COUNT(*) AS service_cn, project_id   FROM oss_service  WHERE IFNULL(expire_datetime, '9999-12-31')>= NOW() AND del_flag = 'N' GROUP BY project_id) VS
+			    ON OPJ.project_id = VS.project_id
+
+			 LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+			WHERE OP.delete_flag != 'Y'
+			 GROUP BY OP.project_box_id, OPM.manager_id
+		) TOT
+		WHERE
+			1=1
+<!-- 			AND TOT.delete_flag != 'Y' -->
+			<if test="userId != 'admin' ">
+			AND (TOT.manager_id = #{userId} OR TOT.project_manager_id = #{userId})
+			</if>
+
+    		<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			TOT.project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_alias like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_customer_name like CONCAT('%',#{keyword},'%')
+    			)
+    		</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				TOT.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				TOT.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_customer_name' and keyword != ''">
+			AND
+				TOT.project_customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+			<if test="customerId != '' ">
+			AND TOT.customer_id = #{customerId}
+			</if>
+			<if test="orderColumn != '' ">
+				<if test="orderDir != '' ">
+				</if>
+			</if>
+		GROUP BY TOT.project_box_id
+		<if test="!length.equals(0)">
+		LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="mbrAppList" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		SELECT
+			TOT.*
+		FROM
+		(
+			SELECT
+				  CU2.user_name AS reg_user_name
+			    , CC.customer_name AS project_customer_name
+			    , TRIM(CD.dept_name) AS dept_name
+			    , CU.user_id AS manager_id
+			    , CU.user_name AS manager_name
+			    , CU.user_tel AS manager_tel
+			    , CU.user_tel_ex AS manager_tel_ex
+			    , CU.user_phone AS manager_phone
+			    , SUM(IFNULL(OA.app_cn, 0)) AS app_cnt
+			    , OP.project_box_id
+			    , OP.project_name
+			    , OP.project_alias
+			    , OP.delete_flag
+			    , OP.program_seq
+			    , OPJ.project_id
+			    , OPJ.cloud_id
+			    , IFNULL(CD2.dept_name,'-') AS dept_name2
+			FROM
+				oss_project_box OP
+			INNER JOIN
+				oss_project OPJ
+				ON OP.project_box_id = OPJ.project_box_id
+			INNER JOIN
+				oss_project_manager OPM
+				ON OP.project_box_id = OPM.project_id
+			 LEFT JOIN
+			 	cmm_user CU
+			 	ON OPM.manager_id=CU.user_id
+			 LEFT JOIN
+			 	cmm_user CU2
+			 	ON OP.reg_user_id=CU2.user_id
+			 LEFT JOIN
+			 	cmm_customer CC
+			 	ON OP.customer_id = CC.customer_id
+			 LEFT JOIN
+			 	cmm_department CD
+			 	ON OP.dept_code = CD.dept_code
+			 LEFT JOIN
+			 	(SELECT project_id, COUNT(*) AS app_cn FROM oss_app WHERE del_flag = 'N'  GROUP BY project_id ) OA
+			 	ON OPJ.project_id = OA.project_id
+			 LEFT JOIN (
+		 					SELECT dept_code
+								 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+								 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+			WHERE OP.delete_flag != 'Y'
+			 GROUP BY OP.project_box_id, OPM.manager_id
+		) TOT
+		WHERE
+			1=1
+			<if test="userId != 'admin' ">
+			AND (TOT.manager_id = #{userId} OR TOT.project_manager_id = #{userId})
+			</if>
+
+    		<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			TOT.project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_alias like CONCAT('%',#{keyword},'%')
+    			)
+    		</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				TOT.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				TOT.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		GROUP BY TOT.project_box_id
+		<if test="!length.equals(0)">
+		LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="mbrNasAppList" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		SELECT
+			TOT.*
+		FROM
+		(
+			SELECT
+				  CU2.user_name AS reg_user_name
+			    , CC.customer_name AS project_customer_name
+			    , TRIM(CD.dept_name) AS dept_name
+			    , CU.user_id AS manager_id
+			    , CU.user_name AS manager_name
+			    , CU.user_tel AS manager_tel
+			    , CU.user_tel_ex AS manager_tel_ex
+			    , CU.user_phone AS manager_phone
+			    , SUM(IFNULL(OA.pv_cnt, 0)) AS pv_cnt
+			    , OP.project_box_id
+			    , OP.project_name
+			    , OP.project_alias
+			    , OP.delete_flag
+			    , OP.program_seq
+			    , OPJ.project_id
+			    , OPJ.cloud_id
+			    , IFNULL(CD2.dept_name,'-') AS dept_name2
+			FROM
+				oss_project_box OP
+			INNER JOIN
+				oss_project OPJ
+				ON OP.project_box_id = OPJ.project_box_id
+			INNER JOIN
+				oss_project_manager OPM
+				ON OP.project_box_id = OPM.project_id
+			 LEFT JOIN
+			 	cmm_user CU
+			 	ON OPM.manager_id=CU.user_id
+			 LEFT JOIN
+			 	cmm_user CU2
+			 	ON OP.reg_user_id=CU2.user_id
+			 LEFT JOIN
+			 	cmm_customer CC
+			 	ON OP.customer_id = CC.customer_id
+			 LEFT JOIN
+			 	cmm_department CD
+			 	ON OP.dept_code = CD.dept_code
+			 LEFT JOIN
+			 	(SELECT project_id, COUNT(*) AS pv_cnt FROM oss_nas WHERE del_flag = 'N' AND nas_type = 'PV'  GROUP BY project_id ) OA
+<!-- 			 	(SELECT project_id, COUNT(*) AS pv_cnt FROM oss_nas onas INNER JOIN oss_nas_app ona ON onas.nas_id = ona.nas_id WHERE ona.del_flag = 'N'  GROUP BY project_id ) OA -->
+			 	ON OPJ.project_id = OA.project_id
+			 LEFT JOIN (
+		 					SELECT dept_code
+								 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+								 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+			WHERE OP.delete_flag != 'Y'
+			 GROUP BY OP.project_box_id, OPM.manager_id
+		) TOT
+		WHERE
+			1=1
+			<if test="userId != 'admin' ">
+			AND (TOT.manager_id = #{userId} OR TOT.project_manager_id = #{userId})
+			</if>
+
+    		<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			TOT.project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_alias like CONCAT('%',#{keyword},'%')
+    			)
+    		</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				TOT.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				TOT.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		GROUP BY TOT.project_box_id
+		<if test="!length.equals(0)">
+		LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="mbrFsList" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		SELECT
+			TOT.*
+		FROM
+		(
+			SELECT
+				  CU2.user_name AS reg_user_name
+			    , CC.customer_name AS project_customer_name
+			    , TRIM(CD.dept_name) AS dept_name
+			    , CU.user_id AS manager_id
+			    , CU.user_name AS manager_name
+			    , CU.user_tel AS manager_tel
+			    , CU.user_tel_ex AS manager_tel_ex
+			    , CU.user_phone AS manager_phone
+			    , SUM(IFNULL(OA.fs_cnt, 0)) AS fs_cnt
+			    , OP.project_box_id
+			    , OP.project_name
+			    , OP.project_alias
+			    , OP.delete_flag
+			    , OP.program_seq
+			    , OPJ.project_id
+			    , OPJ.cloud_id
+			    , IFNULL(CD2.dept_name,'-') AS dept_name2
+			FROM
+				oss_project_box OP
+			INNER JOIN
+				oss_project OPJ
+				ON OP.project_box_id = OPJ.project_box_id
+			INNER JOIN
+				oss_project_manager OPM
+				ON OP.project_box_id = OPM.project_id
+			 LEFT JOIN
+			 	cmm_user CU
+			 	ON OPM.manager_id=CU.user_id
+			 LEFT JOIN
+			 	cmm_user CU2
+			 	ON OP.reg_user_id=CU2.user_id
+			 LEFT JOIN
+			 	cmm_customer CC
+			 	ON OP.customer_id = CC.customer_id
+			 LEFT JOIN
+			 	cmm_department CD
+			 	ON OP.dept_code = CD.dept_code
+			 LEFT JOIN
+			 	(SELECT project_id, COUNT(*) AS fs_cnt FROM oss_nas WHERE del_flag = 'N' AND nas_type = 'FS'  GROUP BY project_id ) OA
+<!-- 			 	(SELECT project_id, COUNT(*) AS pv_cnt FROM oss_nas onas INNER JOIN oss_nas_app ona ON onas.nas_id = ona.nas_id WHERE ona.del_flag = 'N'  GROUP BY project_id ) OA -->
+			 	ON OPJ.project_id = OA.project_id
+			 LEFT JOIN (
+		 					SELECT dept_code
+								 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+								 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+			WHERE OP.delete_flag != 'Y'
+			 GROUP BY OP.project_box_id, OPM.manager_id
+		) TOT
+		WHERE
+			1=1
+			<if test="userId != 'admin' ">
+			AND (TOT.manager_id = #{userId} OR TOT.project_manager_id = #{userId})
+			</if>
+
+    		<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			TOT.project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_alias like CONCAT('%',#{keyword},'%')
+    			)
+    		</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				TOT.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				TOT.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		GROUP BY TOT.project_box_id
+		<if test="!length.equals(0)">
+		LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+    <select id="projectServiceList" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		 SELECT *
+		   FROM (
+					 SELECT  CU2.user_name AS reg_user_name
+					    , CC.customer_name AS project_customer_name
+					    , TRIM(CD.dept_name) AS dept_name
+					    , CU.user_id AS manager_id
+					    , CU.user_name AS manager_name
+					    , CU.user_tel AS manager_tel
+					    , CU.user_tel_ex AS manager_tel_ex
+					    , CU.user_phone AS manager_phone
+					    , SUM(IFNULL(VS.service_cn, 0)) AS service_cnt
+					    , OP.*
+					    , CD2.dept_name AS dept_name2
+				 FROM (select * from oss_project_box WHERE project_name not in ('service', 'demo') AND delete_flag = 'N') OP
+	    INNER JOIN oss_project_manager OPM  ON OP.project_box_id = OPM.project_id AND manager_type = '01'
+		  LEFT JOIN cmm_user CU ON OPM.manager_id=CU.user_id
+		  LEFT JOIN cmm_user CU2 ON OP.reg_user_id=CU2.user_id
+		  LEFT JOIN cmm_customer CC ON OP.customer_id = CC.customer_id
+		  LEFT JOIN cmm_department CD ON OP.dept_code = CD.dept_code
+		  LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+		   LEFT JOIN (
+						  	SELECT a.service_cn,
+							       b.project_id,
+							       c.project_box_id AS se_project_box_id
+
+							FROM (
+							           SELECT COUNT(*) as service_cn, project_id AS os_project_id from oss_service GROUP BY project_id) a
+							  			INNER JOIN oss_project b
+										on a.os_project_id = b.project_id
+										inner join oss_project_box c
+										on b.project_box_id = c.project_box_id
+		  			)VS
+		  			ON OP.project_box_id = VS.se_project_box_id
+		  			GROUP BY OP.project_box_id
+				) TOT
+		      WHERE 1=1
+		      AND TOT.delete_flag != 'Y'
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			TOT.project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_alias like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_customer_name like CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				TOT.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				TOT.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_customer_name' and keyword != ''">
+			AND
+				TOT.project_customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="customerId != '' ">
+			AND TOT.customer_id = #{customerId}
+		</if>
+		<if test="cloudId!=null and !cloudId.equals('')">
+			AND TOT.cloud_id = #{cloudId}
+		</if>
+
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+			</if>
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="mbrProjectServiceList" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		 SELECT *
+		   FROM (
+					 SELECT  CU2.user_name AS reg_user_name
+ 					    , OC.cloud_name AS cloud_name
+					    , CC.customer_name AS project_customer_name
+					    , TRIM(CD.dept_name) AS dept_name
+					    , CU.user_id AS manager_id
+					    , CU.user_name AS manager_name
+					    , CU.user_tel AS manager_tel
+					    , CU.user_tel_ex AS manager_tel_ex
+					    , CU.user_phone AS manager_phone
+					    , SUM(IFNULL(VS.service_cn, 0)) AS service_cnt
+					    , OP.*
+					    , CD2.dept_name AS dept_name2
+				 FROM oss_project OP
+	    INNER JOIN oss_project_manager OPM  ON OP.project_box_id = OPM.project_id AND manager_type = '01'
+	    INNER JOIN oss_cloud OC ON OP.cloud_id = OC.cloud_id
+	    INNER JOIN (SELECT DISTINCT project_id FROM oss_project_manager WHERE manager_id = #{userId}) OPMM ON OP.project_box_id = OPMM.project_id
+		  LEFT JOIN cmm_user CU ON OPM.manager_id=CU.user_id
+		  LEFT JOIN cmm_user CU2 ON OP.reg_user_id=CU2.user_id
+		  LEFT JOIN cmm_customer CC ON OP.customer_id = CC.customer_id
+		  LEFT JOIN cmm_department CD ON OP.dept_code = CD.dept_code
+		  LEFT JOIN (SELECT COUNT(*) AS service_cn, project_id AS se_project_id  FROM oss_service  WHERE IFNULL(expire_datetime, '9999-12-31')>= NOW() AND del_flag = 'N' GROUP BY project_id)VS ON OP.project_id = vs.se_project_id
+		  LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+		   GROUP BY OP.project_box_id
+				) TOT
+		      WHERE 1=1
+			  AND TOT.delete_flag != 'Y'
+    	<if test="searchKind == 'searchAll' and keyword != '' ">
+    		AND (
+    			TOT.project_name like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_alias like CONCAT('%',#{keyword},'%')
+    			OR
+    			TOT.project_customer_name like CONCAT('%',#{keyword},'%')
+    			)
+    	</if>
+		<if test="searchKind == 'project_name' and keyword != ''">
+			AND
+				TOT.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_alias' and keyword != ''">
+			AND
+				TOT.project_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'project_customer_name' and keyword != ''">
+			AND
+				TOT.project_customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="customerId != '' ">
+			AND TOT.customer_id = #{customerId}
+		</if>
+		<if test="cloudId != null ">
+			AND TOT.cloud_id like CONCAT('%',#{cloudId},'%')
+		</if>
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+			</if>
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<!-- 프로젝트 상세정보 ( 자원이용현황>기본자원, ) -->
+    <select id="boxDetail" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+
+			SELECT
+	            PMT.manager_id AS project_manager_id,
+	            PMT.user_name AS manager_name,
+				PMT.user_phone AS manager_phone,
+				PMT.user_tel AS manager_tel,
+				CU.project_name,
+				CU.program_seq AS req_project_seq,
+				CU.project_box_id,
+				CU.project_alias,
+				CU.project_manager_id,
+				CU.reg_datetime,
+				CU.reg_user_id,
+				CU.mod_datetime,
+				CU.mod_user_id,
+			    DATE_FORMAT(CU.project_start_datetime, '%Y-%m-%d') AS project_start_datetime,
+			    DATE_FORMAT(CU.project_end_datetime, '%Y-%m-%d') AS project_end_datetime,
+				CU.project_price,
+				CU.customer_id,
+				CU.dept_code,
+	            CU.description as project_description,
+				CD.dept_name,
+				CC.customer_name,
+				CD2.dept_name AS dept_name2
+			FROM
+				oss_project_box CU
+			LEFT JOIN
+				cmm_department CD
+				ON CU.dept_code = CD.dept_code
+			LEFT JOIN
+				cmm_customer CC
+				ON CC.customer_id = CU.customer_id
+			LEFT JOIN
+				(
+				SELECT
+					RM.manager_id,
+					RM.project_id,
+					CUR.user_phone,
+					CUR.user_tel,
+					CUR.user_name,
+					CUR.dept_code
+				FROM
+					(SELECT * FROM oss_project_manager WHERE manager_type = '01') RM
+				LEFT JOIN
+					cmm_user CUR
+					ON RM.manager_id = CUR.user_id
+				) PMT
+				ON CU.project_box_id = PMT.project_id
+				LEFT JOIN (
+			 					SELECT dept_code
+								 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+								 , TRIM(dept_name) AS dept_name_only
+								FROM  cmm_department
+								WHERE del_flag != 'Y'
+								START WITH up_code IS null
+								CONNECT BY PRIOR dept_code=up_code
+								ORDER SIBLINGS BY dept_code) CD2
+					ON CD2.dept_code = PMT.dept_code
+				WHERE CU.project_box_id = #{projectBoxId}
+	</select>
+
+	<select id="detail" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		SELECT
+            PMT.manager_id AS project_manager_id,
+            PMT.user_name AS manager_name,
+			PMT.user_phone AS manager_phone,
+			PMT.user_tel AS manager_tel,
+			CU.project_name,
+			CU.program_seq AS req_project_seq,
+			CU.project_id,
+			CU.project_alias,
+			CU.project_manager_id,
+			CU.reg_datetime,
+			CU.reg_user_id,
+			CU.mod_datetime,
+			CU.mod_user_id,
+		    DATE_FORMAT(CU.project_start_datetime, '%Y-%m-%d') AS project_start_datetime,
+		    DATE_FORMAT(CU.project_end_datetime, '%Y-%m-%d') AS project_end_datetime,
+			CU.project_price,
+			CU.customer_id,
+			CU.dept_code,
+            CU.description as project_description,
+			CD.dept_name,
+			CC.customer_name,
+			OC.cloud_name,
+			OC.cloud_id,
+			CD2.dept_name AS dept_name2
+		FROM
+			oss_project CU
+		LEFT JOIN
+			oss_cloud OC
+		ON CU.cloud_id = OC.cloud_id
+		LEFT JOIN
+			cmm_department CD
+			ON CU.dept_code = CD.dept_code
+		LEFT JOIN
+			cmm_customer CC
+			ON CC.customer_id = CU.customer_id
+		LEFT JOIN
+			(
+			SELECT
+				RM.manager_id,
+				RM.project_id,
+				CUR.user_phone,
+				CUR.user_tel,
+				CUR.user_name
+			FROM
+				(SELECT * FROM oss_project_manager WHERE manager_type = '01') RM
+			LEFT JOIN
+				cmm_user CUR
+				ON RM.manager_id = CUR.user_id
+			) PMT
+			ON CU.project_box_id = PMT.project_id
+		LEFT JOIN (
+		 					SELECT dept_code
+							 , SYS_CONNECT_BY_PATH(TRIM(dept_name), ' / ') AS dept_name
+							 , TRIM(dept_name) AS dept_name_only
+							FROM  cmm_department
+							WHERE del_flag != 'Y'
+							START WITH up_code IS null
+							CONNECT BY PRIOR dept_code=up_code
+							ORDER SIBLINGS BY dept_code) CD2
+				ON CD2.dept_code = CU.dept_code
+		WHERE
+			CU.project_id = #{projectId}
+	</select>
+
+	<!-- 프로젝트 볼륨 블록디스트 사용량 -->
+    <select id="projectVmInfo" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+
+		SELECT
+			COUNT(*) AS disk_cn,
+			SUM(size_gb) AS disk_gb,
+			project_box_id
+		FROM
+			oss_disk A
+		LEFT JOIN
+			oss_project B
+			ON A.project_id = B.project_id
+		WHERE
+			IFNULL(expire_datetime, '9999-12-31') >= NOW()
+			AND del_flag != 'Y'
+			AND project_box_id = #{projectBoxId}
+		GROUP BY
+			project_box_id
+	</select>
+
+	<!-- 프로젝트 nas 사용량 -->
+    <select id="projectNasInfo" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+
+		SELECT
+			COUNT(*) AS nas_cnt,
+			SUM(nas_gb) AS nas_gb,
+			A.project_box_id
+		FROM
+			oss_nas A
+		LEFT JOIN
+			oss_project B
+			ON A.project_id = B.project_id
+		WHERE
+			IFNULL(expire_datetime, '9999-12-31') >= NOW()
+			AND del_flag != 'Y'
+			AND A.project_box_id = #{projectBoxId}
+		GROUP BY
+			A.project_box_id
+	</select>
+
+	<!-- 프로젝트 서비스 사용량 -->
+    <select id="projectServiceInfo" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		SELECT
+				SUM(service_type_account) AS service_type_account,
+				SUM(service_type_security) AS service_type_security,
+				SUM(service_type_backup) AS service_type_backup,
+				SUM(service_type_sw) AS service_type_sw,
+				SUM(service_type_disk) AS service_type_disk,
+				SUM(service_type_autoscale) AS service_type_autoscale,
+				SUM(service_type_application_redistribution) AS service_type_application_redistribution,
+				SUM(service_type_ct) AS service_type_ct
+		FROM (
+				SELECT  A.service_type,
+							IF(A.service_type ='01',1,0) AS service_type_account,
+							IF(A.service_type ='02',1,0) AS service_type_security,
+							IF(A.service_type ='03',1,0) AS service_type_backup,
+							IF(A.service_type ='04',1,0) AS service_type_sw,
+							IF(A.service_type ='05',1,0) AS service_type_disk,
+							IF(A.service_type ='ASCL',1,0) AS service_type_autoscale,
+							IF(A.service_type ='11',1,0) AS service_type_application_redistribution,
+							IF(A.service_type ='SERVICE99',1,0) AS service_type_ct
+				  FROM oss_service A
+				  INNER JOIN oss_project B
+				  ON A.project_id = B.project_id
+				  INNER JOIN oss_project_box C
+				  ON B.project_box_id = C.project_box_id
+				WHERE  C.project_box_id =  #{projectBoxId}
+				AND A.del_flag = 'N'
+		)
+	</select>
+
+  	<update id="delete" parameterType="CustomOssProjectVO">
+		UPDATE oss_project
+		SET
+			del_flag = 'Y'
+		WHERE project_id = #{projectId}
+  	</update>
+
+    <insert id="insert" parameterType="CustomOssProjectVO">
+   		INSERT INTO oss_project (
+			project_id
+			, customer_id
+			, project_manager_id
+			, project_name
+			, project_alias
+			, reg_datetime
+			, reg_user_id
+			, delete_flag
+			, description
+			, program_seq
+			, dept_code
+			, project_start_datetime
+			, project_end_datetime
+			, project_price
+			, cloud_id
+			, project_box_id
+			, quota_yn
+			, env_type
+		) values (
+			#{projectId}
+			, #{customerId}
+			, #{projectManagerId}
+			, #{projectName}
+			, #{projectAlias}
+			, now()
+			, #{regUserId}
+			, 'N'
+			, #{description}
+			, #{reqProjectSeq}
+			, #{projectDeptCode}
+			, #{projectStartDatetime}
+			<choose>
+				<when test="projectEndDatetime != null and projectEndDatetime != '' ">
+				, #{projectEndDatetime}
+				</when>
+				<otherwise>
+				, NOW()
+				</otherwise>
+			</choose>
+			, #{projectPrice}
+			, #{cloudId}
+			, #{projectBoxId}
+			, #{quotaYn}
+			, #{envType}
+		)
+    </insert>
+
+    <insert id="boxInsert" parameterType="CustomOssProjectVO">
+   		INSERT INTO oss_project_box (
+			project_box_id
+			, customer_id
+			, project_manager_id
+			, project_name
+			, project_alias
+			, reg_datetime
+			, reg_user_id
+			, delete_flag
+			, description
+			, program_seq
+			, dept_code
+			, project_start_datetime
+			, project_end_datetime
+			, project_price
+
+		) values (
+			#{projectBoxId}
+			, #{customerId}
+			, #{projectManagerId}
+			, #{projectName}
+			, #{projectAlias}
+			, now()
+			, #{regUserId}
+			, 'N'
+			, #{description}
+			, #{reqProjectSeq}
+			, #{projectDeptCode}
+			, #{projectStartDatetime}
+			<choose>
+				<when test="projectEndDatetime != null and projectEndDatetime != '' ">
+				, #{projectEndDatetime}
+				</when>
+				<otherwise>
+				, NOW()
+				</otherwise>
+			</choose>
+			, #{projectPrice}
+		)
+    </insert>
+
+    <insert id="insertProvisioning" parameterType="CustomOssProjectVO">
+    	INSERT INTO provisioning_queue
+			(
+				provisioning_seq
+				, request_type
+				, order_product_seq
+				, product_category
+				, on_demand_flag
+				, apply_datetime
+				, provisioning_status
+				, order_user_id
+				, reg_user_id
+				, reg_datetime
+			)
+			VALUES
+			(
+				#{provisioningSeq}
+				, 'REQTYPE_NEW'
+				, #{reqProjectSeq}
+				, 'PRODCATE_PROJECT'
+				, 'Y'
+				, now()
+				, 'PROVISIONING_READY'
+				, #{regUserId}
+				, 'BATCH_SYSTEM'
+				, NOW()
+			)
+    </insert>
+
+    <insert id="insertManager" parameterType="CustomReqCustomerVO">
+
+	   			MERGE INTO oss_project_manager A
+		        USING (
+		        SELECT
+			              #{projectId}	 AS project_id
+						, #{userId} AS manager_id
+						, #{projectManagerType} AS manager_type
+						, now() AS reg_datetime
+						, #{regUserId} AS reg_user_id
+						, 'N' AS del_flag
+
+					FROM db_root
+	              ) B
+	              ON (    A.project_id = B.project_id
+	                   AND A.manager_id = B.manager_id
+	              ) WHEN MATCHED THEN
+	                     UPDATE
+	                        SET
+						A.project_id	= B.project_id,
+						A.manager_id = B.manager_id,
+						A.manager_type = B.manager_type,
+						A.mod_datetime = B.reg_datetime,
+						A.reg_user_id = B.reg_user_id
+
+	                WHEN NOT MATCHED THEN
+	                INSERT
+	                (
+						A.project_id,
+						A.manager_id,
+						A.manager_type,
+						A.reg_datetime,
+						A.reg_user_id
+	                ) VALUES
+	                (
+				        B.project_id,
+						B.manager_id,
+						B.manager_type,
+						B.reg_datetime,
+						B.reg_user_id
+	                )
+
+    </insert>
+
+    <!-- 프로젝트 정보 수정 -->
+    <update id="update" parameterType="CustomOssProjectVO">
+    	UPDATE oss_project
+    	SET
+    		project_alias = #{projectAlias}
+    		,project_name = #{projectName}
+    		,description = #{description}
+    	WHERE
+    		project_id = #{projectId}
+
+    </update>
+
+
+    <!-- 프로젝트 영문명 중복체크 -->
+    <select id="projectNameChk" parameterType="CustomOssProjectVO" resultType="Integer">
+
+  		SELECT
+    		COUNT(a.project_name)
+    	FROM
+    		oss_project a
+    		WHERE SUBSTRING(project_name, 1, 7) = #{projectName}
+
+    </select>
+
+    <!-- 프로젝트 영문명 중복체크 -->
+    <select id="projectNameNextChk" parameterType="CustomOssProjectVO" resultType="Integer">
+  		SELECT
+    		COUNT(project_id)
+    	FROM
+    		oss_project
+    		WHERE project_name = #{projectName}
+    </select>
+
+    <select id="projectBoxIdChk" parameterType="CustomOssProjectVO" resultType="Integer">
+  		SELECT
+    		COUNT(*)
+    	FROM
+    		oss_project_box
+    		WHERE project_box_id = #{projectBoxId}
+    </select>
+
+
+    <select id="findByReqProjectNetwork" resultType="CustomOssProjectVO">
+		SELECT
+			RP.project_alias
+			, CONCAT('_', REPLACE(CC.code_name, ' ','_')) AS network_alias
+			, CONCAT(REPLACE(CC.code_value, 'WORKKIND_', '_'), REPLACE(CC.code_value1, 'WORKNET_', '_'), '_NET') AS network_name
+			, CONCAT(REPLACE(CC.code_value, 'WORKKIND_', '_'), REPLACE(CC.code_value1, 'WORKNET_', '_'), '_SUBNET') AS subnet_name
+			, CCN.ipAddr AS ipAddr
+			, CCN.gateway AS gateway
+		FROM 	(
+					SELECT
+						*
+					FROM req_project_network
+					WHERE select_flag = 'Y'
+					AND req_project_seq = #{reqProjectSeq}
+				) RPN
+
+				LEFT JOIN (
+					SELECT
+						*
+					FROM req_project
+				)RP
+					ON RPN.req_project_seq = RP.req_project_seq
+
+				LEFT JOIN cmm_code CC
+					ON RPN.net_dflt_kind = CC.code_id
+
+				LEFT JOIN cmm_customer CCC
+					ON CCC.customer_id = RP.customer_id
+
+				LEFT JOIN (
+					SELECT
+							c1.customer_id
+							, c3.work_kind
+							, c3.work_net_kind
+							, CONCAT(c3.a_class,'.',c3.b_class,'.',((IFNULL(c4.CNT, 0)*10)+c3.c_class),'.0',c3.cidr) AS ipAddr
+							, CONCAT(c3.a_class,'.',c3.b_class,'.',((IFNULL(c4.CNT, 0)*10)+c3.c_class),'.1') AS gateway
+					FROM	cmm_customer c1
+							INNER JOIN cmm_company c2
+								ON 	c1.ref_company_id = c2.company_id
+							INNER JOIN cmm_network c3
+								ON	c3.company_id = c2.company_id
+							LEFT OUTER JOIN(
+									SELECT 	COUNT(*) AS CNT, customer_id
+									FROM 	oss_project
+									WHERE 	customer_id = (SELECT customer_id FROM req_project WHERE req_project_seq = #{customerId})
+									GROUP BY customer_id
+							) c4
+								ON c1.customer_id = c4.customer_id
+					WHERE	c1.customer_id = (SELECT customer_id FROM req_project WHERE req_project_seq = #{customerId})
+			)CCN
+			ON RP.customer_id = CCN.customer_id
+			AND CC.code_value = CCN.work_kind
+			AND CC.code_value1 = CCN.work_net_kind
+		WHERE 1 = 1
+		ORDER BY CCN.ipAddr DESC
+	</select>
+
+
+    <!-- findByReqProjectNetwork 변경전 -->
+    <select id="findByReqProjectNetwork_old" resultType="CustomOssProjectVO">
+		SELECT
+			RP.project_alias
+			, CONCAT('_', REPLACE(CC.code_name, ' ','_')) AS network_alias
+			, CONCAT(REPLACE(CC.code_value, 'WORKKIND_', '_'), REPLACE(CC.code_value1, 'WORKNET_', '_'), '_NET') AS network_name
+			, CONCAT(REPLACE(CC.code_value, 'WORKKIND_', '_'), REPLACE(CC.code_value1, 'WORKNET_', '_'), '_SUBNET') AS subnet_name
+			, CCN.ipAddr AS ipAddr
+			, CCN.gateway AS gateway
+		FROM (
+			SELECT
+				*
+			FROM req_project_network
+			WHERE select_flag = 'Y'
+			AND req_project_seq = #{reqProjectSeq}
+		) RPN
+
+		LEFT JOIN (
+			SELECT
+				*
+			FROM req_project
+		)RP
+		ON RPN.req_project_seq = RP.req_project_seq
+
+		LEFT JOIN cmm_code CC
+		ON RPN.net_dflt_kind = CC.code_id
+
+		LEFT JOIN cmm_customer CCC
+		ON CCC.customer_id = RP.customer_id
+
+		LEFT JOIN (
+
+			SELECT
+				  CCN.customer_id
+				, CN.work_kind
+				, CN.work_net_kind
+				, CONCAT(CN.a_class,'.',CN.b_class,'.',((IFNULL(OP.CNT, 0)*10)+CN.c_class  ),'.0',CN.cidr) AS ipAddr
+				, CONCAT(CN.a_class,'.',CN.b_class,'.',((IFNULL(OP.CNT, 0)*10)+CN.c_class ),'.1') AS gateway
+				FROM cmm_customer_network CCN
+			LEFT JOIN (SELECT network_id, work_kind, work_net_kind, a_class, b_class, c_class, cidr FROM cmm_network)CN
+			ON CCN.network_id = CN.network_id
+
+			LEFT JOIN(SELECT COUNT(*) AS CNT, customer_id FROM oss_project WHERE customer_id='REVIEW' GROUP BY customer_id) OP
+			ON CCN.customer_id = OP.customer_id
+
+		)CCN
+		ON RP.customer_id = CCN.customer_id
+		AND CC.code_value = CCN.work_kind
+		AND CC.code_value1 = CCN.work_net_kind
+		ORDER BY CCN.ipAddr DESC
+	</select>
+
+
+    <select id="servicelist" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		SELECT
+			'백업서비스' AS serviceName
+			, backup_id AS orderProductSeq
+			, hourly_flag
+			, DATE_FORMAT(create_datetime, '%Y-%m-%d %H:%i') AS create_datetime
+			, IFNULL((
+				SELECT GROUP_CONCAT(LBVM.hostname SEPARATOR <![CDATA['<br>']]>) FROM
+					(
+						SELECT BBLBVM.backup_id, BBLBVM.vm_uuid, IFNULL(VM.hostname, '-') AS hostname
+						FROM oss_backup_vm BBLBVM
+						LEFT OUTER JOIN oss_vm VM
+						ON BBLBVM.vm_uuid = VM.vm_uuid
+					) LBVM
+					WHERE LBVM.backup_id = a.backup_id GROUP BY LBVM.backup_id
+			),'') AS hostname
+			, IFNULL((
+				SELECT GROUP_CONCAT(LBVM.hostname SEPARATOR <![CDATA['<br>']]>) FROM
+					(
+						SELECT BBLBVM.backup_id, BBLBVM.vm_uuid, IFNULL(VM.hostname_alias, '-') AS hostname
+						FROM oss_backup_vm BBLBVM
+						LEFT OUTER JOIN oss_vm VM
+						ON BBLBVM.vm_uuid = VM.vm_uuid
+					) LBVM
+					WHERE LBVM.backup_id = a.backup_id GROUP BY LBVM.backup_id
+			),'') AS hostnameAlias
+		FROM oss_backup a
+		WHERE project_id = #{projectId}
+		AND ( expire_datetime IS NULL OR expire_datetime > NOW() )
+		UNION
+		SELECT
+			'대외계서비스' AS serviceName
+			, mca_id AS orderProductSeq
+			, hourly_flag
+			, DATE_FORMAT(create_datetime, '%Y-%m-%d %H:%i') AS create_datetime
+			, '' AS hostname
+			, '' AS hostnameAlias
+		FROM oss_mca
+		WHERE project_id = #{projectId}
+		AND ( expire_datetime IS NULL OR expire_datetime > NOW() )
+		UNION
+		SELECT
+			'형상관리서비스' AS serviceName
+			, scm_id AS orderProductSeq
+			, hourly_flag
+			, DATE_FORMAT(create_datetime, '%Y-%m-%d %H:%i') AS create_datetime
+			, '' AS hostname
+			, '' AS hostnameAlias
+		FROM oss_scm
+		WHERE project_id = #{projectId}
+		AND ( expire_datetime IS NULL OR expire_datetime > NOW() )
+		UNION
+		SELECT
+			'보안관제서비스' AS serviceName
+			, security_id AS orderProductSeq
+			, hourly_flag
+			, DATE_FORMAT(create_datetime, '%Y-%m-%d %H:%i') AS create_datetime
+			, '' AS hostname
+			, '' AS hostnameAlias
+		FROM oss_security
+		WHERE project_id = #{projectId}
+		AND ( expire_datetime IS NULL OR expire_datetime > NOW() )
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+
+
+    <select id="projectBoxByProgramSeq" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+
+			SELECT * FROM oss_project_box  WHERE program_seq = #{reqProjectSeq}
+
+    </select>
+
+
+    <select id="getOssProjectIdByCloudId" parameterType="CustomOssProjectVO" resultType="CustomOssProjectVO">
+		SELECT
+			*
+		FROM oss_project
+		WHERE cloud_id = #{cloudId}
+		AND project_box_id = #{projectBoxId}
+
+	</select>
+
+</mapper>

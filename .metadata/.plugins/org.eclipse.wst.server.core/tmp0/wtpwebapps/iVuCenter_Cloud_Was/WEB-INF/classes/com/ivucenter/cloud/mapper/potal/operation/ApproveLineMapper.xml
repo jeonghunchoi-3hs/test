@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.operation.adminuser.ApproveLineDAO">
+
+    <select id="list" parameterType="CustomApproveLineVO" resultType="CustomApproveLineVO">
+			SELECT 
+			           b.cloud_name,
+			           a.step_id,
+					   a.model_id,
+					   a.step_name,
+					   a.step_level,
+					   a.left_step_id,
+					   a.right_step_id,
+					   a.cloud_id,
+					   a.step_type,
+					   c.code_name,
+					   (SELECT MAX(step_level) FROM approval_model_step WHERE model_id = 'WFF000' AND cloud_id like CONCAT(#{cloudId})) as step_level_max
+			FROM approval_model_step a
+			INNER JOIN oss_cloud b 
+			ON a.cloud_id = b.cloud_id
+			INNER JOIN cmm_code c   
+			ON a.step_type = c.code_id
+			WHERE a.model_id = 'WFF000'
+			
+			<if test="cloudId != '' ">
+		        AND b.cloud_id like CONCAT('%',#{cloudId},'%')
+		 </if>
+			
+	
+	</select>
+	
+	
+	<insert id="insert" parameterType="CustomApproveLineVO">
+	
+		    INSERT INTO
+				approval_model_step (
+					step_id,
+					model_id,
+					cloud_id,
+					step_name,
+					step_level,
+					step_type
+				)
+			VALUES
+				(
+					#{stepId},
+					'WFF000',
+					#{cloudId},
+					#{stepName},
+					#{stepLevel},
+					#{stepType}
+				)
+    </insert>
+    
+    <delete id="delete" parameterType="CustomApproveLineVO">
+				
+	    DELETE
+		FROM 	approval_model_step
+		WHERE
+			step_id = #{stepId}
+			AND model_id = #{modelId}
+			AND cloud_id = #{cloudId}
+		
+    </delete>
+    
+    
+        <select id="getApproveLineList" parameterType="CustomApproveLineVO" resultType="CustomApproveLineVO">
+				SELECT 
+             		 a.step_id
+		           , a.model_id
+		           , a.cloud_id
+		           , a.step_name
+		           , ROWNUM AS step_level
+		           ,   IF(LAG(a.step_id, 1) OVER (ORDER BY a.step_id) IS NULL , '*' , LAG(a.step_id, 1) OVER (ORDER BY a.step_id))  AS left_step_id
+		           ,   IF(LEAD(a.step_id, 1) OVER (ORDER BY a.step_id) IS NULL, '*', LEAD(a.step_id, 1) OVER (ORDER BY a.step_id))  AS right_step_id
+            FROM approval_model_step a WHERE a.model_id = 'WFF000' and a.cloud_id = #{cloudId}
+            ORDER BY a.step_level
+	
+	</select>
+	
+	   <update id="approveLineUpdate" parameterType="CustomApproveLineVO">
+		
+              UPDATE approval_model_step SET
+					step_level = #{stepLevel},
+					left_step_id = #{leftStepId},
+					right_step_id = #{rightStepId}
+			WHERE model_id = #{modelId}
+			   AND step_id = #{stepId}
+			   AND cloud_id = #{cloudId}
+
+     </update>
+     
+     
+     <select id="stepMaxValue" parameterType="CustomApproveLineVO" resultType="CustomApproveLineVO">
+   	     SELECT 
+			       count(*) AS approvalCount,
+			       (SELECT COUNT(*) FROM approval_model_step WHERE model_id = 'WFF000' AND cloud_id like CONCAT('%', #{cloudId} /**P*/,'%') AND step_type = 'AP001') AS stepTypeCount
+			FROM approval_model_step
+	      WHERE model_id = 'WFF000'
+		     AND cloud_id like CONCAT('%',  #{cloudId} /**P*/,'%')
+     </select>
+    
+</mapper>

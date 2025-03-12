@@ -1,0 +1,214 @@
+package com.ivucenter.cloud.batch.sendKepco;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
+import java.util.Iterator;
+
+import org.apache.ibatis.session.SqlSession;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.ivucenter.cloud.portal.alarms.withkepco.CustomWithKepcoVO;
+import com.ivucenter.cloud.portal.util.CodeUtil;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class SendKepcoService {
+	
+	private final String deleteSendKepcoQueue = "com.ivucenter.cloud.portal.alarms.withkepco.WithKepcoDAO.WithKepcoQueueDelete";
+	private final String insertMailHistory = "com.ivucenter.cloud.portal.alarms.withkepco.WithKepcoDAO.WithKepcoQueueHistoryInsert";
+	private final String updateSendKepcoRetry = "com.ivucenter.cloud.portal.alarms.withkepco.WithKepcoDAO.WithkepcoRetryUpdate";
+	private final String updateSendKepcoNext = "com.ivucenter.cloud.portal.alarms.withkepco.WithKepcoDAO.WithkepcoNextStepUpdate";
+	
+	@Autowired
+	private SqlSession sqlSession;
+	
+	public void openThread(CustomWithKepcoVO item) {
+		Thread thread = new Thread( () -> {
+			
+			// E:0 인경우  E:0 전송 후 S:0 는 전송 
+			// DB에 S:0가 있는 경우는 이전 배치에서 2차전송 실패한 경우
+			String sendOk = sendKepco(item);
+			log.debug("sendKepco result : "+sendOk);			
+			
+			// 전송 실패
+			if( ! "0000".equals(sendOk)) { 
+				if(item.getRetryCount() < 3) {
+					updateSendKepcoRetry(item);				// 실패 카운트 증가
+				} else {
+//					boolean bStep = item.getSignType().equals("S") && item.getStatus().equals("0");					
+//					item.setStep( (bStep) ? "2": "1");					
+					
+					deleteSendKepcoQueue(item); 			// 발송된 알람 삭제
+					storeSendKepcoQueueHistory(item,sendOk);// 발송된 알람 이력 저장
+				}					
+				return ;
+			}
+			
+			// 전송 성공
+//			if( ! (item.getSignType().equals("E") && item.getStatus().equals("0")) ) { // 2차 전송이 필요 없는 경우
+			item.setStep("1");
+			deleteSendKepcoQueue(item); 				// 발송된 알람 삭제
+			storeSendKepcoQueueHistory(item,sendOk); 	// 발송된 알람 이력 저장
+//				return;
+//			}
+			
+			// 2차 전송이 필요한 경우
+//			item.setSignType("S");
+//			item.setRetryCount(0);
+//			updateSendKepcoNextStep(item); // 'E'를 'S'로 변경
+//				
+//			sendOk = sendKepco(item);
+//			log.debug("sendKepco result 2 : "+sendOk);			
+//			if( ! "0000".equals(sendOk) && (item.getRetryCount() < 3)) {
+//				updateSendKepcoRetry(item);				// 실패 카운트 증가
+//				return ;
+//			}
+//			
+//			// 전송 성공 
+//			item.setStep("2");
+//			deleteSendKepcoQueue(item); 				// 발송된 알람 삭제
+//			storeSendKepcoQueueHistory(item,sendOk); 	// 발송된 알람 이력 저장
+		});
+		thread.start();		
+	}
+	
+	private String sendKepco(CustomWithKepcoVO item) {
+		
+		String result = "";
+				
+		try {
+			InetSocketAddress connectAddress = new InetSocketAddress(CodeUtil.KEPCO_HOST, CodeUtil.KEPCO_PORT);
+								
+			Selector selector = Selector.open();
+			SocketChannel channel = SocketChannel.open(connectAddress);
+			channel.configureBlocking(false);
+			
+			SENDKEPCO_INFO info = new SENDKEPCO_INFO (item);			
+			ByteBuffer buffer = ByteBuffer.wrap(info.getInfo());
+			channel.register(selector, SelectionKey.OP_WRITE, buffer);
+			
+			while ("".equals(result) && selector.select() > 0) {
+				Iterator<SelectionKey> keys = selector.selectedKeys().iterator();					
+				while (keys.hasNext()) {
+					SelectionKey key = keys.next();
+					keys.remove();
+					
+					if (!key.isValid()) { continue; }
+					if      (key.isWritable()) { send(selector, key); }
+					else if (key.isReadable()) { 
+						String tmp = receive(selector, key);
+						// close packet으로 인한 데이터 덮어쓰기 방지
+						if( ! "".equals(tmp)) {
+							result = tmp;
+						}
+					}
+				}					
+									
+			}
+			selector.close();
+			
+		} catch (IOException e) {
+			log.error(e.getMessage(), e);
+		}	
+		
+		return result;
+	}
+		
+	private void send(Selector selector, SelectionKey key) throws IOException{					
+		SocketChannel channel = (SocketChannel) key.channel();			
+		channel.configureBlocking(false);
+		
+		ByteBuffer readBuf = ByteBuffer.allocateDirect(8); // 보내기 전 수신버퍼 할당
+
+		ByteBuffer buffer = (ByteBuffer) key.attachment();			
+		int size = channel.write(buffer);	
+		
+		byte[] data = new byte[size];
+		buffer.flip();
+		buffer.get(data);
+		log.debug("client send : "+ new String(data));
+				
+		channel.register(selector, SelectionKey.OP_READ, readBuf);
+	}
+
+	private String receive(Selector selector, SelectionKey key) throws IOException {
+		
+		String ret = "";
+
+		SocketChannel channel = (SocketChannel) key.channel();
+		channel.configureBlocking(false);
+		
+		ByteBuffer buffer = (ByteBuffer) key.attachment();		
+		int size = channel.read(buffer);
+
+		if (size == -1) {
+			Socket socket = channel.socket();
+			SocketAddress remoteAddr = socket.getRemoteSocketAddress();
+			log.debug("Connection closed by server: " + remoteAddr);
+			
+			channel.close();				
+			socket.close();				
+			key.cancel();
+			return ret;
+		}
+		
+		buffer.flip();
+		Charset charset = Charset.forName("euc-kr");
+		ret = charset.decode(buffer).toString().trim();
+		log.debug("client recv : " + ret + ", size : " + String.valueOf(size));
+		buffer.clear();
+//		try {
+//			Thread.sleep(1000);
+//		} catch(InterruptedException e) {
+//			e.printStackTrace();
+//		}
+//		channel.register(selector, SelectionKey.OP_WRITE, key.attachment());
+		
+		return ret;
+	}
+	
+	public void storeSendKepcoQueueHistory(CustomWithKepcoVO withKepcoQueue, String sendOk) {
+		/**************************************/
+		// 문자 이력에 발송 내역 저장
+		/**************************************/
+		CustomWithKepcoVO withKepcoHistory = new CustomWithKepcoVO();
+		withKepcoHistory.setAlarmSeq(withKepcoQueue.getAlarmSeq());
+		withKepcoHistory.setApprovalNo(withKepcoQueue.getApprovalNo());
+		withKepcoHistory.setStatus(withKepcoQueue.getStatus());
+		withKepcoHistory.setSignType(withKepcoQueue.getSignType());
+		withKepcoHistory.setPayerId(withKepcoQueue.getPayerId());
+		withKepcoHistory.setWriterId(withKepcoQueue.getWriterId());
+		withKepcoHistory.setWriterName(withKepcoQueue.getWriterName());		
+		withKepcoHistory.setSystemName(withKepcoQueue.getSystemName());
+		withKepcoHistory.setTitle(withKepcoQueue.getTitle());
+		withKepcoHistory.setContentUrl(withKepcoQueue.getContentUrl());
+		withKepcoHistory.setRegDatetime(withKepcoQueue.getRegDatetime());
+		withKepcoHistory.setRtnCode(sendOk);
+		withKepcoHistory.setRedirectUrl(withKepcoQueue.getRedirectUrl());
+//		withKepcoHistory.setStep(withKepcoQueue.getStep());
+		sqlSession.insert(insertMailHistory, withKepcoHistory);
+	}	
+	
+	public void deleteSendKepcoQueue(CustomWithKepcoVO withKepcoQueue) {
+		sqlSession.delete(deleteSendKepcoQueue, withKepcoQueue);
+	}
+	
+	public void updateSendKepcoRetry(CustomWithKepcoVO withKepcoQueue) {
+		sqlSession.update(updateSendKepcoRetry, withKepcoQueue);
+	}
+	public void updateSendKepcoNextStep(CustomWithKepcoVO withKepcoQueue) {
+		sqlSession.update(updateSendKepcoNext, withKepcoQueue);
+	}
+	
+
+}

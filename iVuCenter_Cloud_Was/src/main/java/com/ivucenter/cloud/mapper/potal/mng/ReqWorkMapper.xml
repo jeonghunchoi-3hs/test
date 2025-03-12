@@ -1,0 +1,1125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.mng.req.work.MngReqWorkDAO">
+
+	<!-- req_work -->
+    <select id="getReqWorkList" resultType="CustomMngReqWorkVO" parameterType="CustomMngReqWorkVO">
+			SELECT * FROM (
+				SELECT
+				REQ.req_work_seq,
+				REQ.order_product_seq,
+				PRO.request_type,
+				CD1.code_name AS  request_type_name,
+				PRO.product_category,
+				CD2.code_name AS product_category_name ,
+				SER.service_type,
+				CD3.code_name AS service_name,
+				SER.work_user_id AS work_user_id,
+				SER.project_id,
+				OP.project_name,
+				CU.user_name AS work_user_name,
+				REQ.work_state,
+				REQ.complete_datetime,
+				DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime2,
+				REQ.charge_start_datetime,
+				REQ.description,
+				REQ.reg_user_id,
+				REQ.reg_datetime,
+				DATE_FORMAT(REQ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2,
+				REQ.mod_user_id,
+				REQ.mod_datetime,
+				DATE_FORMAT(REQ.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2,
+				DATE_FORMAT(REQ.confirm_datetime, '%Y-%m-%d %H:%i') AS confirm_datetime2,
+				DATE_FORMAT(REQ.read_datetime, '%Y-%m-%d %H:%i') AS read_datetime,
+				DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime2
+			FROM req_work REQ
+			LEFT OUTER JOIN bss_order_product PRO
+			ON PRO.order_product_seq = REQ.order_product_seq
+
+			LEFT OUTER JOIN bss_order_product_service SER
+			ON REQ.order_product_seq = SER.order_product_seq
+
+			LEFT OUTER JOIN oss_project OP
+			ON OP.project_id = SER.project_id
+
+			LEFT OUTER JOIN cmm_user CU
+			ON CU.user_id = SER.work_user_id
+
+			LEFT OUTER JOIN cmm_code CD1
+			ON  CD1.code_key_id ='REQUEST_TYPE'
+
+			LEFT OUTER JOIN cmm_code CD2
+			ON  CD2.code_key_id ='PRODUCT_CATEGPRY'
+
+			LEFT OUTER JOIN cmm_code CD3
+			ON  CD3.code_key_id ='SERVICE_TYPE'
+			AND 	CD3.code_id = SER.service_type
+
+			where 1=1
+		    AND CD2.code_id = PRO.product_category
+			AND CD1.code_id = PRO.request_type
+
+
+		<if test="searchKind == 'projectName' and keyword != ''">
+ 			AND OP.project_name like CONCAT('%',#{keyword},'%')
+ 		</if>
+ 		<if test="searchKind == 'serviceName' and keyword != ''">
+			AND CD3.code_name like CONCAT('%',#{keyword},'%')
+ 		</if>
+ 		<if test="searchKind == 'workUserName' and keyword != ''">
+			AND CU.user_name like CONCAT('%',#{keyword},'%')
+ 		</if>
+
+ 		<if test="searchKind == 'searchAll' and keyword != ''">
+
+ 			and (
+ 				 OP.project_name like CONCAT('%',#{keyword},'%')
+			or
+				 CD3.code_name like CONCAT('%',#{keyword},'%')
+			or
+				 CU.user_name like CONCAT('%',#{keyword},'%')
+			)
+
+ 		</if>
+
+		<if test="searchAll == 'my' ">
+			AND SER.work_user_id = #{userId}
+			AND REQ.work_state != 'Y'
+		</if>
+		)
+		UNION ALL
+		(
+			SELECT
+				REQ.req_work_seq,
+				REQ.order_product_seq,
+				PRO.request_type,
+				CD1.code_name AS  request_type_name,
+				PRO.product_category,
+				CD2.code_name AS product_category_name ,
+				'loadbalancer' AS service_type,
+				SER.loadbalancer_name AS service_name,
+				SER.work_user_id AS work_user_id,
+				SER.project_id,
+				OP.project_name,
+				CU.user_name AS work_user_name,
+				REQ.work_state,
+				REQ.complete_datetime,
+				DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime2,
+				REQ.charge_start_datetime,
+				REQ.description,
+				REQ.reg_user_id,
+				REQ.reg_datetime,
+				DATE_FORMAT(REQ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2,
+				REQ.mod_user_id,
+				REQ.mod_datetime,
+				DATE_FORMAT(REQ.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2,
+				DATE_FORMAT(REQ.confirm_datetime, '%Y-%m-%d %H:%i') AS confirm_datetime2,
+				DATE_FORMAT(REQ.read_datetime, '%Y-%m-%d %H:%i') AS read_datetime,
+				DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime2
+			FROM req_work REQ
+			LEFT OUTER JOIN bss_order_product PRO
+			ON PRO.order_product_seq = REQ.order_product_seq
+
+			LEFT OUTER JOIN bss_order_product_loadbalancer SER
+			ON REQ.order_product_seq = SER.order_product_seq
+
+			LEFT OUTER JOIN oss_project_box OP
+			ON OP.project_box_id = SER.project_id
+
+			LEFT OUTER JOIN cmm_user CU
+			ON CU.user_id = SER.work_user_id
+
+			LEFT OUTER JOIN cmm_code CD1
+			ON  CD1.code_key_id ='REQUEST_TYPE'
+
+			LEFT OUTER JOIN cmm_code CD2
+			ON  CD2.code_key_id ='PRODUCT_CATEGPRY'
+
+			LEFT OUTER JOIN cmm_code CD3
+			ON  CD3.code_key_id ='SERVICE_TYPE'
+			AND 	CD3.code_id = '07'
+
+			where 1=1
+		    AND CD2.code_id = 'PRODCATE_SERVICE'
+			AND CD1.code_id = PRO.request_type
+			AND PRO.product_category = 'ITEMCATE_LOADBALANCER'
+
+		<if test="searchKind == 'projectName' and keyword != ''">
+ 			AND OP.project_name like CONCAT('%',#{keyword},'%')
+ 		</if>
+ 		<if test="searchKind == 'serviceName' and keyword != ''">
+			AND CD3.code_name like CONCAT('%',#{keyword},'%')
+ 		</if>
+ 		<if test="searchKind == 'workUserName' and keyword != ''">
+			AND CU.user_name like CONCAT('%',#{keyword},'%')
+ 		</if>
+
+ 		<if test="searchKind == 'searchAll' and keyword != ''">
+
+ 			and (
+ 				 OP.project_name like CONCAT('%',#{keyword},'%')
+			or
+				 CD3.code_name like CONCAT('%',#{keyword},'%')
+			or
+				 CU.user_name like CONCAT('%',#{keyword},'%')
+			)
+
+ 		</if>
+
+		<if test="searchAll == 'my' ">
+			AND SER.work_user_id = #{userId}
+			AND REQ.work_state != 'Y'
+		</if>
+		)
+		UNION ALL
+		(
+			SELECT
+				REQ.req_work_seq,
+				REQ.order_product_seq,
+				PRO.request_type,
+				CD1.code_name AS  request_type_name,
+				PRO.product_category,
+				CD2.code_name AS product_category_name ,
+				'snapshot' AS service_type,
+				SER.snapshot_name AS service_name,
+				SER.work_user_id AS work_user_id,
+				SER.project_id,
+				OP.project_name,
+				CU.user_name AS work_user_name,
+				REQ.work_state,
+				REQ.complete_datetime,
+				DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime2,
+				REQ.charge_start_datetime,
+				REQ.description,
+				REQ.reg_user_id,
+				REQ.reg_datetime,
+				DATE_FORMAT(REQ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2,
+				REQ.mod_user_id,
+				REQ.mod_datetime,
+				DATE_FORMAT(REQ.mod_datetime, '%Y-%m-%d %H:%i') AS mod_datetime2,
+				DATE_FORMAT(REQ.confirm_datetime, '%Y-%m-%d %H:%i') AS confirm_datetime2,
+				DATE_FORMAT(REQ.read_datetime, '%Y-%m-%d %H:%i') AS read_datetime,
+				DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime2
+			FROM req_work REQ
+			LEFT OUTER JOIN bss_order_product PRO
+			ON PRO.order_product_seq = REQ.order_product_seq
+
+			LEFT OUTER JOIN bss_order_product_snapshot SER
+			ON REQ.order_product_seq = SER.order_product_seq
+
+			LEFT OUTER JOIN oss_project_box OP
+			ON OP.project_box_id = SER.project_id
+
+			LEFT OUTER JOIN cmm_user CU
+			ON CU.user_id = SER.work_user_id
+
+			LEFT OUTER JOIN cmm_code CD1
+			ON  CD1.code_key_id ='REQUEST_TYPE'
+
+			LEFT OUTER JOIN cmm_code CD2
+			ON  CD2.code_key_id ='PRODUCT_CATEGPRY'
+
+			LEFT OUTER JOIN cmm_code CD3
+			ON  CD3.code_key_id ='SERVICE_TYPE'
+			AND 	CD3.code_id = '07'
+
+			where 1=1
+		    AND CD2.code_id = 'PRODCATE_SERVICE'
+			AND CD1.code_id = PRO.request_type
+			AND PRO.product_category = 'ITEMCATE_SNAPSHOT'
+
+		<if test="searchKind == 'projectName' and keyword != ''">
+ 			AND OP.project_name like CONCAT('%',#{keyword},'%')
+ 		</if>
+ 		<if test="searchKind == 'serviceName' and keyword != ''">
+			AND CD3.code_name like CONCAT('%',#{keyword},'%')
+ 		</if>
+ 		<if test="searchKind == 'workUserName' and keyword != ''">
+			AND CU.user_name like CONCAT('%',#{keyword},'%')
+ 		</if>
+
+ 		<if test="searchKind == 'searchAll' and keyword != ''">
+
+ 			and (
+ 				 OP.project_name like CONCAT('%',#{keyword},'%')
+			or
+				 CD3.code_name like CONCAT('%',#{keyword},'%')
+			or
+				 CU.user_name like CONCAT('%',#{keyword},'%')
+			)
+
+ 		</if>
+
+		<if test="searchAll == 'my' ">
+			AND SER.work_user_id = #{userId}
+			AND REQ.work_state != 'Y'
+		</if>
+		)
+		    order by reg_datetime desc
+
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+  	</select>
+
+  	<select id="getReqWorkView" resultType="CustomMngReqWorkVO">
+    <![CDATA[
+		SELECT
+		    OSV2.hostname_alias as oss_hostname_alias,
+			PJ.project_name,
+			PJ.project_alias,
+			pj.project_price,
+			pj.project_id,
+			OSV.hostname_alias,
+			CD3.code_name AS service_type_name,
+			SER.service_name,
+			CC.customer_name AS project_customer_name,
+			CD.dept_name AS project_dept_name,
+			CUR.user_name AS project_manager_name,
+			cur.user_tel AS project_manager_tel,
+			REQ.req_work_seq,
+			REQ.order_product_seq,
+			PRO.request_type,
+			CD1.code_name AS  request_type_name,
+			DATE_FORMAT(REQ.confirm_datetime, '%Y-%m-%d %H:%i') AS confirm_datetime2,
+			DATE_FORMAT(REQ.read_datetime, '%Y-%m-%d %H:%i') AS read_datetime,
+			DATE_FORMAT(REQ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2,
+			DATE_FORMAT(REQ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime,
+			DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime2,
+			DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime2,
+			DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime,
+			DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime,
+			DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime,
+			DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime,
+			PRO.product_category,
+			CD2.code_name AS product_category_name,
+			SER.work_user_id AS work_user_id,
+			SER.work_user_id	AS confirm_user_id,
+	        CU.user_name AS work_user_name,
+	        SER.order_product_seq	,
+			SER.on_demand_flag AS on_demand_flag,
+			SER.apply_datetime AS apply_datetime,
+			SER.description AS vm_description,
+			SER.service_id	AS old_id,
+			SER.apply_datetime,
+			REQ.description,
+			REQ.reg_user_id,
+			REQ.mod_user_id,
+			REQ.mod_datetime,
+			SER.description AS product_bigo,
+			replace(SER.description, CHR(10), '\n')AS product_bigo_enter,
+			OA.app_name,
+			OA.app_uid,
+			SER.service_type,
+			OC.cloud_type,
+			OC.cloud_id,
+			OSV.vm_uuid,
+			OP.fixed_ips,
+			OAS.autoscaler_uuid,
+			OAS.autoscaler_name,
+			SER.hpa_division,
+			SER.hpa_max,
+			SER.hpa_continue,
+			SER.hpa_min_pod,
+			SER.hpa_max_pod,
+			SER.hpa_incre_pod,
+			SER.env_type
+		FROM req_work REQ
+		LEFT OUTER JOIN bss_order_product PRO
+		ON PRO.order_product_seq = REQ.order_product_seq
+		LEFT OUTER JOIN bss_order_product_service SER
+		ON REQ.order_product_seq = SER.order_product_seq
+		LEFT OUTER JOIN oss_app OA
+		ON SER.app_uuid = OA.app_uid
+		LEFT OUTER JOIN oss_autoscaler OAS
+		ON OA.app_uid = OAS.app_uid
+		LEFT OUTER JOIN oss_service OS
+		ON SER.order_product_seq = OS.req_service_product_seq
+		LEFT OUTER JOIN oss_project pj
+		ON SER.project_id = pj.project_id
+		LEFT OUTER JOIN oss_cloud OC
+		ON pj.cloud_id = OC.cloud_id
+		LEFT OUTER JOIN cmm_user CU
+		ON SER.work_user_id = CU.user_id
+		LEFT OUTER JOIN cmm_code CD1
+		ON CD1.code_key_id ='REQUEST_TYPE'
+		AND CD1.code_id = PRO.request_type
+		LEFT OUTER JOIN cmm_code CD2
+		ON  CD2.code_key_id ='PRODUCT_CATEGPRY'
+		AND CD2.code_id = PRO.product_category
+		LEFT OUTER JOIN cmm_customer CC
+		ON PJ.customer_id = CC.customer_id
+		LEFT OUTER JOIN cmm_department CD
+		ON PJ.dept_code = CD.dept_code
+		INNER JOIN (SELECT project_id,manager_id FROM oss_project_manager WHERE manager_type = '01') OPM
+		ON PJ.project_box_id = OPM.project_id
+		INNER JOIN cmm_user CUR
+		ON OPM.manager_id = CUR.user_id
+		LEFT OUTER JOIN oss_vm OSV
+		ON SER.vm_uuid = OSV.vm_uuid
+		LEFT OUTER JOIN oss_vm OSV2
+		ON OS.vm_uuid = OSV2.vm_uuid
+		LEFT OUTER JOIN (SELECT * FROM cmm_code WHERE code_key_id = 'SERVICE_TYPE') CD3
+		ON SER.service_type = CD3.code_id
+		LEFT OUTER JOIN oss_port OP
+		ON OSV.vm_uuid = OP.device_id
+		WHERE REQ.req_work_seq = #{reqWorkSeq}
+		limit 1
+		]]>
+  	</select>
+
+  	<select id="getReqLoadWorkView" resultType="CustomMngReqWorkVO">
+    <![CDATA[
+		SELECT
+			PJ.project_name,
+			PJ.project_alias,
+			pj.project_price,
+			pj.project_box_id,
+			SER.loadbalancer_name,
+			CC.customer_name AS project_customer_name,
+			CD.dept_name AS project_dept_name,
+			CUR.user_name AS project_manager_name,
+			cur.user_tel AS project_manager_tel,
+			REQ.req_work_seq,
+			REQ.order_product_seq,
+			PRO.request_type,
+			CD1.code_name AS  request_type_name,
+			DATE_FORMAT(REQ.confirm_datetime, '%Y-%m-%d %H:%i') AS confirm_datetime2,
+			DATE_FORMAT(REQ.read_datetime, '%Y-%m-%d %H:%i') AS read_datetime,
+			DATE_FORMAT(REQ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2,
+			DATE_FORMAT(REQ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime,
+			DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime2,
+			DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime2,
+			DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime,
+			DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime,
+			DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime,
+			DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime,
+			PRO.product_category,
+			CD2.code_name AS product_category_name,
+			SER.work_user_id AS work_user_id,
+			SER.work_user_id	AS confirm_user_id,
+	        CU.user_name AS work_user_name,
+	        SER.order_product_seq	,
+			SER.on_demand_flag AS on_demand_flag,
+			SER.apply_datetime AS apply_datetime,
+			SER.description AS vm_description,
+			SER.loadbalancer_id	AS old_id,
+			SER.apply_datetime,
+			SER.[method],
+			SER.protocol,
+			SER.ip,
+			SER.port,
+			REQ.description,
+			REQ.reg_user_id,
+			REQ.mod_user_id,
+			REQ.mod_datetime,
+			SER.description AS product_bigo
+		FROM req_work REQ
+		LEFT OUTER JOIN bss_order_product PRO
+		ON PRO.order_product_seq = REQ.order_product_seq
+		LEFT OUTER JOIN bss_order_product_loadbalancer SER
+		ON REQ.order_product_seq = SER.order_product_seq
+		LEFT OUTER JOIN oss_service OS
+		ON SER.order_product_seq = OS.req_service_product_seq
+		LEFT OUTER JOIN oss_project_box pj
+		ON SER.project_id = pj.project_box_id
+		LEFT OUTER JOIN cmm_user CU
+		ON SER.work_user_id = CU.user_id
+		LEFT OUTER JOIN cmm_code CD1
+		ON CD1.code_key_id ='REQUEST_TYPE'
+		AND CD1.code_id = PRO.request_type
+		LEFT OUTER JOIN cmm_code CD2
+		ON  CD2.code_key_id ='PRODUCT_CATEGPRY'
+		AND CD2.code_id = PRO.product_category
+		LEFT OUTER JOIN cmm_customer CC
+		ON PJ.customer_id = CC.customer_id
+		LEFT OUTER JOIN cmm_department CD
+		ON PJ.dept_code = CD.dept_code
+		INNER JOIN (SELECT project_id,manager_id FROM oss_project_manager WHERE manager_type = '01') OPM
+		ON PJ.project_box_id = OPM.project_id
+		INNER JOIN cmm_user CUR
+		ON OPM.manager_id = CUR.user_id
+		WHERE REQ.req_work_seq = #{reqWorkSeq}
+		]]>
+  	</select>
+
+  	<select id="getReqSnapWorkView" resultType="CustomMngReqWorkVO">
+    <![CDATA[
+		SELECT
+			PJ.project_name,
+			PJ.project_alias,
+			pj.project_price,
+			pj.project_box_id,
+			SER.snapshot_name,
+			CC.customer_name AS project_customer_name,
+			CD.dept_name AS project_dept_name,
+			CUR.user_name AS project_manager_name,
+			cur.user_tel AS project_manager_tel,
+			REQ.req_work_seq,
+			REQ.order_product_seq,
+			PRO.request_type,
+			CD1.code_name AS  request_type_name,
+			DATE_FORMAT(REQ.confirm_datetime, '%Y-%m-%d %H:%i') AS confirm_datetime2,
+			DATE_FORMAT(REQ.read_datetime, '%Y-%m-%d %H:%i') AS read_datetime,
+			DATE_FORMAT(REQ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2,
+			DATE_FORMAT(REQ.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime,
+			DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime2,
+			DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime2,
+			DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime,
+			DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime,
+			DATE_FORMAT(REQ.complete_datetime, '%Y-%m-%d %H:%i') AS complete_datetime,
+			DATE_FORMAT(REQ.charge_start_datetime, '%Y-%m-%d %H:%i') AS charge_start_datetime,
+			PRO.product_category,
+			CD2.code_name AS product_category_name,
+			SER.work_user_id AS work_user_id,
+			SER.work_user_id	AS confirm_user_id,
+	        CU.user_name AS work_user_name,
+	        SER.order_product_seq	,
+			SER.on_demand_flag AS on_demand_flag,
+			SER.apply_datetime AS apply_datetime,
+			SER.description AS vm_description,
+			SER.snapshot_id	AS old_id,
+			SER.apply_datetime,
+			REQ.description,
+			REQ.reg_user_id,
+			REQ.mod_user_id,
+			REQ.mod_datetime,
+			SER.description AS product_bigo,
+			OD.disk_alias,
+			OV.hostname
+		FROM req_work REQ
+		LEFT OUTER JOIN bss_order_product PRO
+		ON PRO.order_product_seq = REQ.order_product_seq
+		LEFT OUTER JOIN bss_order_product_snapshot SER
+		ON REQ.order_product_seq = SER.order_product_seq
+		LEFT OUTER JOIN oss_disk OD
+		ON SER.disk_id = OD.disk_id
+		LEFT OUTER JOIN oss_vm OV
+		ON SER.vm_uuid = OV.vm_uuid
+		LEFT OUTER JOIN oss_service OS
+		ON SER.order_product_seq = OS.req_service_product_seq
+		LEFT OUTER JOIN oss_project_box pj
+		ON SER.project_id = pj.project_box_id
+		LEFT OUTER JOIN cmm_user CU
+		ON SER.work_user_id = CU.user_id
+		LEFT OUTER JOIN cmm_code CD1
+		ON CD1.code_key_id ='REQUEST_TYPE'
+		AND CD1.code_id = PRO.request_type
+		LEFT OUTER JOIN cmm_code CD2
+		ON  CD2.code_key_id ='PRODUCT_CATEGPRY'
+		AND CD2.code_id = PRO.product_category
+		LEFT OUTER JOIN cmm_customer CC
+		ON PJ.customer_id = CC.customer_id
+		LEFT OUTER JOIN cmm_department CD
+		ON PJ.dept_code = CD.dept_code
+		INNER JOIN (SELECT project_id,manager_id FROM oss_project_manager WHERE manager_type = '01') OPM
+		ON PJ.project_box_id = OPM.project_id
+		INNER JOIN cmm_user CUR
+		ON OPM.manager_id = CUR.user_id
+		WHERE REQ.req_work_seq = #{reqWorkSeq}
+		]]>
+  	</select>
+
+  	<select id="getVmList" resultType="CustomReqOrderVO">
+    <![CDATA[
+		SELECT
+			*
+		FROM bss_order_product_loadbalancer_vm e
+			LEFT JOIN oss_vm a ON E.vm_uuid = a.vm_uuid
+	    	LEFT OUTER JOIN oss_vm_network b ON b.vm_uuid = a.vm_uuid
+	    	LEFT OUTER JOIN oss_network c ON b.network_id = c.network_id
+	    	LEFT JOIN oss_zone_network f ON b.network_id = f.network_id
+	    	LEFT JOIN oss_port d ON a.vm_uuid = d.device_id AND d.network_id = f.network_id
+    	WHERE f.is_backup = 'N'
+    		AND f.is_available = 'Y'
+			AND e.order_product_Seq = #{orderProductSeq}
+		]]>
+  	</select>
+
+    <select id="getReqWorkchk" resultType="CustomMngReqWorkVO">
+    <![CDATA[
+    SELECT
+	   *
+	FROM
+		req_work
+	WHERE order_product_seq = #{orderProductSeq}
+   	]]>
+    </select>
+
+   <update id="setWorkComplete" parameterType="CustomMngReqWorkVO" >
+    <![CDATA[
+	UPDATE req_work
+		SET
+		work_state = 'Y',
+		mod_user_id = #{modUserId},
+		mod_datetime = now()	,
+		confirm_user_id = #{modUserId},
+		confirm_datetime = now()
+	WHERE
+		req_work_seq = #{reqWorkSeq}
+	]]>
+  	</update>
+
+	<!-- 작업 완료후 과금적용 수정 20191126 박지문 추가 confirm_user_id,confirm_datetime, charge_start_datetime 업데이트 추가 -->
+   	<update id="setWorkChkOk" parameterType="CustomMngReqWorkVO" >
+    <![CDATA[
+	UPDATE req_work
+		SET
+		work_state = 'C',
+		complete_datetime = now(),
+		description = #{description},
+		mod_user_id = #{modUserId},
+		mod_datetime = now()	,
+		confirm_user_id = #{modUserId},
+		confirm_datetime = now(),
+		charge_start_datetime = now()
+	WHERE
+		req_work_seq = #{reqWorkSeq}
+	]]>
+  	</update>
+
+  	<update id="setWorkReadUpdate" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	UPDATE req_work
+	SET		read_datetime = now()
+	WHERE req_work_seq = #{reqWorkSeq}
+	]]>
+  	</update>
+
+  	<!-- order  -->
+	<select id="getOrderWorkList" resultType="CustomMngReqWorkVO" parameterType="CustomMngReqWorkVO">
+		SELECT
+			A.work_user_id
+			, B.order_no
+			, B.order_product_seq
+			, B.product_category
+			, (SELECT code_name FROM cmm_code WHERE code_id = B.product_category) AS product_name
+		FROM (
+			SELECT work_user_id, order_product_seq FROM bss_order_product_loadbalancer
+			UNION ALL
+			SELECT work_user_id, order_product_seq FROM bss_order_product_publicip
+			UNION ALL
+			SELECT work_user_id, order_product_seq FROM bss_order_product_nas
+			) A ,
+			(SELECT BO.order_no, BP.product_category, BP.order_product_seq FROM bss_order BO, bss_order_product BP
+			WHERE BO.order_no = BP.order_no
+			AND BO.order_no = #{orderNo}
+			) B
+
+		WHERE A.order_product_seq = B.order_product_seq
+	</select>
+
+	<select id="workUserId" resultType="CustomMngReqWorkVO" parameterType="String">
+		SELECT
+			CD2.code_name AS product_category_name ,
+			CASE PRO.product_category
+			WHEN 'PRODCATE_LOADBALANCER' 	THEN BAL.work_user_id
+			WHEN 'PRODCATE_NAS' 		THEN NAS.work_user_id
+			WHEN 'PRODCATE_PUBLICIP' 	THEN IP.work_user_id
+			WHEN 'PRODCATE_SERVICE'	THEN SER.work_user_id
+			ELSE ''
+			END AS work_user_id
+		FROM (
+			SELECT
+				*
+			FROM bss_order_product
+			WHERE order_no = #{orderNo}
+		)PRO
+		LEFT JOIN req_work REQ
+		ON PRO.order_product_seq = REQ.order_product_seq
+
+		LEFT OUTER JOIN cmm_code CD2
+		ON  CD2.code_key_id ='PRODUCT_CATEGPRY'
+		AND CD2.code_id = PRO.product_category
+
+		LEFT OUTER JOIN bss_order_product_service SER
+		ON REQ.order_product_seq = SER.order_product_seq
+
+		LEFT OUTER JOIN bss_order_product_loadbalancer BAL
+		ON REQ.order_product_seq = BAL.order_product_seq
+
+		LEFT OUTER JOIN bss_order_product_nas NAS
+		ON REQ.order_product_seq = NAS.order_product_seq
+
+		LEFT OUTER JOIN bss_order_product_publicip IP
+		ON REQ.order_product_seq = IP.order_product_seq
+
+		WHERE REQ.work_state <![CDATA[<>]]> 'Y'
+	</select>
+
+  	<!-- NAS -->
+    <select id="orderNasSelect" resultType="CustomReqOrderVO" parameterType="CustomReqProjectVO">
+    <![CDATA[
+    SELECT
+	    order_product_seq,
+		on_demand_flag,
+		apply_datetime,
+		hourly_flag,
+		project_id,
+		nas_name,
+		nas_gb,
+		description,
+		work_user_id,
+		nas_catalog_seq,
+		nas_product_seq,
+		vm_name
+	FROM
+		bss_order_product_nas
+	WHERE order_product_seq = #{orderProductSeq}
+   	]]>
+    </select>
+
+   	<insert id="setOssNasInsert" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	INSERT INTO oss_nas
+			(
+				nas_id,
+				project_id,
+				nas_name,
+				nas_gb,
+				description,
+				create_datetime,
+				reg_datetime,
+				reg_user_id,
+				hourly_flag,
+				nas_catalog_seq,
+				nas_product_seq,
+				vm_name
+			)
+	VALUES
+			(
+				#{nasId},
+				#{projectId},
+				#{nasName},
+				#{nasGb},
+				#{description},
+				#{createDatetime},
+				now(),
+				#{regUserId},
+				#{hourlyFlag},
+				#{nasCatalogSeq},
+				#{nasProductSeq},
+				#{vmName}
+			)
+	]]>
+  	</insert>
+
+   	<update id="setOssNasUpdate" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	UPDATE oss_nas
+		SET
+		del_flag = #{delFlag},
+		expire_datetime = #{expireDatetime},
+		mod_user_id = #{modUserId},
+		delete_datetime = now(),
+		mod_datetime = 	now()
+	WHERE
+		nas_id = #{nasId}
+	]]>
+  	</update>
+
+   <update id="setOssNasChgUpdate" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	UPDATE oss_nas
+		SET
+		nas_gb = #{nasGb},
+		mod_user_id = #{modUserId},
+		mod_datetime = 	now()
+	WHERE
+		nas_id = #{nasId}
+	]]>
+  	</update>
+
+   <insert id="setOssNasHistoryInsert" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	INSERT INTO oss_nas_history
+			(
+				nas_id,
+				request_type,
+				apply_date,
+				nas_gb,
+				reg_user_id,
+				reg_datetime
+			)
+	VALUES
+			(
+				#{nasId},
+				#{requestType},
+				#{applyDate},
+				#{nasGb},
+				#{regUserId},
+				now()
+			)
+	]]>
+  	</insert>
+
+  	<!-- LoadBalancer -->
+    <select id="orderLbSelect" resultType="CustomReqOrderVO" parameterType="CustomReqProjectVO">
+    <![CDATA[
+    SELECT
+	    order_product_seq,
+		on_demand_flag,
+		apply_datetime,
+		hourly_flag,
+		project_id,
+		default_network_id,
+		loadbalancer_name,
+		loadbalancer_ea,
+		protocol,
+		[method],
+		monitor_type,
+		description,
+		work_user_id,
+		loadbalancer_catalog_seq,
+		loadbalancer_product_seq,
+		ip,
+		port
+	FROM
+		bss_order_product_loadbalancer
+	WHERE order_product_seq = #{orderProductSeq}
+   	]]>
+    </select>
+
+	<insert id="setOssLbInsert" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	INSERT INTO oss_loadbalancer
+			(
+				loadbalancer_id,
+				project_id,
+				network_id,
+				loadbalancer_name,
+				description,
+				hourly_flag,
+				protocol,
+				[method],
+				monitor_type,
+				loadbalancer_ea,
+				create_datetime,
+				reg_datetime,
+				reg_user_id,
+				loadbalancer_catalog_seq,
+				loadbalancer_product_seq,
+				ip,
+				port
+			)
+	VALUES
+			(
+				#{loadbalancerId},
+				#{projectId},
+				#{networkId},
+				#{loadbalancerName},
+				#{description},
+				#{hourlyFlag},
+				#{protocol},
+				#{method},
+				#{monitorType},
+				#{loadbalancerEa},
+				now(),
+				now(),
+				#{regUserId},
+				#{loadbalancerCatalogSeq},
+				#{loadbalancerProductSeq},
+				#{ip},
+				#{port}
+			)
+	]]>
+  	</insert>
+
+  	<insert id="setOssSnInsert" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	INSERT INTO oss_snapshot
+			(
+				snapshot_id,
+				project_id,
+				snapshot_name,
+				description,
+				hourly_flag,
+				create_datetime,
+				reg_datetime,
+				reg_user_id,
+				snapshot_catalog_seq,
+				snapshot_product_seq,
+				del_flag,
+				vm_uuid,
+				disk_id
+			)
+	VALUES
+			(
+				#{snapshotId},
+				#{projectId},
+				#{snapshotName},
+				#{description},
+				#{hourlyFlag},
+				now(),
+				now(),
+				#{regUserId},
+				#{snapshotCatalogSeq},
+				#{snapshotProductSeq},
+				'N',
+				#{vmUuid},
+				#{diskId}
+			)
+	]]>
+  	</insert>
+
+	<update id="setOssLbUpdate" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	UPDATE oss_loadbalancer_vm
+		SET
+		del_flag = #{delFlag}
+	WHERE
+		loadbalancer_id = #{loadbalancerId}
+		and vm_uuid = #{vmUuid}
+	]]>
+  	</update>
+
+  	<update id="setOssSnUpdate" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	UPDATE oss_snapshot
+		SET
+		del_flag = 'Y'
+	WHERE
+		snapshot_id = #{oldId}
+	]]>
+  	</update>
+
+    <select id="orderLbVmSelect" resultType="CustomReqOrderVO" parameterType="CustomMngReqWorkVO">
+    <![CDATA[
+    SELECT
+	    order_product_seq,
+		vm_uuid
+	FROM
+		bss_order_product_loadbalancer_vm
+	WHERE order_product_seq = #{orderProductSeq}
+   	]]>
+    </select>
+
+   <insert id="setOssLbVmInsert" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	INSERT INTO oss_loadbalancer_vm
+			(
+				loadbalancer_id,
+				vm_uuid,
+				del_flag
+			)
+	VALUES
+			(
+				#{loadbalancerId},
+				#{vmUuid},
+				'N'
+			)
+	ON DUPLICATE KEY UPDATE
+		del_flag = 'N'
+	]]>
+  	</insert>
+
+  	<!-- Snapshot -->
+  	<select id="orderSnSelect" resultType="CustomReqOrderVO" parameterType="CustomReqProjectVO">
+    <![CDATA[
+    SELECT
+		order_product_seq,
+		on_demand_flag,
+		apply_datetime,
+		hourly_flag,
+		project_id,
+		snapshot_id,
+		snapshot_name,
+		description,
+		work_user_id,
+		snapshot_catalog_seq,
+		snapshot_product_seq,
+		vm_uuid,
+		disk_id
+	FROM
+		bss_order_product_snapshot
+	WHERE order_product_seq = #{orderProductSeq}
+   	]]>
+    </select>
+
+  	<!-- public ip -->
+    <select id="orderIpSelect" resultType="CustomReqOrderVO" parameterType="CustomReqProjectVO">
+    <![CDATA[
+    SELECT
+	    order_product_seq,
+		on_demand_flag,
+		apply_datetime,
+		hourly_flag,
+		project_id,
+		vm_uuid,
+		publicip_ea,
+		description,
+		publicip_catalog_seq,
+		publicip_product_seq,
+		work_user_id
+	FROM
+		bss_order_product_publicip
+	WHERE order_product_seq = #{orderProductSeq}
+   	]]>
+    </select>
+
+	<insert id="setOssIpInsert" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	INSERT INTO oss_publicip
+			(
+				publicip_id,
+				project_id,
+				vm_uuid,
+				hourly_flag,
+				description,
+				publicip_ea,
+				create_datetime,
+				reg_datetime,
+				reg_user_id,
+				publicip_catalog_seq,
+				publicip_product_seq
+			)
+	VALUES
+			(
+				#{publicipId},
+				#{projectId},
+				#{vmUuid},
+				#{hourlyFlag},
+				#{description},
+				#{publicipEa},
+				#{createDatetime},
+				now(),
+				#{regUserId},
+				#{publicipCatalogSeq},
+				#{publicipProductSeq}
+			)
+	]]>
+  	</insert>
+
+	<update id="setOssIpUpdate" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	UPDATE oss_publicip
+		SET
+		del_flag = #{delFlag},
+		expire_datetime = #{expireDatetime},
+		mod_user_id = #{modUserId},
+		delete_datetime = now(),
+		mod_datetime = 	now()
+	WHERE
+		publicip_id = #{publicipId}
+	]]>
+  	</update>
+
+    <!-- service -->
+    <select id="orderServiceSelect" resultType="CustomReqOrderVO" parameterType="CustomReqProjectVO">
+    <![CDATA[
+    SELECT
+	    order_product_seq,
+		on_demand_flag,
+		apply_datetime,
+		hourly_flag,
+		project_id,
+		vm_uuid,
+		description,
+		work_user_id,
+		service_ea,
+		service_catalog_seq,
+		service_product_seq,
+		service_type,
+		service_name,
+		app_uuid,
+		hpa_division,
+		hpa_max,
+		hpa_continue,
+		hpa_min_pod,
+		hpa_max_pod,
+		hpa_incre_pod,
+		env_type
+	FROM
+		bss_order_product_service
+	WHERE order_product_seq = #{orderProductSeq}
+   	]]>
+    </select>
+
+    <update id="setReqServiceInsert" parameterType="CustomMngReqWorkVO" >
+    <![CDATA[
+	UPDATE bss_order_product_service
+		SET
+		service_name = #{serviceName}
+	WHERE
+		order_product_seq = #{orderProductSeq}
+	]]>
+  	</update>
+
+	<insert id="setOssServiceInsert" parameterType="CustomMngOssVo" >
+    <![CDATA[
+	INSERT INTO oss_service
+			(
+				service_id,
+				project_id,
+				service_ea,
+				description,
+				create_datetime,
+				reg_datetime,
+				reg_user_id,
+				service_product_seq,
+				service_catalog_seq,
+				service_type,
+				service_name,
+				vm_uuid,
+				req_service_product_seq,
+				app_uuid,
+				hpa_division,
+				hpa_max,
+				hpa_continue,
+				hpa_min_pod,
+				hpa_max_pod,
+				hpa_incre_pod
+			)
+	VALUES
+			(
+				#{serviceId},
+				#{projectId},
+				#{serviceEa},
+				#{description},
+				now(),
+				now(),
+				#{regUserId},
+				#{serviceProductSeq},
+				#{serviceCatalogSeq},
+				#{serviceType},
+				#{serviceName},
+				#{vmUuid},
+				#{reqServiceProductSeq},
+				#{appUuid},
+				#{hpaDivision},
+				#{hpaMax},
+				#{hpaContinue},
+				#{hpaMinPod},
+				#{hpaMaxPod},
+				#{hpaIncrePod}
+			)
+	]]>
+  	</insert>
+
+	<update id="setOssServiceUpdate" parameterType="CustomMngOssVo" >
+    <![CDATA[
+
+	UPDATE oss_service
+		SET
+		del_flag = #{delFlag},
+		expire_datetime = #{expireDatetime},
+		mod_user_id = #{modUserId},
+		delete_datetime = now(),
+		mod_datetime = now()
+	WHERE
+		service_id = #{serviceId}
+	]]>
+  	</update>
+
+  	<update id="setOssServiceVmUpdate" parameterType="CustomMngReqWorkVO" >
+    <![CDATA[
+		UPDATE oss_service
+			SET
+			vm_uuid = #{vmUuid}
+		WHERE
+			req_service_product_seq = #{reqServiceProductSeq}
+	]]>
+  	</update>
+</mapper>

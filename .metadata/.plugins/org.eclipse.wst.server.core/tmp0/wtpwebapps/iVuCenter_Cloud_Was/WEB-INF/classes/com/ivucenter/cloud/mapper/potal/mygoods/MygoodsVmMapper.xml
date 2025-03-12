@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.mygoods.vm.MygoodsVmDAO">
+ 	
+ 	
+ 	<!-- 나의상품 VM 리스트 -->
+    <select id="list" parameterType="CustomMygoodsVmVO" resultType="CustomMygoodsVmVO">
+		SELECT 
+			b.project_name
+			, a.hostname
+			, a.reg_datetime
+			, a.del_flag
+		FROM 
+			oss_vm a, oss_project b 
+		WHERE 
+			a.project_id = b.project_id
+		AND
+			a.reg_user_id = #{userId}	
+		<if test="searchKind == 'projectNm' and keyword != ''">
+		AND 
+			b.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'hostNm' and keyword != ''">
+		AND 
+			a.hostname like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND (
+			b.project_name like CONCAT('%',#{keyword},'%') 
+			OR 
+			a.hostname like CONCAT('%',#{keyword},'%')
+			)
+		</if>
+		<if test='delFlag != "statusAll"'>
+		AND 
+			a.del_flag = #{delFlag}
+		</if>
+		<if test="regDatetime != ''">
+		AND 
+			a.reg_datetime = #{regDatetime}
+		</if>	
+	</select>
+	
+	<select id="listTot" resultType="Int" parameterType="CustomBbsNoticeVO">
+		SELECT 
+			count(*)
+    	FROM 
+    		oss_vm a, oss_project b
+    	WHERE  
+			a.project_id = b.project_id
+		AND
+			a.reg_user_id = #{userId}	
+		<if test="searchKind == 'projectNm' and keyword != ''">
+		AND 
+			b.project_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'hostNm' and keyword != ''">
+		AND 
+			a.hostname like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND (
+			b.project_name like CONCAT('%',#{keyword},'%') 
+			OR 
+			a.hostname like CONCAT('%',#{keyword},'%')
+			)
+		</if>
+		<if test='delFlag != "statusAll"'>
+		AND 
+			a.del_flag = #{delFlag}
+		</if>
+		<if test="regDatetime != ''">
+		AND 
+			a.reg_datetime = #{regDatetime}
+		</if>
+	</select>
+	
+	<!-- 나의상품 VM 상세조회 -->
+	<insert id="insert" parameterType="CustomMygoodsVmVO">
+	
+	</insert>
+	
+	<!-- 나의상품 VM 상세조회 -->
+    <select id="detail" parameterType="CustomMygoodsVmVO" resultType="CustomMygoodsVmVO">
+		
+  	</select>
+  	
+  	<!-- 나의상품 VM 수정 -->
+  	<update id="update" parameterType="CustomMygoodsVmVO" >
+  		
+  	</update>
+  	
+  	<update id="delete" parameterType="CustomMygoodsVmVO">
+		
+  	</update>
+
+	
+</mapper>

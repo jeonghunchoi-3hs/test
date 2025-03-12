@@ -1,0 +1,108 @@
+package com.ivucenter.cloud.portal.oss.application;
+
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.collections.map.HashedMap;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonObject;
+import com.ivucenter.cloud.api.openshift.object.OpsApiOptionService;
+import com.ivucenter.cloud.portal.cmm.cloud.CustomOssCloudVO;
+import com.ivucenter.cloud.portal.cmm.cloud.OssCloudService;
+
+import io.fabric8.kubernetes.api.model.ServicePort;
+import io.fabric8.openshift.api.model.DeploymentConfig;
+import io.fabric8.openshift.api.model.DeploymentConfigList;
+import io.fabric8.openshift.api.model.Route;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class OssAppService {
+
+	@Autowired
+	private OssAppDAO dao;
+	
+	@Autowired
+	private OssCloudService ossCloudService;
+	
+	@Autowired
+	OpsApiOptionService opsApiOptionService;
+	
+	public CustomOssAppVO returnVoInfo( CustomOssAppVO req) {
+		CustomOssAppVO returnVo = new CustomOssAppVO();
+		try {
+			
+			System.out.println("ToStringReq");
+			System.out.println(req.toString());
+			returnVo = dao.returnVoInfo( req);
+		}catch (Exception e) {
+			throw e;
+		}
+		return returnVo;
+	}
+	
+	public String list(CustomOssAppVO req) {
+		Assert.notNull(req.getProjectId(), "");
+		Assert.notNull(req.getProjectName(), "");
+		List<CustomOssAppVO> lists = dao.projectList(req);
+		int recordsTotal = dao.projectListTot(req).size();
+		int recordsFiltered = recordsTotal;
+
+		List<DeploymentConfig> list = new LinkedList<DeploymentConfig>();
+		String sError = "";
+		
+		for(CustomOssAppVO vo : lists) {
+			CustomOssCloudVO cloudVo = ossCloudService.getCloudInfo(vo.getCloudId());
+			if(cloudVo.getCloudType().equals("openshift")) {
+				 DeploymentConfigList res = opsApiOptionService.getDeploymentConfigList(cloudVo, vo.getAppNameSpace());
+				
+				//DeploymentConfig res = opsApiOptionService.getDeploymentConfig(cloudVo, vo.getAppNameSpace(), vo.getAppName());
+				
+					Route route = opsApiOptionService.getRoute(cloudVo, vo.getAppNameSpace(), vo.getAppName());
+					ServicePort servicePort = opsApiOptionService.getServicePort( cloudVo, vo.getAppNameSpace(), vo.getAppName(), 0);
+					res.setAdditionalProperty("cloudName", cloudVo.getCloudName());
+					res.setAdditionalProperty("appName", vo.getAppName());
+					res.setAdditionalProperty("appUid", vo.getAppUid());
+					res.setAdditionalProperty("host", route.getSpec().getHost());
+					res.setAdditionalProperty("servicePort", servicePort.getPort());
+					res.setAdditionalProperty("cloudId", vo.getCloudId());
+					res.setAdditionalProperty("projectId", vo.getProjectId());
+					res.setAdditionalProperty("templateProductSeq", vo.getTemplateProductSeq());
+					res.setAdditionalProperty("templateCatalogSeq", vo.getTemplateCatalogSeq());
+					res.setAdditionalProperty("regDatetime", vo.getRegDatetime());
+					res.setAdditionalProperty("state", "정상");
+					if( !"N".equals(vo.getDelFlag())) {
+						res.setAdditionalProperty("state", "삭제됨");
+					}
+				
+				list.add(res);
+			}
+		}
+		 try {
+		        JsonObject jsonResponse = new JsonObject();
+		        Gson gson = new Gson();
+
+		        jsonResponse.addProperty("draw", req.getDraw());
+		        jsonResponse.addProperty("error", sError);
+		        jsonResponse.addProperty("recordsTotal", recordsTotal);
+		        jsonResponse.addProperty("recordsFiltered", recordsFiltered);
+//		        jsonResponse.addProperty("create_date", req.getCreateDatetime());
+
+		        jsonResponse.add("data", gson.toJsonTree(list));
+//		        log.debug(gson.toJsonTree(list).toString());
+		        return jsonResponse.toString();
+		    } catch (JsonIOException e) {
+		    	log.error(e.getMessage());
+		    }
+		return "";
+		
+	}
+	
+}

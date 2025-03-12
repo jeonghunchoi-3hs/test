@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.cmm.aop.UserHistoryDAO">
+
+	<select id="list" parameterType="UserHistoryVO"
+		resultType="UserHistoryVO">
+
+		SELECT
+		history_datetime,
+		user_id,
+		user_role,
+		user_name,
+		ip,
+		method_name,
+		task_name
+		FROM
+		user_history
+		where 1=1
+
+		<if test="searchKind == 'userId' and keyword != ''">
+			and user_id like CONCAT('%',#{keyword},'%')
+		</if>
+
+		<if test="searchKind == 'userNm' and keyword != ''">
+			and user_name like CONCAT('%',#{keyword},'%')
+		</if>
+
+		<if test="searchKind == 'methodName' and keyword != ''">
+			and method_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			and (
+			user_id like CONCAT('%',#{keyword},'%')
+			or
+			user_name like
+			CONCAT('%',#{keyword},'%')
+			or
+			method_name like CONCAT('%',#{keyword},'%')
+			)
+		</if>
+
+		<if test="orderColumn != ''">
+			<if test="orderDir != ''">
+				ORDER BY user_id ASC
+		</if>
+			
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 		
+			
+		</if>
+
+
+	</select>
+
+	<insert id="insertUserHistory" parameterType="UserHistoryVO">
+
+		INSERT INTO
+		user_history (
+		history_datetime,
+		user_id,
+		user_role,
+		user_name,
+		ip,
+		method_name,
+		task_name
+		)
+		VALUES
+		(
+		NOW(),
+		#{userId},
+		#{userRole},
+		#{userName},
+		#{ip},
+		#{methodName},
+		#{taskName}
+		);
+
+	</insert>
+	
+	
+	<select id="loginHistoryList" parameterType="CustomLoginHistoryVO" resultType="CustomLoginHistoryVO">
+		
+		  SELECT 
+                    login_datetime,
+					user_id,
+					user_name,
+					site_gbn_name,			
+					site_gbn,				
+					ip,			
+					success_yn,				
+					service,
+					login_fail_message
+			FROM (
+			         SELECT
+								a.login_datetime,
+								a.user_id,
+								b.user_name,
+								IF(a.site_gbn = 'MBR' ,'사용자' ,'관리자') AS site_gbn_name,			
+								a.site_gbn,				
+								a.ip,			
+								IF(a.success_yn = 'N' ,'실패' ,'성공') AS success_yn,				
+								a.service,
+								a.login_fail_message
+					   FROM login_history a
+					   INNER JOIN cmm_user b ON a.user_id = b.user_id
+				) a
+				where 1=1
+			AND
+				DATE_FORMAT(a.login_datetime, '%Y%m%')  <![CDATA[>=]]> #{startYm}
+			AND
+				DATE_FORMAT(a.login_datetime, '%Y%m%')  <![CDATA[<=]]> #{endYm}
+	    	<if test="searchKind == 'searchAll' and keyword != ''">
+	    		AND (
+	    			a.user_id  LIKE CONCAT('%',#{keyword},'%')
+	    			OR
+	    			a.user_name  LIKE CONCAT('%',#{keyword},'%')
+	    			OR
+	    			a.site_gbn_name  LIKE CONCAT('%',#{keyword},'%')
+	    			OR
+	    			a.ip  like CONCAT('%',#{keyword},'%')
+	    			OR
+	    			a.success_yn  LIKE CONCAT('%',#{keyword},'%')
+	    			)
+	    	</if>
+				
+			<if test="searchKind == 'user_id' and keyword != ''">
+				AND
+					a.user_id like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'user_name' and keyword != ''">
+				AND
+					a.user_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'site_gbn_name' and keyword != ''">
+				AND
+					a.site_gbn_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'ip' and keyword != ''">
+				AND
+					a.ip like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'success_yn' and keyword != ''">
+				AND
+					a.success_yn like CONCAT('%',#{keyword},'%')
+			</if>		
+			<if test="orderColumn != ''">
+				<if test="orderDir != ''">
+					ORDER BY login_datetime DESC
+			</if>
+			<if test="!length.equals(0)">
+				LIMIT #{start}, #{length}
+			</if> 		
+			</if>
+
+	</select>
+	
+</mapper>
+
+

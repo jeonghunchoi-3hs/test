@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ivucenter.cloud.portal.sms.queue.history.SmsQueueHistoryDAO">
+
+    <select id="list" resultType="CustomSmsQueueHistoryVO" parameterType="CustomSmsQueueHistoryVO">
+		SELECT 
+			z.*
+			, DATE_FORMAT(z.result_datetime, '%Y-%m-%d %H:%i') AS result_datetime2
+		FROM
+		( 
+			SELECT 
+				a.*
+				,b.template_name
+				, (CASE 
+					WHEN a.receiver_flg = 'U' 
+					THEN (
+						SELECT 
+							cc.customer_name 
+						FROM cmm_user cu, cmm_customer cc 
+						WHERE cu.customer_id=cc.customer_id
+						AND cu.user_id=a.receiver_id
+						)
+					WHEN a.receiver_flg = 'C' 
+					THEN (SELECT cc2.customer_name FROM cmm_customer cc2 WHERE cc2.customer_id=a.receiver_id)
+					ELSE '' END
+				) AS customer
+			FROM sms_queue_history a
+			
+			LEFT JOIN sms_template b 
+				ON a.template_id = b.template_id
+		) z
+		WHERE 1=1
+		AND
+			DATE_FORMAT(z.result_datetime, '%Y%m%')  >= #{startYm}
+		AND
+			DATE_FORMAT(z.result_datetime, '%Y%m%')  <![CDATA[<=]]> #{endYm}	
+		<if test="searchKind == 'template_id' and keyword != ''">
+			AND
+				z.template_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'template_name' and keyword != ''">
+			AND
+				z.template_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+					z.template_id like CONCAT('%',#{keyword},'%')
+					OR
+					z.template_name like CONCAT('%',#{keyword},'%')
+				)
+		</if>		
+    	ORDER BY z.result_datetime DESC
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+    </select>
+
+	<select id="detail" resultType="CustomSmsQueueHistoryVO" parameterType="CustomSmsQueueHistoryVO">
+    	SELECT 
+			*
+			, DATE_FORMAT(result_datetime, '%Y-%m-%d %H:%i') AS result_datetime2
+    	FROM sms_queue_history
+    	WHERE sms_seq = #{smsSeq}    	
+    </select>
+    
+    <insert id="insert" parameterType="CustomSmsQueueHistoryVO">
+   		INSERT INTO sms_queue_history (
+			sms_seq
+			, sms_short_seq
+			, template_id
+			, sender_name
+			, sender_number
+			, receiver_flg
+			, receiver_id
+			, receiver_name
+			, receiver_number
+			, message
+			, retry_count
+			, result_flg
+			, result_datetime
+		) values (
+			#{smsSeq}
+			, #{smsShortSeq}
+			, #{templateId}
+			, #{senderName}
+			, #{senderNumber}
+			, #{receiverFlg}
+			, #{receiverId}
+			, #{receiverName}
+			, #{receiverNumber}
+			, #{message}
+			, #{retryCount}
+			, #{resultFlg}
+			, now()
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomSmsQueueHistoryVO">
+        UPDATE sms_queue_history SET
+			template_id = #{templateId}
+			, sender_name = #{senderName}
+			, sender_number = #{senderNumber}
+			, receiver_flg = #{receiverFlg}
+			, receiver_id = #{receiverId}
+			, receiver_name = #{receiverName}
+			, receiver_number = #{receiverNumber}
+			, message = #{message}
+			, retry_count = #{retryCount}
+        WHERE sms_seq = #{smsSeq}
+    </update>
+    
+    <delete id="delete" parameterType="CustomSmsQueueHistoryVO">
+    	DELETE FROM sms_queue_history 
+    	WHERE sms_seq = #{smsSeq}
+    </delete>
+    
+</mapper>

@@ -1,0 +1,814 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.operation.approveUser.ApproveUserDAO">
+
+    <select id="list" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+		SELECT
+			A.user_id
+			, A.user_name
+			, IF(SUBSTRING(A.user_authority, 2, 1) ='1', 'Y', 'N') AS operation
+			, IF(SUBSTRING(A.user_authority, 3, 1) ='1', 'Y', 'N') AS confirmAction
+			, MAX(IF(A.step_id = #{WF1000A0}, 'Y', 'N')) AS WF1000A0
+			, MAX(IF(A.step_id = #{WF1000B0}, 'Y', 'N')) AS WF1000B0
+			, MAX(IF(A.step_id = #{WF1000C0}, 'Y', 'N')) AS WF1000C0
+			, MAX(IF(A.step_id = #{WF2000A0}, 'Y', 'N')) AS WF2000A0
+			, MAX(IF(A.step_id = #{WF2000B0}, 'Y', 'N')) AS WF2000B0
+			, MAX(IF(A.step_id = #{WF2000C0}, 'Y', 'N')) AS WF2000C0
+			, MAX(IF(A.step_id = #{WF2000D0}, 'Y', 'N')) AS WF2000D0
+			, MAX(IF(A.step_id = #{WF2000E0}, 'Y', 'N')) AS WF2000E0
+			, MAX(IF(A.step_id = #{WF3000A0}, 'Y', 'N')) AS WF3000A0
+			, MAX(IF(A.step_id = #{WF3000B0}, 'Y', 'N')) AS WF3000B0
+			, MAX(IF(A.step_id = #{WF3000C0}, 'Y', 'N')) AS WF3000C0
+			, MAX(IF(A.step_id = #{WF3000D0}, 'Y', 'N')) AS WF3000D0
+			, MAX(IF(A.step_id = #{WF3000E0}, 'Y', 'N')) AS WF3000E0
+		FROM(
+			SELECT
+				AMM.step_id
+				, CU.user_id
+				, CU.user_name
+				, CU.user_authority
+				, (SELECT customer_name FROM cmm_customer WHERE customer_id = CU.customer_id ) AS customer_name
+			FROM (
+				SELECT *
+				FROM cmm_user
+				WHERE del_flag = 'N'
+				<!-- AND user_status = 'USER_USING' -->
+			) CU
+			INNER JOIN approval_model_member AMM
+			ON CU.user_id = AMM.user_id
+		) A
+		WHERE 1=1
+		<if test="searchKind == 'user_id' and keyword != ''">
+			AND
+				A.user_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'user_name' and keyword != ''">
+			AND
+				A.user_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+			AND (
+					A.user_id like CONCAT('%',#{keyword},'%')
+					OR
+					A.user_name like CONCAT('%',#{keyword},'%')
+		</if>
+		GROUP BY A.user_id
+		<if test="orderColumn != '' ">
+			<if test="orderDir != '' ">
+				ORDER BY A.user_id ASC
+			</if>
+		</if>
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+	<select id="projectManagerCheck" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+		SELECT
+			project_manager_id
+		FROM
+			req_project_manager
+        WHERE
+        	req_project_seq = #{programSeq}
+            AND del_flag = 'N'
+	</select>
+
+
+	<select id="ossProjectManagerCheck" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+
+             SELECT *
+            FROM oss_project_manager
+             WHERE project_id = #{projectId}
+             AND del_flag = 'N'
+
+
+	</select>
+
+
+	<select id="projectManagerCount" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+		SELECT
+			project_manager_id
+		FROM
+			req_project_manager
+        WHERE
+        	req_project_seq = #{projectId}
+            AND project_manager_id = #{userId}
+	</select>
+
+
+	<select id="ossProjectManagerCount" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+
+           SELECT manager_id
+             FROM oss_project_manager
+           WHERE  project_id = '054ad6247cd84aa39cf480f861d7c273'
+               AND manager_id = 'admin'
+
+	</select>
+
+
+
+	<select id="projectList" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+		SELECT
+			   A.user_id
+			    , A.user_name
+				, A.customer_id
+				, A.customer_name
+				, A.company_id
+				, A.company_name
+				 ,A.user_phone
+				 ,A.user_tel
+				 ,A.user_mail
+			, IF(SUBSTRING(A.user_authority, 2, 1) ='1', 'Y', 'N') AS operation
+			, IF(SUBSTRING(A.user_authority, 3, 1) ='1', 'Y', 'N') AS confirmAction
+			, MAX(IF(A.step_id = #{WF1000A0}, 'Y', 'N')) AS WF1000A0
+			, MAX(IF(A.step_id = #{WF1000B0}, 'Y', 'N')) AS WF1000B0
+			, MAX(IF(A.step_id = #{WF1000C0}, 'Y', 'N')) AS WF1000C0
+			, MAX(IF(A.step_id = #{WF2000A0}, 'Y', 'N')) AS WF2000A0
+			, MAX(IF(A.step_id = #{WF2000B0}, 'Y', 'N')) AS WF2000B0
+			, MAX(IF(A.step_id = #{WF2000C0}, 'Y', 'N')) AS WF2000C0
+			, MAX(IF(A.step_id = #{WF2000D0}, 'Y', 'N')) AS WF2000D0
+			, MAX(IF(A.step_id = #{WF2000E0}, 'Y', 'N')) AS WF2000E0
+			, MAX(IF(A.step_id = #{WF3000A0}, 'Y', 'N')) AS WF3000A0
+			, MAX(IF(A.step_id = #{WF3000B0}, 'Y', 'N')) AS WF3000B0
+			, MAX(IF(A.step_id = #{WF3000C0}, 'Y', 'N')) AS WF3000C0
+			, MAX(IF(A.step_id = #{WF3000D0}, 'Y', 'N')) AS WF3000D0
+			, MAX(IF(A.step_id = #{WF3000E0}, 'Y', 'N')) AS WF3000E0
+			FROM(
+			SELECT
+				AMM.step_id
+				, CU.user_id
+				, CU.user_name
+				, CU.user_authority
+				, CU.customer_id
+				, CU.customer_name
+				, CU.company_id
+				, CU.company_name
+				 ,CU.user_phone
+				 ,CU.user_tel
+				 ,CU.user_mail
+			FROM (
+						SELECT
+			              b.customer_id
+						 ,b.customer_name
+						 ,c.company_id
+						 ,c.company_name
+					     ,a.user_id
+					     ,a.user_name
+					     ,a.user_authority
+					     ,a.user_phone
+					     ,a.user_tel
+					     ,a.user_mail
+					FROM cmm_user a
+						, cmm_customer b
+						, cmm_company c
+					WHERE a.del_flag = 'N'
+					<!-- AND a.user_status = 'USER_USING' -->
+					AND a.customer_id = b.customer_id
+					AND b.ref_company_id = c.company_id
+			) CU
+			INNER JOIN
+
+		(SELECT
+			 s.step_id
+            ,a.user_id
+            ,s.request_seq
+		FROM
+				sr_approval_step s
+				LEFT JOIN (SELECT * FROM approval_model_member ) a
+				ON s.step_id = a.step_id
+				INNER JOIN(SELECT * FROM sr_approval_member WHERE  request_seq= #{programSeq}) b
+				ON a.user_Id = b.user_Id
+				WHERE  s.request_seq=  #{programSeq}/**P*/
+				AND s.step_id in ('WF3000A0','WF3000B0','WF3000C0','WF3000D0','WF3000E0')
+			) AMM
+			ON CU.user_id = AMM.user_id
+		) A
+		WHERE 1=1
+		GROUP BY A.user_id
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+    <select id="projectManagerList" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+
+	     	   SELECT
+					     b.customer_id
+						,b.customer_name
+						,c.dept_code
+						,c.dept_name
+						,a.user_id
+						,a.user_name
+						,a.user_authority
+						,a.user_phone
+						,a.user_tel
+						,a.user_mail
+						,d.project_manager_type
+
+			     FROM (SELECT * FROM req_project_manager WHERE req_project_seq = #{programSeq}) d
+		   LEFT JOIN req_project t ON d.req_project_seq=t.req_project_seq
+		   LEFT JOIN cmm_user a ON d.project_manager_id=a.user_id
+		   LEFT JOIN cmm_customer b ON a.customer_id=b.customer_id
+		   LEFT JOIN cmm_department c ON a.dept_code = c.dept_code
+		   <if test="!length.equals(0)">
+		   LIMIT #{start}, #{length}
+		   </if>
+
+	</select>
+
+
+	<select id="projectManagerWriteList" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+
+	     	   SELECT
+					     b.customer_id
+						,b.customer_name
+						,c.dept_code
+						,c.dept_name
+						,a.user_id
+						,a.user_name
+						,a.user_authority
+						,a.user_phone
+						,a.user_tel
+						,a.user_mail
+						,d.project_manager_type
+						,CONCAT(a.user_name,'(',a.user_level,')') AS user_name_level
+
+			     FROM (SELECT * FROM req_project_manager WHERE req_project_seq = #{programSeq} AND project_manager_type !='01') d
+		   LEFT JOIN req_project t ON d.req_project_seq=t.req_project_seq
+		   LEFT JOIN cmm_user a ON d.project_manager_id=a.user_id
+		   LEFT JOIN cmm_customer b ON a.customer_id=b.customer_id
+		   LEFT JOIN cmm_department c ON a.dept_code = c.dept_code
+		   <if test="!length.equals(0)">
+		   LIMIT #{start}, #{length}
+		   </if>
+
+	</select>
+
+		<select id="ossProjectManagerList" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+
+	                  SELECT
+     	 		                 d.customer_id
+     	 		                ,d.customer_name
+     	 		                ,b.manager_id AS user_id
+     	 		                ,c.user_name
+     	 		                ,c.user_authority
+     	 		                ,c.user_phone
+     	 		                ,c.user_tel
+     	 		                ,c.user_mail
+     	 		                ,c.user_level
+     	 		                ,CONCAT(c.user_name,' (',c.user_level,')') AS user_name_level
+     	 		                ,b.manager_type AS project_manager_type
+     	 		                ,e.dept_name
+     	 		                ,f.code_name AS project_manager_type_name
+     	 		        FROM oss_project a
+     	 		  INNER JOIN (SELECT * FROM oss_project_manager WHERE manager_type !='01') b ON a.project_id = b.project_id
+     	 		  LEFT JOIN cmm_user c ON b.manager_id = c.user_id
+     	 		  LEFT JOIN cmm_customer d ON c.customer_id = d.customer_id
+     	 		  LEFT JOIN cmm_department e ON c.dept_code = e.dept_code
+     	 		  LEFT JOIN (SELECT * FROM cmm_code WHERE code_key_id = 'PROJECT_MANAGER_TYPE') f ON b.manager_type = f.code_id
+     	 		      WHERE a.project_id = #{projectId}
+
+		</select>
+
+
+	<select id="addProjectManageList" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+			SELECT
+				user_id
+				, user_name
+				, dept_code
+				, dept_name
+				, user_level
+				, up_code
+				, (SELECT dept_name FROM cmm_department WHERE dept_code = T.up_code) up_dept_name
+			FROM
+			(
+				SELECT
+					  a.user_id
+					, a.user_name
+					, a.dept_code
+					, b.dept_name
+					, a.user_level
+					,b.up_code
+  				FROM
+  					cmm_user a
+  				INNER JOIN
+  					cmm_department b
+  				ON a.dept_code = b.dept_code
+
+				WHERE
+					a.del_flag = 'N'
+    				<!-- AND a.user_status = 'USER_USING' -->
+   					AND a.user_id NOT IN (SELECT project_manager_id FROM req_project_manager WHERE req_project_seq = #{programSeq} )
+   					AND b.dept_code = #{deptCode}
+
+   				UNION all
+
+				SELECT
+  					a.user_id
+					, a.user_name
+					, a.dept_code
+					, b.dept_name
+					, a.user_level
+					,b.up_code
+				FROM
+					cmm_user a
+  				INNER JOIN
+  					cmm_department b
+  				ON a.dept_code = b.dept_code
+
+				WHERE
+					a.del_flag = 'N'
+					<!-- AND a.user_status = 'USER_USING' -->
+					AND a.user_id NOT IN (SELECT project_manager_id FROM req_project_manager WHERE req_project_seq = #{programSeq} )
+					AND b.dept_code != #{deptCode}
+			) T
+
+			WHERE
+				1=1
+				<if test="keyword == ''">
+				AND dept_code = (SELECT dept_code from cmm_user where user_id = #{userId})
+				</if>
+				<if test="searchKind == 'userId' and keyword != ''">
+				and 	user_id like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'userName' and keyword != ''">
+				and user_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'deptName' and keyword != ''">
+				and dept_name like CONCAT('%',#{keyword},'%')
+				</if>
+				<if test="searchKind == 'searchAll' and keyword != ''">
+				and
+				(
+					user_id like CONCAT('%',#{keyword},'%')
+					or
+					user_name like CONCAT('%',#{keyword},'%')
+					or
+					dept_name like CONCAT('%',#{keyword},'%')
+				)
+				</if>
+				AND user_id NOT IN ('admin')
+
+			ORDER BY
+				user_level, user_id
+
+	</select>
+
+
+	<select id="addOssProjectManageList" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+
+	                 SELECT
+		    	               user_id
+					         , user_name
+					         , dept_name
+		              FROM
+		                      (
+					          SELECT
+									  a.user_id
+									, a.user_name
+									, b.dept_name
+							  FROM cmm_user a
+							  INNER JOIN (SELECT * FROM cmm_department WHERE  dept_code = #{deptCode}) b
+							  ON a.dept_code = b.dept_code
+
+							WHERE a.del_flag = 'N'
+							    <!-- AND a.user_status = 'USER_USING' -->
+
+						    	<!-- AND a.user_id NOT IN (SELECT manager_id FROM oss_project_manager WHERE project_id = #{projectId} ) -->
+
+						    	UNION all
+
+						    	SELECT
+									  a.user_id
+									, a.user_name
+									, b.dept_name
+							  FROM cmm_user a
+							  INNER JOIN (SELECT * FROM cmm_department WHERE  dept_code != #{deptCode}) b
+							  ON a.dept_code = b.dept_code
+
+							WHERE a.del_flag = 'N'
+							    <!-- AND a.user_status = 'USER_USING' -->
+<!-- 						    	AND a.user_id NOT IN (SELECT manager_id FROM oss_project_manager WHERE project_id = #{projectId} ) -->
+			    	       )
+			    	WHERE 1=1
+
+		<if test="searchKind == 'userId' and keyword != ''">
+			and 	user_id like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'userName' and keyword != ''">
+			and user_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'deptName' and keyword != ''">
+			and dept_name like CONCAT('%',#{keyword},'%')
+			</if>
+
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			and (	user_id like CONCAT('%',#{keyword},'%')
+				or
+				user_name like CONCAT('%',#{keyword},'%')
+				or
+				dept_name like CONCAT('%',#{keyword},'%')
+				)
+		</if>
+	</select>
+
+
+    <select id="addList" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+		SELECT
+			user_id
+			, user_name
+		FROM cmm_user
+		WHERE del_flag = 'N'
+		<!-- AND user_status = 'USER_USING' -->
+		AND user_id NOT IN (SELECT user_id FROM approval_model_member)
+		<if test="searchKind == 'userId' and keyword != ''">
+		AND a.user_id like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'userName' and keyword != ''">
+		AND a.user_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'deptName' and keyword != ''">
+		AND b.dept_name like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND
+			(
+			a.user_id like CONCAT('%',#{keyword},'%')
+			OR
+			a.user_name like CONCAT('%',#{keyword},'%')
+			OR
+			b.dept_name like CONCAT('%',#{keyword},'%')
+		    )
+		</if>
+	</select>
+
+    <select id="addProjectApproveList" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+		SELECT
+			CU.user_id,
+			CU.user_name,
+			CU.user_level,
+			(select code_value from cmm_code where code_name = cu.user_level) as user_level_code,
+			CU.dept_code,
+			(SELECT up_code FROM cmm_department WHERE dept_code = CU.dept_code) up_code,
+			CU.user_condition,
+			CU.user_condition_text,
+			CD.dept_name,
+			(SELECT dept_name FROM cmm_department WHERE dept_code = (SELECT up_code FROM cmm_department WHERE dept_code = CU.dept_code)) up_dept_name,
+			CD.tree_level
+		FROM
+			cmm_user CU
+		INNER OUTER JOIN
+			(
+				SELECT
+					dept_code  AS dept_code
+					, TRIM(dept_name) AS dept_name
+					, LEVEL AS tree_level
+					, CONNECT_BY_ROOT dept_code AS same_dept
+				FROM
+					cmm_department
+				WHERE
+					del_flag != 'Y'
+				START WITH up_code IS null
+				CONNECT BY PRIOR dept_code=up_code
+				ORDER
+					SIBLINGS BY dept_code
+			) CD
+		ON CU.dept_code = CD.dept_code
+
+		WHERE
+			1=1
+			<if test="keyword == ''">
+			AND CD.dept_code = (SELECT dept_code from cmm_user where user_id = #{userId})
+			</if>
+			<if test="searchKind == 'userId' and keyword != ''">
+			and CU.user_id like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'userName' and keyword != ''">
+			and CU.user_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'deptName' and keyword != ''">
+			and CD.dept_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			and (	CU.user_id like CONCAT('%',#{keyword},'%')
+				or
+				    CU.user_name like CONCAT('%',#{keyword},'%')
+			    or
+			        CD.dept_name like CONCAT('%',#{keyword},'%')
+				  )
+			</if>
+			AND del_flag != 'Y'
+
+		ORDER BY
+			user_level, user_id
+	</select>
+
+	<select id="addProjectApprove2List" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+		SELECT
+			CU.user_id,
+			CU.user_name,
+			CU.user_level,
+			(select code_value from cmm_code where code_name = cu.user_level) as user_level_code,
+			CU.dept_code,
+			(SELECT up_code FROM cmm_department WHERE dept_code = CU.dept_code) up_code,
+			CU.user_condition,
+			CU.user_condition_text,
+			CD.dept_name,
+			(SELECT dept_name FROM cmm_department WHERE dept_code = (SELECT up_code FROM cmm_department WHERE dept_code = CU.dept_code)) up_dept_name,
+			CD.tree_level
+		FROM
+			cmm_user CU
+		INNER OUTER JOIN
+			(
+			SELECT
+				dept_code  AS dept_code
+				, TRIM(dept_name) AS dept_name
+				, LEVEL AS tree_level
+				, CONNECT_BY_ROOT dept_code AS same_dept
+			FROM
+				cmm_department
+			WHERE
+				del_flag != 'Y'
+			START WITH up_code IS null
+			CONNECT BY PRIOR dept_code=up_code
+			ORDER
+				SIBLINGS BY dept_code
+			) CD
+		ON CU.dept_code = CD.dept_code
+		WHERE
+			1=1
+			<if test="keyword == ''">
+			AND CD.dept_code = (SELECT dept_code from cmm_user where user_id = #{userId})
+			</if>
+			<if test="searchKind == 'userId' and keyword != ''">
+			and CU.user_id like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'userName' and keyword != ''">
+			and CU.user_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'deptName' and keyword != ''">
+			and CD.dept_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			and (	CU.user_id like CONCAT('%',#{keyword},'%')
+				    or
+				    CU.user_name like CONCAT('%',#{keyword},'%')
+				     or
+				    CD.dept_name like CONCAT('%',#{keyword},'%')
+				  )
+			</if>
+			AND user_id NOT IN ('admin')
+
+		ORDER BY
+			user_level, user_id
+	</select>
+
+	<select id="addDevUserApproveList" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+		SELECT
+			CU.user_id,
+			CU.user_name,
+			CU.user_level,
+			(select code_value from cmm_code where code_name = cu.user_level) as user_level_code,
+			CU.dept_code,
+			(SELECT up_code FROM cmm_department WHERE dept_code = CU.dept_code) up_code,
+			CD.dept_name,
+			(SELECT dept_name FROM cmm_department WHERE dept_code = (SELECT up_code FROM cmm_department WHERE dept_code = CU.dept_code)) up_dept_name,
+			CD.tree_level,
+			CC.customer_name,
+			CU.user_tel_ex,
+			CU.user_tel,
+			CU.user_mail
+		FROM
+			cmm_user CU
+		INNER OUTER JOIN
+			(
+				SELECT
+					dept_code  AS dept_code
+					, TRIM(dept_name) AS dept_name
+					, LEVEL AS tree_level
+					, CONNECT_BY_ROOT dept_code AS same_dept
+				FROM
+					cmm_department
+				WHERE
+					del_flag != 'Y'
+				START WITH up_code IS null
+				CONNECT BY PRIOR dept_code=up_code
+				ORDER
+					SIBLINGS BY dept_code
+			) CD
+		ON CU.dept_code = CD.dept_code
+		INNER JOIN cmm_customer CC ON CU.customer_id = CC.customer_id
+		WHERE
+			1=1
+			<if test="keyword == ''">
+			AND CD.dept_code = (SELECT dept_code from cmm_user where user_id = #{userId})
+			</if>
+			<if test="searchKind == 'userId' and keyword != ''">
+			and CU.user_id like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'userName' and keyword != ''">
+			and CU.user_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'deptName' and keyword != ''">
+			and CD.dept_name like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="searchKind == 'searchAll' and keyword != ''">
+			and (	CU.user_id like CONCAT('%',#{keyword},'%')
+				or
+				    CU.user_name like CONCAT('%',#{keyword},'%')
+			    or
+			        CD.dept_name like CONCAT('%',#{keyword},'%')
+				  )
+			</if>
+			AND CU.del_flag != 'Y'
+
+		ORDER BY
+			CU.user_level, CU.user_id
+	</select>
+
+	<insert id="insertAdmin" parameterType="CustomApproveUserVO">
+   		INSERT INTO approval_model_member (
+			step_id
+			, user_id
+			, apprv_auth_flag
+			, mail_recv_flag
+			, sms_recv_flag
+			, push_recv_flag
+		) values (
+			#{stepId}
+			, #{userId}
+			, 'Y'
+			, 'Y'
+			, 'Y'
+			, 'Y'
+		)
+    </insert>
+
+
+    <insert id="insertManager" parameterType="CustomApproveUserVO">
+   		INSERT INTO req_project_manager (
+			req_project_seq
+			,project_manager_id
+			,reg_datetime
+			,reg_user_id
+			,del_flag
+			,save_yn
+		) values (
+			 #{programSeq}
+			,#{userId}
+			,now()
+			,#{managerId}
+			,'N'
+			,'Y'
+		)
+    </insert>
+
+    <insert id="updateManager" parameterType="CustomApproveUserVO">
+
+   		UPDATE  req_project_manager
+   		      SET	 del_flag = 'N'
+   		 WHERE project_manager_id = #{userId}
+   		     AND req_project_seq = #{programSeq}
+
+    </insert>
+
+    <insert id="ossInsertManager" parameterType="CustomApproveUserVO">
+
+				INSERT INTO
+				oss_project_manager (
+					project_id,
+					manager_id,
+					reg_datetime,
+					reg_user_id,
+					del_flag
+					)
+				VALUES
+					(
+					#{projectId},
+					#{userId},
+					now(),
+					#{regUserId},
+					'N'
+					);
+
+    </insert>
+
+    <update id="updateAdmin" parameterType="CustomApproveUserVO">
+		UPDATE cmm_user SET
+			user_authority = CONCAT(SUBSTRING(user_authority, 1, 7), '1', SUBSTRING(user_authority, 9, 8))
+        WHERE user_id=#{userId}
+    </update>
+
+
+
+    <update id="updatePm" parameterType="CustomApproveUserVO">
+		UPDATE cmm_user SET
+			user_authority = CONCAT(SUBSTRING(user_authority, 1, 12), '1', SUBSTRING(user_authority, 14, 3))
+        WHERE user_id=#{userId}
+    </update>
+
+
+
+    <select id="auth" parameterType="CustomApproveUserVO" resultType="CustomApproveUserVO">
+		SELECT
+			IF(SUBSTRING(A.user_authority, 2, 1) ='1', 'Y', 'N') AS operation
+			, IF(SUBSTRING(A.user_authority, 3, 1) ='1', 'Y', 'N') AS confirmAction
+			, MAX(IF(A.step_id = #{WF1000A0}, 'Y', 'N')) AS WF1000A0
+			, MAX(IF(A.step_id = #{WF1000B0}, 'Y', 'N')) AS WF1000B0
+			, MAX(IF(A.step_id = #{WF1000C0}, 'Y', 'N')) AS WF1000C0
+			, MAX(IF(A.step_id = #{WF2000A0}, 'Y', 'N')) AS WF2000A0
+			, MAX(IF(A.step_id = #{WF2000B0}, 'Y', 'N')) AS WF2000B0
+			, MAX(IF(A.step_id = #{WF2000C0}, 'Y', 'N')) AS WF2000C0
+			, MAX(IF(A.step_id = #{WF2000D0}, 'Y', 'N')) AS WF2000D0
+			, MAX(IF(A.step_id = #{WF2000E0}, 'Y', 'N')) AS WF2000E0
+			, MAX(IF(A.step_id = #{WF3000A0}, 'Y', 'N')) AS WF3000A0
+			, MAX(IF(A.step_id = #{WF3000B0}, 'Y', 'N')) AS WF3000B0
+			, MAX(IF(A.step_id = #{WF3000C0}, 'Y', 'N')) AS WF3000C0
+			, MAX(IF(A.step_id = #{WF3000D0}, 'Y', 'N')) AS WF3000D0
+			, MAX(IF(A.step_id = #{WF3000E0}, 'Y', 'N')) AS WF3000E0
+		FROM(
+			SELECT
+				AMM.step_id
+				, CU.user_authority
+			FROM (
+				SELECT *
+				FROM cmm_user
+				WHERE user_id = #{userId}
+			) CU
+			INNER JOIN approval_model_member AMM
+			ON CU.user_id = AMM.user_id
+		) A
+		GROUP BY OPERATION, confirmAction
+	</select>
+
+    <update id="updateAuth" parameterType="CustomApproveUserVO">
+		UPDATE cmm_user SET
+			user_authority = CONCAT(
+									#{portaladmin}
+									, #{operation}
+									, #{confirmAction}
+									, #{cloudeAcct}
+									, SUBSTRING(user_authority, 5, 3)
+									, #{login}
+									, SUBSTRING(user_authority, 9, 9)
+							)
+        WHERE user_id=#{userId}
+    </update>
+
+    <delete id="deleteApproval" parameterType="CustomCmmFileVO">
+    	DELETE FROM approval_model_member
+    	WHERE user_id = #{userId}
+		<if test="!length.equals(0)">
+			AND step_id <![CDATA[<>]]> '*'
+		</if>
+    </delete>
+
+<!--
+    <select id="view" parameterType="CustomAdminUserVO" resultType="CustomAdminUserVO">
+		SELECT
+			user_id
+			, user_name
+			, user_phone
+			, user_authority
+		FROM
+			cmm_user
+		WHERE
+			user_id = #{userId}
+	</select>
+
+    <select id="userList" parameterType="CustomAdminUserVO" resultType="CustomAdminUserVO">
+		SELECT
+			user_id
+			, user_name
+			, user_phone
+			, user_authority
+		FROM
+			cmm_user
+		WHERE
+			LEFT(user_authority, 8) = 0
+		<if test="keyword != ''">
+		AND (
+			user_id like CONCAT('%',#{keyword},'%')
+			OR
+			user_name like CONCAT('%',#{keyword},'%')
+			)
+		</if>
+		ORDER BY
+			user_name
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+   	<update id="updateRole" parameterType="CustomAdminUserVO">
+    	UPDATE cmm_user SET
+			user_authority = #{userAuthority}
+        WHERE user_id=#{userId}
+    </update>
+
+ -->
+
+
+</mapper>

@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.productUsageStatus.total.ProductUsageStatusTotalDAO">
+
+    <select id="list" parameterType="CustomProductUsageStatusTotalVO" resultType="CustomProductUsageStatusTotalVO">
+     	SELECT
+    		*
+    	FROM
+    	(
+			SELECT
+				OP.project_box_id
+				, OP.project_id AS project_id
+				, CC.customer_id AS customer_id
+				, CC.customer_name AS customer_name
+				, OP.project_name
+				, OP.project_alias
+				, ( SELECT GROUP_CONCAT(app_uid  SEPARATOR ',') FROM oss_app WHERE project_id = OP.project_id) AS app_uid
+				, FORMAT(IFNULL(SUM(OV.vmCnt), 0), 0) AS vmCnt
+				, FORMAT(IFNULL(SUM(OV.vcpusTotal), 0), 0) AS vcpusTotal
+				, FORMAT(IFNULL(SUM(OV.memTotal), 0), 0) AS memTotal
+				, FORMAT(IFNULL(SUM(OD.osDiskTotal), 0), 0) AS osDiskTotal
+				, FORMAT(IFNULL(SUM(OD2.dataDiskTotal), 0), 0) AS dataDiskTotal
+
+				, FORMAT(IFNULL(SUM(PVNASV.pvDiskTotal), 0), 0) AS pvDiskTotal
+				, FORMAT(IFNULL(SUM(NASV.nasDiskTotal), 0), 0) AS nasDiskTotal
+
+				, FORMAT(IFNULL(SUM(ACT.actCnt), 0), 0) AS actCnt
+				, FORMAT(IFNULL(SUM(SEC.secCnt), 0), 0) AS secCnt
+				, FORMAT(IFNULL(SUM(BACK.backCnt), 0), 0) AS backCnt
+				, FORMAT(IFNULL(SUM(SW.swCnt), 0), 0) AS swCnt
+				, FORMAT(IFNULL(SUM(DISKMNG.diskMngCnt), 0), 0) AS diskMngCnt
+				, FORMAT(IFNULL(SUM(APP.appCnt), 0), 0) AS appCnt
+				, FORMAT(IFNULL(SUM(APP.pod), 0), 0) AS podCnt
+
+				, FORMAT(IFNULL(SUM(ASCL.autoscalingGourpCnt), 0), 0) AS autoscalingGourpCnt
+				, FORMAT(IFNULL(SUM(CTLCNT.containerTerminalCnt), 0), 0) AS containerTerminalCnt
+
+			FROM (SELECT * FROM oss_project WHERE delete_flag = 'N') OP
+			LEFT JOIN cmm_customer CC
+			ON OP.customer_id=CC.customer_id
+			LEFT JOIN (
+				SELECT
+					project_id
+					, COUNT(*) AS vmCnt
+					, SUM(vcpus) AS vcpusTotal
+					, SUM(mem_gb) AS memTotal
+				FROM
+					oss_vm
+				WHERE
+					del_flag = 'N'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY project_id
+			) OV
+			ON OP.project_id = OV.project_id
+			LEFT JOIN (
+				SELECT
+					project_id
+					, SUM(size_gb) AS osDiskTotal
+				FROM
+					oss_disk
+				WHERE
+					del_flag = 'N'
+					AND disk_alias LIKE '%_OS'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) OD
+			ON OP.project_id = OD.project_id
+			LEFT JOIN (
+				SELECT
+					project_id
+					, SUM(size_gb) AS dataDiskTotal
+				FROM
+					oss_disk
+				WHERE
+					del_flag = 'N'
+					AND disk_alias NOT LIKE '%_OS'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) OD2
+			ON OP.project_id = OD2.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id
+					, SUM(nas_gb) AS pvDiskTotal
+				FROM
+					oss_nas
+				WHERE
+					del_flag = 'N'
+					AND nas_type = 'PV'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) PVNASV
+			ON OP.project_id = PVNASV.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id
+					, SUM(nas_gb) AS nasDiskTotal
+				FROM
+					oss_nas
+				WHERE
+					del_flag = 'N'
+					AND nas_type = 'FV'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) NASV
+			ON OP.project_id = NASV.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS actCnt
+				FROM
+					oss_service
+				WHERE
+					del_flag = 'N'
+					AND service_type = '01'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) ACT
+			ON OP.project_id = ACT.project_id
+			LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS secCnt
+				FROM
+					oss_service
+				WHERE
+					del_flag = 'N'
+					AND service_type = '02'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) SEC
+			ON OP.project_id = SEC.project_id
+			LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS backCnt
+				FROM
+					oss_service
+				WHERE
+					del_flag = 'N'
+					AND service_type = '03'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) BACK
+			ON OP.project_id = BACK.project_id
+
+				LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS appCnt,
+					SUM(CAST(pod AS INTEGER)) AS pod
+				FROM
+					oss_app
+				WHERE
+					del_flag = 'N'
+				GROUP BY
+					project_id
+			) APP
+			ON OP.project_id = APP.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS swCnt
+				FROM
+					oss_service
+				WHERE
+					del_flag = 'N'
+					AND service_type = '04'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) SW
+			ON OP.project_id = SW.project_id
+			LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS diskMngCnt
+				FROM
+					oss_service
+				WHERE
+					del_flag = 'N'
+					AND service_type = '05'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) DISKMNG
+			ON OP.project_id = DISKMNG.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS autoscalingGourpCnt
+				FROM
+					oss_service
+				WHERE
+					del_flag = 'N'
+					AND service_type = 'ASCL'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) ASCL
+			ON OP.project_id = ASCL.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS containerTerminalCnt
+				FROM
+					oss_service
+				WHERE
+					del_flag = 'N'
+					AND service_type = 'SERVICE99'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) CTLCNT
+			ON OP.project_id = CTLCNT.project_id
+			group by project_box_id
+    	) A
+		WHERE
+			1=1
+	   		<if test="searchKind == 'searchAll' and keyword != '' ">
+	   		AND ( A.project_alias like CONCAT('%',#{keyword},'%')
+	   		)
+	   		</if>
+			<if test="searchKind == 'project_alias' and keyword != ''">
+				AND
+					a.project_alias like CONCAT('%',#{keyword},'%')
+			</if>
+
+		ORDER BY
+			A.customer_name asc, A.project_alias asc
+	</select>
+
+ 	<select id="listAppUid" resultType="CustomProductUsageStatusTotalVO">
+
+
+
+
+	</select>
+
+
+    <select id="total" parameterType="CustomProductUsageStatusTotalVO" resultType="CustomProductUsageStatusTotalVO">
+    	SELECT
+			'합계' AS customer_id
+			, '합계' AS customer_name
+			, '합계' AS project_id
+			, '합계' AS project_name
+			, '합계' AS project_alias
+			, IFNULL(FORMAT(SUM(X.vmCnt), 0), 0) AS vmCnt
+			, IFNULL(FORMAT(SUM(X.vcpusTotal), 0), 0) AS vcpusTotal
+			, IFNULL(FORMAT(SUM(X.memTotal), 0), 0) AS memTotal
+			, IFNULL(FORMAT(SUM(X.osDiskTotal), 0), 0) AS osDiskTotal
+			, IFNULL(FORMAT(SUM(X.dataDiskTotal), 0), 0) AS dataDiskTotal
+
+			, IFNULL(FORMAT(SUM(X.pvDiskTotal), 0), 0) AS pvDiskTotal
+			, IFNULL(FORMAT(SUM(X.nasDiskTotal), 0), 0) AS nasDiskTotal
+
+			, IFNULL(FORMAT(SUM(X.actCnt), 0), 0) AS actCnt
+			, IFNULL(FORMAT(SUM(X.secCnt), 0), 0) AS secCnt
+			, IFNULL(FORMAT(SUM(X.backCnt), 0), 0) AS backCnt
+			, IFNULL(FORMAT(SUM(X.swCnt), 0), 0) AS swCnt
+			, IFNULL(FORMAT(SUM(X.diskMngCnt), 0), 0) AS diskMngCnt
+
+			, IFNULL(FORMAT(SUM(X.appCnt), 0), 0) AS appCnt
+			, IFNULL(FORMAT(SUM(X.podCnt), 0), 0) AS podCnt
+
+			, IFNULL(FORMAT(SUM(X.autoscalingGroupTotal), 0), 0) AS autoscalingGroupTotal
+			, IFNULL(FORMAT(SUM(X.containerTerminalTotal), 0), 0) AS containerTerminalTotal
+
+    	FROM
+    	(
+			SELECT
+				*
+			FROM
+			(
+				SELECT
+					CC.customer_id AS customer_id
+					, CC.customer_name AS customer_name
+					, OP.cloud_id AS cloud_id
+					, OP.project_id
+					, OP.project_name
+					, OP.project_alias
+					, IFNULL(OV.vmCnt, 0) AS vmCnt
+					, IFNULL(OV.vcpusTotal, 0) AS vcpusTotal
+					, IFNULL(OV.memTotal, 0) AS memTotal
+					, IFNULL(OD.osDiskTotal, 0) AS osDiskTotal
+					, IFNULL(OD2.dataDiskTotal, 0) AS dataDiskTotal
+
+					, IFNULL(PVNASV.pvDiskTotal, 0) AS pvDiskTotal
+					, IFNULL(NASV.nasDiskTotal, 0) AS nasDiskTotal
+
+					, IFNULL(ACT.actCnt, 0) AS actCnt
+					, IFNULL(SEC.secCnt, 0) AS secCnt
+					, IFNULL(BACK.backCnt, 0) AS backCnt
+					, IFNULL(SW.swCnt, 0) AS swCnt
+					, IFNULL(DISKMNG.diskMngCnt, 0) AS diskMngCnt
+
+					, IFNULL(APP.appCnt, 0) AS appCnt
+					, IFNULL(APP.pod, 0) AS podCnt
+
+					, IFNULL(ASCL.autoscalingGroupTotal, 0) AS autoscalingGroupTotal
+					, IFNULL(CTLCNT.containerTerminalTotal, 0) AS containerTerminalTotal
+
+				FROM
+					(SELECT * FROM oss_project WHERE delete_flag = 'N') OP
+						LEFT JOIN
+					cmm_customer CC
+						ON OP.customer_id=CC.customer_id
+				LEFT JOIN (
+					SELECT
+						project_id
+						, COUNT(*) AS vmCnt
+						, SUM(vcpus) AS vcpusTotal
+						, SUM(mem_gb) AS memTotal
+					FROM
+						oss_vm
+					WHERE
+						del_flag = 'N'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					GROUP BY project_id
+				) OV
+				ON OP.project_id = OV.project_id
+				LEFT JOIN (
+					SELECT
+						project_id
+						, SUM(size_gb) AS osDiskTotal
+					FROM
+						oss_disk
+					WHERE
+						del_flag = 'N'
+						AND disk_alias LIKE '%_OS'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					GROUP BY
+						project_id
+				) OD
+				ON OP.project_id = OD.project_id
+				LEFT JOIN (
+					SELECT
+						project_id
+						, SUM(size_gb) AS dataDiskTotal
+					FROM
+						oss_disk
+					WHERE
+						del_flag = 'N'
+						AND disk_alias NOT LIKE '%_OS'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					GROUP BY
+						project_id
+				) OD2
+				ON OP.project_id = OD2.project_id
+
+
+			LEFT JOIN (
+				SELECT
+					project_id
+					, SUM(nas_gb) AS pvDiskTotal
+				FROM
+					oss_nas
+				WHERE
+					del_flag = 'N'
+					AND nas_type = 'PV'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) PVNASV
+			ON OP.project_id = PVNASV.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id
+					, SUM(nas_gb) AS nasDiskTotal
+				FROM
+					oss_nas
+				WHERE
+					del_flag = 'N'
+					AND nas_type = 'FV'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) NASV
+			ON OP.project_id = NASV.project_id
+
+
+
+				LEFT JOIN (
+					SELECT
+						project_id,
+						COUNT(*) AS actCnt
+					FROM
+						oss_service
+					WHERE
+						del_flag = 'N'
+						AND service_type = '01'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					GROUP BY
+						project_id
+				) ACT
+				ON OP.project_id = ACT.project_id
+				LEFT JOIN (
+					SELECT
+						project_id,
+						COUNT(*) AS secCnt
+					FROM
+						oss_service
+					WHERE
+						del_flag = 'N'
+						AND service_type = '02'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					GROUP BY
+						project_id
+				) SEC
+				ON OP.project_id = SEC.project_id
+
+				LEFT JOIN (
+					SELECT
+						project_id,
+						COUNT(*) AS backCnt
+					FROM
+						oss_service
+					WHERE
+						del_flag = 'N'
+						AND service_type = '03'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					GROUP BY
+						project_id
+				) BACK
+				ON OP.project_id = BACK.project_id
+				LEFT JOIN (
+					SELECT
+						project_id,
+						COUNT(*) AS swCnt
+					FROM
+						oss_service
+					WHERE
+						del_flag = 'N'
+						AND service_type = '04'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					GROUP BY
+						project_id
+				) SW
+				ON OP.project_id = SW.project_id
+				LEFT JOIN (
+					SELECT
+						project_id,
+						COUNT(*) AS diskMngCnt
+					FROM
+						oss_service
+					WHERE
+						del_flag = 'N'
+						AND service_type = '05'
+						AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+					GROUP BY
+						project_id
+				) DISKMNG
+				ON OP.project_id = DISKMNG.project_id
+
+
+				LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS appCnt,
+					SUM(CAST(pod AS INTEGER)) AS pod
+				FROM
+					oss_app
+				WHERE
+					del_flag = 'N'
+				GROUP BY
+					project_id
+			) APP
+			ON OP.project_id = APP.project_id
+
+
+			   LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS autoscalingGroupTotal
+				FROM
+					oss_service
+				WHERE
+					del_flag = 'N'
+					AND service_type = 'ASCL'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) ASCL
+			ON OP.project_id = ASCL.project_id
+
+			LEFT JOIN (
+				SELECT
+					project_id,
+					COUNT(*) AS containerTerminalTotal
+				FROM
+					oss_service
+				WHERE
+					del_flag = 'N'
+					AND service_type = 'SERVICE99'
+					AND IFNULL(expire_datetime, '9999-12-31') >= NOW()
+				GROUP BY
+					project_id
+			) CTLCNT
+			ON OP.project_id = CTLCNT.project_id
+
+			) A
+
+		WHERE
+			1 = 1
+	   		<if test="searchKind == 'searchAll' and keyword != '' ">
+	   		AND ( A.project_alias like CONCAT('%',#{keyword},'%')
+	   		)
+	   		</if>
+			<if test="searchKind == 'project_alias' and keyword != ''">
+				AND
+					A.project_alias like CONCAT('%',#{keyword},'%')
+			</if>
+			<if test="cloudId != null and cloudId != ''">
+			AND A.cloud_id like CONCAT('%',#{cloudId},'%')
+			</if>
+		) X
+	</select>
+
+	<select id="searchBox" parameterType="String" resultType="CustomProductUsageStatusTotalVO">
+		SELECT
+			A.#{searchKind} AS searchKind
+			, IFNULL(A.customer_name, '') AS customer_name
+			, IFNULL(A.customer_name, '') AS customer_name
+			, IFNULL(A.project_alias, '') AS project_alias
+		FROM
+		(
+			SELECT
+				CC.customer_id AS customer_id
+				, CC.customer_name AS customer_name
+				, OP.project_alias AS project_alias
+			FROM
+				(SELECT * FROM oss_project WHERE
+				delete_flag = 'N'
+				<if test="cloudId!=null and !cloudId.equals('')">
+				and
+					cloud_id = #{cloudId}
+				</if>
+				)
+				OP
+				LEFT JOIN
+				cmm_customer CC
+				ON OP.customer_id=CC.customer_id
+
+		)A
+		WHERE
+			A.#{searchKind} IS NOT NULL
+		GROUP BY
+			A.#{searchKind}
+	</select>
+</mapper>

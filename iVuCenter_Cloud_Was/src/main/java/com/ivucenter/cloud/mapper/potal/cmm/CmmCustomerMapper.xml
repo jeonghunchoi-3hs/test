@@ -1,0 +1,654 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.cmm.customer.CmmCustomerDAO">
+ 	
+    <select id="list" resultType="CustomCmmCustomerVO" parameterType="CustomCmmCustomerVO">
+		SELECT 
+			CU.customer_id,
+			CU.customer_name,
+			CU.corporation_no,			 
+			CU.biz_condition,
+			CU.biz_type,
+			IFNULL(CU.vat_rate, '0') AS vat_rate,
+			CU.manager_id,
+			US.user_name AS manager_name,
+			US.user_phone AS manager_phone,
+			US.user_tel AS manager_tel,
+			US.user_tel_ex AS manager_tel_ex,
+			CD.dept_code AS manager_dept_code,
+			CD.dept_name AS manager_dept_name,
+			DATE_FORMAT(CU.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime,
+			CU.reg_user_id,
+			US1.user_name AS reg_user_name,
+			CU.mod_datetime,
+			CU.mod_user_id,
+			CU.del_flag,
+			CU.user_id_pattern,
+			CU.company_rep
+		FROM cmm_customer CU
+		
+		LEFT OUTER JOIN cmm_user US
+		ON US.user_id = CU.manager_id
+		
+		LEFT OUTER JOIN cmm_user US1
+		ON US1.user_id = CU.reg_user_id
+		
+		LEFT OUTER JOIN cmm_department CD
+		ON CD.dept_code = US.dept_code
+		
+		WHERE 1=1
+
+		<if test="searchKind == 'customerName' and keyword != ''">
+			AND CU.customer_name like CONCAT('%',#{keyword},'%')
+		</if>
+		
+		<if test="searchKind == 'customerId' and keyword != ''">
+			AND CU.customer_id  like CONCAT('%',#{keyword},'%')
+		</if>
+		
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND (
+				CU.customer_name  like CONCAT('%',#{keyword},'%')
+				OR 
+			 	CU.customer_id  like CONCAT('%',#{keyword},'%')
+			)	 
+		</if>
+		
+		order by 
+			CU.reg_datetime DESC		
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+	
+    <select id="listAll" resultType="CustomCmmCustomerVO" parameterType="CustomCmmCustomerVO">
+    	SELECT 
+			*
+		FROM cmm_customer 
+		order by customer_name asc
+    </select>	
+
+	<select id="detail" resultType="CustomCmmCustomerVO" parameterType="CustomCmmCustomerVO">
+    	SELECT 
+			CU.customer_id
+			, CU.customer_name
+			, CU.corporation_no
+			, CU.company_no
+			, CU.biz_condition
+			, CU.biz_type
+			, CU.company_rep
+			, IFNULL(CU.vat_rate,'0') AS vat_rate			
+			, DATE_FORMAT(CU.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime			
+			, CU.mod_datetime
+			, CU.mod_user_id
+			, CU.del_flag
+			, CU.manager_id
+			, US.user_name AS manager_name
+			, US.user_phone AS manager_phone
+			, US.user_tel AS manager_tel
+			, US.user_tel_ex AS manager_tel_ex
+			, US.user_mail AS manager_mail
+			, CU.reg_user_id
+			, US2.user_name AS reg_user_name			
+    	FROM cmm_customer CU   		
+   		LEFT JOIN cmm_user US
+   			ON CU.manager_id = US.user_id
+   		LEFT JOIN cmm_user US2
+   			ON CU.reg_user_id = US2.user_id
+		WHERE CU.customer_id = #{customerId}		     	
+    </select>
+    
+    <select id="detailManagerId" resultType="CustomCmmCustomerVO" parameterType="CustomCmmCustomerVO">
+    	SELECT 
+			CU.*,
+			US.user_name,
+			US.user_phone,
+			US.user_tel,
+			US.user_mail
+    	FROM cmm_customer CU
+    	LEFT JOIN cmm_user US
+    	       ON CU.manager_id = US.user_id
+		WHERE CU.manager_id = #{managerId}    	
+    </select>
+
+    <select id="userList" resultType="CustomCmmCustomerVO" parameterType="CustomCmmCustomerVO">
+    	SELECT 
+			a.* 
+    	FROM cmm_user a
+		WHERE customer_id = #{customerId}  
+		<if test="searchKind == 'userPhone' and keyword != ''">
+		AND
+			a.user_phone LIKE CONCAT('%',#{keyword},'%')
+		</if>  	
+		<if test="searchKind == 'userName' and keyword != ''">
+		AND
+			a.user_name LIKE CONCAT('%',#{keyword},'%')
+		</if>  	
+		<if test="searchKind == 'userId' and keyword != ''">
+		AND
+			a.user_id LIKE CONCAT('%',#{keyword},'%')
+		</if> 
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		AND
+			(
+			a.user_phone LIKE CONCAT('%',#{keyword},'%')
+			OR
+			a.user_name LIKE CONCAT('%',#{keyword},'%')
+			OR
+			a.user_id LIKE CONCAT('%',#{keyword},'%')
+			)
+		</if>
+		ORDER BY a.reg_datetime
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+    
+    <select id="detailUser" resultType="CustomCmmCustomerVO" parameterType="CustomCmmCustomerVO">
+    	SELECT 
+			a.* ,
+			b.customer_name
+    	FROM cmm_user a , cmm_customer b
+		WHERE a.user_id=#{userId} AND b.customer_id = #{customerId}   	
+    </select>
+    
+    
+    <!-- 사용자 권한 등록-->
+   	<update id="editUser" parameterType="CustomCmmCustomerVO">
+    	UPDATE cmm_user SET
+			user_authority = #{userAuthority}
+        WHERE user_id=#{userId}
+    </update>
+    
+    <insert id="insert" parameterType="CustomCmmCustomerVO">
+   		INSERT INTO customer (
+			customer_id
+			, customer_name
+			, customer_password
+			, company_id
+			, contact_name
+			, contact_tel
+			, contact_mail
+			, sms_recv_flag
+			, mail_auth_flag
+			, request_seq
+			, reg_datetime
+			, reg_user_id
+			, del_flag
+		) values (
+			#{customerId, jdbcType=VARCHAR}
+			, #{customerName, jdbcType=VARCHAR}
+			, #{customerPassword, jdbcType=VARCHAR}
+			, #{companyId, jdbcType=VARCHAR}
+			, #{contactName, jdbcType=VARCHAR}
+			, #{contactTel, jdbcType=VARCHAR}
+			, #{contactMail, jdbcType=VARCHAR}
+			, #{smsRecvFlag, jdbcType=VARCHAR}
+			, #{mailAuthFlag, jdbcType=VARCHAR}
+			, #{requestSeq, jdbcType=VARCHAR}
+			, now()
+			, #{regUserId, jdbcType=VARCHAR}
+			, #{delFlag, jdbcType=VARCHAR}
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomCmmCustomerVO">
+        UPDATE customer SET
+			 customer_password	=	#{customerPasswordjdbcType=VARCHAR}
+			, company_id	=	#{companyIdjdbcType=VARCHAR}
+			, company_name  =   #{companyNamejdbcType=VARCHAR}
+			, contact_name	=	#{contactNamejdbcType=VARCHAR}
+			, contact_tel	=	#{contactTeljdbcType=VARCHAR}
+			, contact_mail	=	#{contactMailjdbcType=VARCHAR}
+			, sms_recv_flag	=	#{smsRecvFlagjdbcType=VARCHAR}
+			, mail_auth_flag	=	#{mailAuthFlagjdbcType=VARCHAR}
+			, request_seq	=	#{requestSeqjdbcType=VARCHAR}
+			, mod_datetime	=	now()
+			, mod_user_id	=	#{regUserIdjdbcType=VARCHAR}
+			, del_flag	=	#{delFlagjdbcType=VARCHAR}   
+        WHERE customer_id = #{customerId}
+    </update>
+    
+    <update id="customerInfoUpdate" parameterType="CustomCmmCustomerVO">
+        UPDATE customer SET
+			 contact_name	=	#{contactName}
+			, contact_tel	=	#{contactTel}
+			, contact_mail	=	#{contactMail}
+			, sms_recv_flag	=	#{smsRecvFlag}
+			, mod_datetime	=	now()
+			, mod_user_id	=	#{customerId}
+        WHERE customer_id = #{customerId}
+    </update>
+    
+    <update id="customerInfoUpdatepw" parameterType="CustomCmmCustomerVO">
+        UPDATE customer SET
+			 contact_name	=	#{contactName}
+			, contact_tel	=	#{contactTel}
+			, contact_mail	=	#{contactMail}
+			, sms_recv_flag	=	#{smsRecvFlag}
+			, mod_datetime	=	now()
+			, mod_user_id	=	#{customerId}
+			, customer_password	=	#{customerPassword}
+        WHERE customer_id = #{customerId}
+    </update>
+    
+    <update id="delete" parameterType="CustomCmmCustomerVO">
+    	UPDATE customer SET
+			del_flag = 'Y' 
+        WHERE customer_id = #{customerId}
+    </update>
+    
+    <select id="customerProjectcnt" resultType="int" parameterType="CustomCmmCustomerVO">
+    	SELECT 
+			COUNT(customer_id)
+    	FROM oss_project
+		WHERE customer_id = #{customerId}    	
+		AND delete_flag = 'N'
+    </select>
+    
+    <select id="getCustomerInfo" resultType="CustomCmmCustomerVO" parameterType="CustomCmmCustomerVO">
+    	SELECT 
+    		a.*    		
+		FROM 
+			customer a
+		WHERE 
+			a.contact_name = #{contactName}
+		AND 
+			a.contact_mail = #{contactMail}	   	
+    </select>
+    
+    <select id="getCustomerInfopw" resultType="CustomCmmCustomerVO" parameterType="CustomCmmCustomerVO">
+    	SELECT 
+    		a.*    		
+		FROM 
+			customer a
+		WHERE 
+			a.customer_id = #{customerId}
+		AND 
+			a.contact_mail = #{contactMail}	   	
+    </select>
+    
+    <select id="getCustomerexprcnt" resultType="int" parameterType="CustomCmmCustomerVO">
+    	SELECT 	
+    		COUNT(customer_id)
+		FROM 
+			req_customer WHERE customer_id=#{customerId} AND request_type='REQTYPE_EXPR'  	
+    </select>
+    
+    <update id="setUserInfo" parameterType="CustomCmmCustomerVO">
+    	UPDATE customer SET
+			pwd_init_flag = 'Y',
+			customer_password = #{customerPassword},
+			pwd_mod_datetime = now() 
+        WHERE customer_id=#{customerId}
+    </update>
+    
+     <update id="setSearchResult" parameterType="CustomCmmCustomerVO">
+    	INSERT INTO mail_queue 
+			(
+			mail_seq, 
+			template_id, 
+			title, 
+			content, 
+			sender_name, 
+			sender_mail, 
+			receiver_flg, 
+			receiver_id, 
+			receiver_name, 
+			receiver_mail, 
+			reg_datetime, 
+			reg_user_id
+			)
+			VALUES
+			(
+			#{mailSeq}, 
+			#{templateId}, 
+			#{title}, 
+			#{content}, 
+			#{senderName}, 
+			#{senderMail}, 
+			#{receiverFlg}, 
+			#{receiverId}, 
+			#{receiverName}, 
+			#{receiverMail}, 
+			now(), 
+			#{regUserId}			
+			)
+    </update>
+    
+    <!-- 부가가치세율 코드 리스트-->
+    <select id="vatRateList" parameterType="String" resultType="CustomCmmCustomerVO">
+	SELECT 	code_id, 
+		code_name 
+	FROM 
+		cmm_code 
+	where code_key_id='VAT_RATE' and code_level>0
+	order by code_sort_num asc
+  	</select>
+  	
+  	<!-- 회원사 멤버 사용자 리스트-->
+    <select id="getCustomerMemberList" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	SELECT 	
+		a.user_name, 
+		a.user_id ,
+		a.user_authority,
+		b.dept_name
+	FROM 
+		cmm_user a 
+		inner join cmm_department b
+		on a.dept_code = b.dept_code
+	where a.customer_id = #{customerId}
+	<if test="keyword != '' ">
+		AND 
+			(
+				a.user_name like CONCAT('%',#{keyword},'%') 
+				or a.user_id like CONCAT('%',#{keyword},'%')
+			)
+	</if> 
+	order by a.user_name asc
+  	</select>  
+ 
+  	<!-- 회원사 등록-->
+  	<insert id="customerInsert" parameterType="CustomCmmCustomerVO">
+   		INSERT INTO cmm_customer (
+			customer_id
+			, customer_name
+			, ref_company_id			
+			, corporation_no
+			, company_no
+			, company_rep
+			, biz_condition
+			, biz_type	
+			, vat_rate		
+			, reg_datetime
+			, reg_user_id			
+		) values (
+			#{customerId}
+			, #{customerName}
+			, #{refCompanyId}			
+			, #{corporationNo}
+			, #{companyNo}
+			, #{companyRep}
+			, #{bizCondition}
+			, #{bizType}
+			, #{vatRate}
+			, now()
+			, #{regUserId}			
+		)
+    </insert>
+  
+    <!-- 회원사 관리자 권한 등록-->
+   	<update id="setUserCustomadminInsert" parameterType="CustomCmmCustomerVO">
+    	UPDATE cmm_user SET
+			user_authority = #{userAuthority}
+        WHERE user_id=#{userId}
+    </update>
+  
+     <!-- 회원사 관리자아이디 등록-->
+  	<update id="setCustomadminInsert" parameterType="CustomCmmCustomerVO">
+    	UPDATE cmm_customer SET
+			manager_id = #{userId}
+        WHERE customer_id=#{customerId}
+    </update>
+    
+    <!-- 회원사 수정 -->
+    <update id="customerEdit" parameterType="CustomCmmCustomerVO">
+        UPDATE cmm_customer SET
+			customer_name	=	#{customerName}			
+			, ref_company_id= #{refCompanyId}
+			, corporation_no=	#{corporationNo}
+			, company_no	=	#{companyNo}
+			, company_rep	=	#{companyRep}
+			, biz_condition	=	#{bizCondition}
+			, biz_type	=	#{bizType}
+			, vat_rate	=	#{vatRate}
+			, mod_datetime	=	now()			
+			, mod_user_id	=	#{regUserId}		
+        WHERE customer_id = #{customerId}
+    </update>
+    
+    <update id="vatRateEdit" parameterType="CustomCmmCustomerVO">
+        UPDATE cmm_customer SET
+			vat_rate	=	#{vatRate}
+			, mod_datetime	=	now()			
+			, mod_user_id	=	#{regUserId}		
+        WHERE customer_id = #{customerId}
+    </update>    
+    
+   	<!-- 회원사 관리차 체크 -->
+    <select id="setManageridChk" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	SELECT 	
+		customer_name, 
+		manager_id 
+	FROM 
+		cmm_customer 
+	where customer_id = #{customerId}	
+  	</select>
+  	
+  	<!-- 기존 회원사 관리자 내용 -->
+    <select id="getuserAuthView" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	SELECT 	
+		user_name, 
+		user_id ,
+		user_authority
+	FROM 
+		cmm_user 
+	where user_id = #{managerId}
+  	</select> 
+  	
+  	<!--기존 회원사 관리자 권한 수정-->
+   	<update id="setuserAuthChg" parameterType="CustomCmmCustomerVO">
+    	UPDATE cmm_user SET
+			user_authority = #{userAuthority}
+        WHERE user_id=#{userId}
+    </update> 
+    
+    
+    
+    <!-- Chart 최근3개월 청구금액 -->
+   <!--  <select id="get3MonthAmount" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	    SELECT 
+		    A.bill_yyyymm 
+			, B.customer_id 
+			, B.customer_name 
+		  	, SUM(CASE WHEN C.invoice_item = '0000' THEN C.amount ELSE 0 END) AS amount
+		FROM 
+			(SELECT * FROM bill_master) A 
+			, bill_invoice_customer B 
+			, bill_invoice_customer_detail C 
+		WHERE A.bill_yyyymm = B.bill_yyyymm 
+		AND B.bill_yyyymm = C.bill_yyyymm 
+		AND B.customer_id = C.customer_id 
+		AND B.customer_id = #{customerId}
+		AND B.bill_yyyymm <![CDATA[<]]> #{billYyyymm}
+	 	GROUP BY A.bill_yyyymm, B.customer_id, B.customer_name 
+		ORDER BY bill_yyyymm DESC
+		LIMIT 3
+    </select> -->
+    
+    <!-- Chart 최근3개월 청구금액 -->
+    <select id="get3MonthAmount" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	   	SELECT	
+	   		X.bill_yyyymm	AS bill_yyyymm,
+			SUM(X.amount)	AS amount
+		FROM	
+		(
+			SELECT DATE_FORMAT(DATE_ADD(STR_TO_DATE(CONCAT(#{billYyyymm}, '01'), '%Y%m%d'), INTERVAL -1 MONTH), '%Y%m')  AS bill_yyyymm , 0 AS amount FROM DB_ROOT
+		UNION ALL 
+			SELECT DATE_FORMAT(DATE_ADD(STR_TO_DATE(CONCAT(#{billYyyymm}, '01'), '%Y%m%d'), INTERVAL -2 MONTH), '%Y%m')  AS bill_yyyymm , 0 AS amount FROM DB_ROOT
+		UNION ALL 
+			SELECT DATE_FORMAT(DATE_ADD(STR_TO_DATE(CONCAT(#{billYyyymm}, '01'), '%Y%m%d'), INTERVAL -3 MONTH), '%Y%m')  AS bill_yyyymm , 0 AS amount FROM DB_ROOT
+		UNION ALL
+			SELECT 
+				A.bill_yyyymm 
+				, SUM(CASE WHEN C.invoice_item = '0000' THEN C.amount ELSE 0 END) AS amount
+			FROM 
+				(SELECT * FROM bill_master) A 
+				, bill_invoice_customer B 
+				, bill_invoice_customer_detail C 
+			WHERE 
+				A.bill_yyyymm = B.bill_yyyymm
+				AND A.cloud_id = B.cloud_id 
+				AND B.bill_yyyymm = C.bill_yyyymm 
+				AND B.customer_id = C.customer_id 
+				AND B.cloud_id = #{cloudId}
+				AND B.customer_id = #{customerId}
+				AND B.bill_yyyymm <![CDATA[<]]> #{billYyyymm}
+				AND B.bill_yyyymm <![CDATA[>=]]> DATE_FORMAT(DATE_ADD(STR_TO_DATE(CONCAT(#{billYyyymm}, '01'), '%Y%m%d'), INTERVAL -3 MONTH), '%Y%m')
+			 GROUP BY 
+			 	A.bill_yyyymm, B.customer_id, B.customer_name 
+		) X
+		
+		GROUP BY 
+			bill_yyyymm
+		ORDER BY 
+			bill_yyyymm DESC
+	</select>
+    
+    
+    <!-- 청구예상금액 당월 사용금액 -->
+    <select id="getCurrentAmount" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	    SELECT 
+		    A.bill_yyyymm 
+			, B.customer_id 
+			, B.customer_name 
+		  	, SUM(CASE WHEN C.invoice_item = '0000' THEN C.amount ELSE 0 END) AS amount
+		FROM 
+			(SELECT * FROM bill_master) A 
+			, bill_invoice_customer B 
+			, bill_invoice_customer_detail C 
+		WHERE A.bill_yyyymm = B.bill_yyyymm 
+		AND B.bill_yyyymm = C.bill_yyyymm 
+		AND B.customer_id = C.customer_id 
+		AND B.customer_id = #{customerId}
+		<!-- AND A.bill_yyyymm = #{billYyyymm} -->
+		GROUP BY A.bill_yyyymm, B.customer_id, B.customer_name 
+		ORDER BY A.bill_yyyymm DESC
+		LIMIT 1
+	</select>
+    
+    
+    <!-- Chart 리소스별 총사용량 -->
+    <select id="getResourceTotalAmount" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+		SELECT	
+			SUM(A.servers) 		AS server_cnt,
+			SUM(IFNULL(A.vcpus, 0)) 		AS vcpus,
+			SUM(IFNULL(A.mem_gb, 0)) 		AS mem_gb,
+			SUM(IFNULL(A.disk_gb, 0)) 		AS disk_gb
+		FROM	(
+			SELECT  P.project_id,
+				P.project_name,
+				P.project_alias,
+				V.vm_uuid	AS server_id,
+				V.hostname	AS server_name,
+				CASE WHEN V.vm_uuid IS NULL THEN 0 ELSE 1 END		AS servers,
+				V.vcpus	AS vcpus,
+				V.mem_gb	AS mem_gb,
+				V.disk_gb	AS disk_gb
+			FROM 	cmm_customer C
+				INNER JOIN (SELECT * FROM oss_project WHERE delete_flag ='N') P
+					ON 	P.customer_id = C.customer_id
+				LEFT OUTER JOIN req_project R
+					ON 	R.req_project_seq = P.program_seq 
+				LEFT OUTER JOIN (SELECT * FROM oss_vm WHERE del_flag = 'N') V
+					ON 	V.project_id = P.project_id
+					AND 	IFNULL(V.expire_datetime, '9999-12-31') <![CDATA[>=]]> NOW()
+			WHERE 	'X' = 'X'
+			AND	(R.complete_flag = 'Y' OR R.complete_flag IS NULL) 
+			AND	C.customer_id =  (SELECT X.customer_id FROM cmm_user X WHERE X.user_id = #{userId})
+			UNION ALL
+			SELECT  P.project_id,
+				P.project_name,
+				P.project_alias,
+				NULL	AS server_id,
+				NULL	AS server_name,
+				0		AS servers,
+				0		AS vcpus,
+				0		AS mem_gb,
+				D.size_gb	AS disk_gb
+			FROM 	cmm_customer C
+				INNER JOIN (SELECT * FROM oss_project WHERE delete_flag = 'N') P
+					ON 	P.customer_id = C.customer_id
+				LEFT OUTER JOIN req_project R 
+					ON 	R.req_project_seq = P.program_seq 
+				LEFT OUTER  JOIN (SELECT * FROM oss_disk WHERE del_flag = 'N') D
+					ON	D.project_id = P.project_id
+					AND 	IFNULL(D.expire_datetime, '9999-12-31') <![CDATA[>=]]> NOW()
+			WHERE 	'X' = 'X'
+			AND	(R.complete_flag = 'Y' OR R.complete_flag IS NULL) 
+			AND	C.customer_id =  (SELECT X.customer_id FROM cmm_user X WHERE X.user_id = #{userId})
+			) A
+    </select>
+    
+    <!-- 고객사 사업자 법호 중복 체크 -->
+    <select id="companyNoChk" parameterType="CustomCmmCustomerVO" resultType="int">
+	SELECT 	
+		COUNT(company_no)
+	FROM 
+		cmm_customer 
+	where company_no = #{companyNo}	
+  	</select>
+  	
+  	 <!-- 본사 계열사 셀렉트 박스 대분류 -->
+    <select id="upCompanyList" resultType="CustomCmmCustomerVO">
+	SELECT 	
+		company_id,
+		company_name as select_name
+	FROM 
+		cmm_company
+	where up_company_id ='*'	
+  	</select>
+  	
+  	 <!-- 본사 계열사 셀렉트 박스 소분류 -->
+    <select id="companySelectList" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	SELECT 	
+		company_id,
+		company_name as select_name
+	FROM 
+		cmm_company
+	where up_company_id =#{companyId}
+  	</select>
+  	
+    <!-- 본사 계열사 팝업 리스트 -->
+    <select id="companyList" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	SELECT 	
+		company_id,
+		company_name ,
+		(SELECT company_name FROM cmm_company WHERE company_id = a.up_company_id)up_company_name
+	FROM 
+		cmm_company a
+	WHERE a.company_id NOT IN (SELECT ref_company_id FROM cmm_customer WHERE ref_company_id IS NOT NULL)
+	AND a.up_company_id != '*'
+	<if test="keyword != '' ">
+		AND 
+			(
+				company_name like CONCAT('%',#{keyword},'%') 
+				or up_company_id IN (SELECT company_id FROM cmm_company WHERE company_name like CONCAT('%',#{keyword},'%'))
+			)
+	</if> 
+  	</select>
+  	
+  	    <!-- 본사 계열사 등록된 리스트 조회 하는 팝업 리스트 -->
+    <select id="companyFullList" parameterType="CustomCmmCustomerVO" resultType="CustomCmmCustomerVO">
+	SELECT 	
+		a.company_id,
+		a.company_name ,
+		(SELECT company_name FROM cmm_company WHERE company_id = a.up_company_id)up_company_name,
+		b.customer_id
+	FROM 
+		cmm_company a , cmm_customer b 
+		
+	WHERE  b.ref_company_id = a.company_id
+	AND a.up_company_id != '*'
+	<if test="keyword != '' ">
+		AND 
+			(
+				a.company_name like CONCAT('%',#{keyword},'%') 
+				or a.up_company_id IN (SELECT company_id FROM cmm_company WHERE company_name like CONCAT('%',#{keyword},'%'))
+			)
+	</if> 
+  	</select>
+  	
+</mapper>

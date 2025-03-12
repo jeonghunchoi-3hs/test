@@ -1,0 +1,8 @@
+INDEX VERSION 1.4+D:\workspace\k-cloud-20250113-dev\.metadata\.plugins\org.eclipse.wst.jsdt.core\indexes
+420429066.index
+2790572333.index
+3329353446.index
+1109540010.index
+3795896716.index
+1533062053.index
+2934834933.index

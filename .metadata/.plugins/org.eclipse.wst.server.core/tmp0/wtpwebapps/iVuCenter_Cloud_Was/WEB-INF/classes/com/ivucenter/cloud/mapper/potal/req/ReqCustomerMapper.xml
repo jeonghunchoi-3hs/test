@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.req.customer.CustomerDAO">
+ 	
+ 	<!--사업자 리스트 -->
+    <select id="getCompanyList" resultType="CustomReqCustomerVO">
+		SELECT 	
+			company_id, 
+			company_name, 
+			company_no, 
+			company_rep, 
+			company_addr, 
+			contact_name, 
+			contact_phone, 
+			contact_tel, 
+			contact_mail, 
+			reg_datetime, 
+			reg_user_id, 
+			mod_datetime, 
+			mod_user_id, 
+			del_flag			 
+		FROM 
+			company 
+  	</select>
+  	
+  	<!--사업자 선택시 내용 -->
+    <select id="getCompanySelectList" resultType="CustomReqCustomerVO" parameterType="CustomReqCustomerVO">
+		SELECT 	
+			company_id, 
+			company_name, 
+			company_no, 
+			company_rep, 
+			company_addr, 
+			contact_name, 
+			contact_phone, 
+			contact_tel, 
+			contact_mail, 
+			reg_datetime, 
+			reg_user_id, 
+			mod_datetime, 
+			mod_user_id, 
+			del_flag			 
+		FROM 
+			company 
+		where company_id=#{companyId}
+  	</select>
+  	
+   	<!-- 회원사 내용입력 -->
+    <update id="setCustomerForminsert" parameterType="CustomReqCustomerVO" >
+		INSERT INTO req_customer 
+			(
+				request_seq, 
+				customer_id, 
+				customer_name, 
+				company_id, 
+				contact_name, 
+				contact_phone, 
+				contact_tel, 
+				contact_mail, 
+				sms_recv_flag,
+				apprv_state,
+				reg_datetime,
+				request_type
+			)
+		VALUES
+			(
+				#{requestSeq}, 
+				#{customerId}, 
+				#{customerName}, 
+				#{companyId}, 
+				#{contactName}, 
+				#{contactPhone}, 
+				#{contactTel}, 
+				#{contactMail}, 
+				#{smsRecvFlag},
+				'APPRV_PROCESSING',
+				NOW(),
+				#{requestType}
+			)
+  	</update>
+  	
+  	<!-- 회원사 내용입력후  sr_approval_step(서비스 요청 승인단계입력)-->
+    <update id="setSrApprovalStepinsert" parameterType="CustomReqCustomerVO" >
+		INSERT INTO sr_approval_step 
+				(
+					step_id, 
+					request_seq, 
+					flow_id, 
+					step_name, 
+					step_level, 
+					left_step_id, 
+					right_step_id, 
+					apprv_state
+				)
+		VALUES
+				(
+					#{stepId}, 
+					#{requestSeq}, 
+					'AFW0010',   <!--고정(회원사 승인 신청)-->
+					#{stepName}, 
+					#{stepLevel}, 
+					#{leftStepId}, 
+					#{rightStepId}, 
+					#{apprvState}  <!--고정(승인처리중)-->
+				)
+  	</update>
+  	
+  	<!-- 승인모델 단계  리스트 -->
+    <select id="getApprovalModelSteplist" resultType="CustomReqCustomerVO">
+		SELECT 	
+			step_id, 
+			model_id, 
+			step_name, 
+			step_level, 
+			left_step_id, 
+			right_step_id
+		FROM 
+			approval_model_step	
+		where 
+			model_id=(SELECT model_id FROM sr_approval_flow WHERE flow_id='AFW0010')	 
+  	</select>
+  	
+  	<!-- 회원사 내용입력후  sr_approval_member(서비스 요청 승인 구성원 입력)-->
+    <update id="setSrApprovalMemberinsert" parameterType="CustomReqCustomerVO" >
+		INSERT INTO sr_approval_member 
+			(
+				step_id, 
+				request_seq, 
+				flow_id, 
+				user_id, 
+				apprv_auth_flag, 
+				mail_recv_flag, 
+				sms_recv_flag, 
+				push_recv_flag
+			)
+		VALUES
+			(
+				#{stepId}, 
+				#{requestSeq}, 
+				'AFW0010',   <!--고정(회원사 승인 신청)-->
+				#{userId}, 
+				#{apprvAuthFlag}, 
+				#{mailRecvFlag}, 
+				#{smsRecvFlag}, 
+				#{pushRecvFlag}
+			)
+  	</update>
+  	
+  	<!-- 승인모델 단계 구성원 리스트 -->
+    <select id="getApprovalModelMemberlist" resultType="CustomReqCustomerVO">
+		SELECT 	
+			a.step_id, 
+			a.user_id, 
+			a.apprv_auth_flag, 
+			a.mail_recv_flag, 
+			a.sms_recv_flag, 
+			a.push_recv_flag			 
+		FROM 
+			approval_model_member 	a , approval_model_step b
+		WHERE a.step_id=b.step_id 
+		AND b.model_id=(SELECT model_id FROM sr_approval_flow WHERE flow_id='AFW0010') 		 
+  	</select>
+  	
+  	<!-- 회원사 신청 회원사 아이디 중복체크 -->
+    <select id="getCustomefIdcheck" resultType="String">
+		SELECT 	
+			customer_id		 
+		FROM 
+			cmm_customer 
+		where customer_id=#{customerId}		 
+  	</select>
+  	
+  	<!-- 회원사 신청 회원사 이름 중복체크 -->
+    <select id="getCustomerNamecheck" resultType="String">
+		SELECT 	
+			customer_name		 
+		FROM 
+			cmm_customer 
+		where customer_name=#{customerName}		 
+  	</select>
+  	
+  	  	<!-- 회원사 신청 회원사 이름 중복체크 -->
+    <select id="setCustomerFormchk" resultType="int">
+		SELECT 	
+			COUNT(customer_name)		 
+		FROM 
+			req_customer  
+		where customer_name=#{customerName}	or 	 customer_id=#{customerId}
+  	</select>
+  	  	
+  	<!--회원사 리스트 -->
+    <select id="getCustomerList" resultType="CustomReqCustomerVO">
+	SELECT 		
+		customer_id, 
+		customer_name, 
+		company_id
+	FROM 
+		req_customer 
+	where company_id=#{companyId}
+  	</select>
+  	
+<!--     회원사 신청현황 리스트pho-->
+      <select id="list" parameterType="CustomReqCustomerVO"  resultType="CustomReqCustomerVO">
+	SELECT
+	request_seq,
+		company_id, 	
+		customer_name, 
+		customer_id,
+		contact_name,
+		contact_phone,
+		contact_mail,
+		reg_datetime,
+		apprv_state,
+		request_type,
+		CONCAT((SELECT code_name FROM cmm_code WHERE  code_id=request_type AND code_key_id=#{requestCodeKeyId}), '-', 
+						(SELECT code_name FROM cmm_code WHERE  code_id=apprv_state AND code_key_id=#{apprvCodeKeyId})) AS request_apprv_state
+	FROM 
+		req_customer
+	WHERE 1=1	
+	<if test="appvKind != ''">
+	AND	
+		apprv_state = #{appvKind}	
+	</if>
+	<if test="searchKind == 'cstmName' and keyword != ''">
+	AND
+		customer_name like CONCAT('%',#{keyword},'%')
+	</if>
+	<if test="searchKind == 'cstmId' and keyword != ''">
+	AND
+		customer_id like CONCAT('%',#{keyword},'%')
+	</if>
+	<if test="searchKind == 'ctctName' and keyword != ''">
+	AND
+		contact_name like CONCAT('%',#{keyword},'%')
+	</if>
+	<if test="searchKind == 'searchAll' and keyword != ''">
+	AND
+		(
+		customer_name like CONCAT('%',#{keyword},'%')
+		OR
+		customer_id like CONCAT('%',#{keyword},'%')
+		OR
+		contact_name like CONCAT('%',#{keyword},'%')
+		)
+		
+	</if>
+		order by
+		 request_seq
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 		
+  	</select>
+  	
+  	    <select id="listTot" resultType="Int" parameterType="CustomReqCustomerVO">
+    	SELECT 
+			count(*)
+    	FROM req_customer
+    	WHERE 1=1	
+	<if test="appvKind != ''">
+	AND	
+		apprv_state = #{appvKind}	
+	</if>
+	<if test="searchKind == 'cstmName' and keyword != ''">
+	AND
+		customer_name like CONCAT('%',#{keyword},'%')
+	</if>
+	<if test="searchKind == 'cstmId' and keyword != ''">
+	AND
+		customer_id like CONCAT('%',#{keyword},'%')
+	</if>
+	<if test="searchKind == 'ctctName' and keyword != ''">
+	AND
+		contact_name like CONCAT('%',#{keyword},'%')
+	</if>
+	<if test="searchKind == 'searchAll' and keyword != ''">
+	AND
+		(
+		customer_name like CONCAT('%',#{keyword},'%')
+		OR
+		customer_id like CONCAT('%',#{keyword},'%')
+		OR
+		contact_name like CONCAT('%',#{keyword},'%')
+		)
+		
+	</if>
+    </select> 	
+    
+<!--  	회원사 신청현황 리스트 상세조회-->
+    <select id="detail" parameterType="CustomReqCustomerVO" resultType="CustomReqCustomerVO">
+	select
+		request_seq,
+		company_id, 	
+		customer_name, 
+		customer_id,
+		contact_name,
+		contact_phone,
+		contact_mail,
+		reg_datetime,
+		apprv_state,
+		sms_recv_flag,
+		mail_auth_flag,
+		reg_user_id,
+		request_type
+	from
+			req_customer 
+ 		where 
+			request_seq = #{requestSeq}
+	</select>
+<!-- 	  	회원사 신규 마지막 승인 신청현황 등록-->
+  	<insert id="insert" parameterType="CustomReqCustomerVO" >
+  		insert into customer(
+			request_seq,
+			company_id, 	
+			customer_name, 
+			customer_id,
+			contact_name,
+			contact_tel,
+			contact_mail,
+			reg_datetime,
+			reg_user_id,
+			sms_recv_flag,
+			mail_auth_flag
+  		)values(
+			#{requestSeq} 
+			,#{companyId}      
+			,#{customerName}	  
+			,#{customerId}  
+			,#{contactName} 
+			,#{contactPhone}  
+			,#{contactMail}    
+			,NOW()
+			,#{regUserId}
+			,#{smsRecvFlag}
+			,#{mailAuthFlag}
+  		)
+  	</insert>
+ <!--   	회원사 미승인 신청현황 수정-->
+  	<update id="rejectedUpdate" parameterType="CustomReqCustomerVO" >
+  		update 
+  			req_customer
+  		set
+			apprv_state = 'APPRV_REJECTED'
+  		where
+  			request_seq = #{requestSeq}
+			
+  	</update> 	
+<!--   	회원사 신규 마지막 승인 신청현황 수정-->
+  	<update id="newUpdate" parameterType="CustomReqCustomerVO" >
+  		update 
+  			req_customer
+  		set
+			apprv_state = 'APPRV_COMPLETED'
+  		where
+  			request_seq = #{requestSeq}
+			
+  	</update>
+  
+  <!--   	회원사 해지 마지막 승인 신청현황 1수정-->
+  	<update id="update" parameterType="CustomReqCustomerVO" >
+  		update 
+  			req_customer
+  		set
+			apprv_state = 'APPRV_COMPLETED',
+			del_flag='Y'
+  		where
+  			request_seq = #{requestSeq}
+			
+  	</update>
+  	
+  <!--   	회원사 해지 마지막 승인 신청현황 2수정-->
+  	<update id="exprUpdate" parameterType="CustomReqProjectVO" >
+  		update 
+  			customer
+  		set
+			expr_date =NOW()
+  		where
+  			customer_id = #{customerId}
+
+  	</update> 	
+ <!--   	회원사 신청현황 상세 리스트 승인멤버 조회-->
+    <select id="approvalList" parameterType="CustomReqCustomerVO" resultType="CustomReqCustomerVO">
+	select
+		a.request_seq,
+		a.step_name,
+		a.step_level,
+		a.apprv_state,
+		a.step_id,
+		a.right_step_id,
+		a.apprv_description
+	<!-- 	(SELECT code_name FROM cmm_code WHERE  code_id=#{codeKeyId} AND code_key_id=#{codeKeyId} ) AS code_name -->
+	from
+			sr_approval_step a
+ 		where 
+			a.request_seq = #{requestSeq}
+	</select>
+	
+<!--  	   	회원사 신청현황 상세 리스트 승인멤버 유저 아이디 조회-->
+    <select id="approvalUserId" parameterType="CustomReqCustomerVO" resultType="CustomReqCustomerVO">
+	select
+		user_id
+		,step_id
+	from
+			sr_approval_member 
+ 		where 
+			request_seq = #{requestSeq}
+		GROUP BY step_id	
+	</select>
+	
+	<!--   	회원사 승인 스텝정보 수정-->
+	<update id="stepUpdate" parameterType="CustomReqCustomerVO" >
+	  		UPDATE 
+	  			sr_approval_step
+	  		SET
+	  			apprv_description=#{apprvDescription},
+				apprv_state = #{apprvState},
+				apprv_user_name = #{apprvUserName},
+				apprv_user_id = #{apprvUserId}, 
+				apprv_datetime = NOW()
+	  		WHERE
+	  			request_seq = #{requestSeq}
+	  		AND 	
+	  			step_level =#{stepLevel}
+
+	</update>	
+</mapper>

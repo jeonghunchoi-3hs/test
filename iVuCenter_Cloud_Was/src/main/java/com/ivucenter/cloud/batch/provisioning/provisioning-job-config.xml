@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+     xmlns="http://www.springframework.org/schema/beans"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:aop="http://www.springframework.org/schema/aop"
+     xmlns:tx="http://www.springframework.org/schema/tx"
+     xmlns:batch="http://www.springframework.org/schema/batch"
+     xmlns:context="http://www.springframework.org/schema/context"
+     xmlns:util="http://www.springframework.org/schema/util"
+    
+     xsi:schemaLocation="
+         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+         http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+         http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch-2.2.xsd
+         http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd
+     http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+    ">
+    
+    
+     <!-- *********************************************************** -->
+     <!-- ********** Job 선언 ********** -->
+     <!-- *********************************************************** -->
+     <batch:job id="provisioningJob">
+     
+     	<!-- jobContextStep -->
+    	<batch:step id="provisioningJobContextStep" next="provisioningStep">
+			<batch:tasklet ref="provisioningJobContextTasklet" />
+		</batch:step>
+		<!-- 
+		<batch:step id="provisioningStartStep" next="ProvisioningContextStep" >
+			<batch:tasklet>
+				<batch:chunk reader="provisioningStartReader" 
+							writer="provisioningStartWriter"
+	                        commit-interval="1">
+				</batch:chunk>
+				<batch:listeners>
+					<batch:listener ref="promotionListener" />
+				</batch:listeners>
+			</batch:tasklet>
+		</batch:step>     
+     	
+		
+    	<batch:step id="ProvisioningContextStep" next="provisioningStep" >
+			<batch:tasklet ref="ProvisioningContextTasklet" />
+		</batch:step>
+		-->
+		     	
+ 		<batch:step id="provisioningStep" >
+			<batch:tasklet>
+				<batch:chunk reader="provisioningReader" 
+							writer="provisioningWriter"
+	                        commit-interval="1">
+				</batch:chunk>
+				<batch:listeners>
+					<batch:listener ref="promotionListener" />
+				</batch:listeners>
+			</batch:tasklet>
+		</batch:step>	
+		
+				
+		
+     </batch:job>
+  
+   
+	
+	<!-- *********************************************************** -->
+	<!-- ********** 변수 선언 ********** -->
+	<!-- *********************************************************** -->
+
+	<!-- 입력변수 -->
+	<util:map id="provisioningJobParams" key-type="java.lang.String" scope="step" >
+		<entry key="runtime" value="#{jobParameters['runtime']}" />
+		<entry key="applyDatetime" value="#{jobParameters['applyDatetime']}" />
+		<entry key="provisioningStatus" value="#{jobParameters['provisioningStatus']}" />
+		<!-- <entry key="provisioningSeq" value="#{jobParameters['provisioningSeq']}" /> -->
+	</util:map>
+	
+	<!-- 스텝간 동적 변수 -->
+	<util:map id="provisioningStepParams" key-type="java.lang.String" scope="step">
+		<entry key="applyDatetime" value="#{jobExecutionContext['applyDatetime']}" />	
+		<entry key="provisioningStatus" value="#{jobExecutionContext['provisioningStatus']}" />	
+		<entry key="provisioningSeq" value="#{jobExecutionContext['provisioningSeq']}" />
+	</util:map>
+	
+	
+     <!-- *********************************************************** -->
+     <!-- ********** Bean 선언 ********** -->
+     <!-- *********************************************************** -->
+
+    <bean id="provisioningJobContextTasklet" class="com.ivucenter.cloud.batch.provisioning.JobContextTasklet">
+	    <property name="parameterValues" ref="provisioningJobParams"/>
+    </bean> 
+    
+	<bean id="provisioningStartReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">  	  	
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.provisioning.BatchProvisioningDAO.batchSelectListProvisioningQueue"/>
+	    <property name="parameterValues" ref="provisioningStepParams"/>
+    </bean>
+    
+    
+        
+<!--     <bean id="provisioningStartWriter" class="com.ivucenter.cloud.batch.provisioning.ProvisioningStartWriter"> -->
+<!-- 		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />	 -->
+<!-- 	    <property name="parameterValues" ref="provisioningStepParams"/> -->
+<!--     </bean> -->
+        
+<!--     <bean id="ProvisioningContextTasklet" class="com.ivucenter.cloud.batch.provisioning.ProvisioningContextTasklet"> -->
+<!-- 	    <property name="parameterValues" ref="provisioningStepParams"/> -->
+<!--     </bean>          -->
+	
+
+    <bean id="provisioningReader" class="org.mybatis.spring.batch.MyBatisPagingItemReader">  	  	
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />
+		<property name="queryId" value="com.ivucenter.cloud.batch.provisioning.BatchProvisioningDAO.batchSelectListProvisioningQueue"/>
+	    <property name="parameterValues" ref="provisioningStepParams"/>
+    </bean>
+
+	
+    <!-- 중복되어 provisioning 처리되어 수정함 2020.04.03 장중일 --> 
+	<!-- 
+    <bean id="provisioningReader" class="com.ivucenter.cloud.batch.provisioning.provisioningReader">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory" />	
+	    <property name="parameterValues" ref="provisioningStepParams"/>
+    </bean>
+	-->
+	
+    <bean id="provisioningWriter" class="com.ivucenter.cloud.batch.provisioning.ProvisioningWriter">
+		<property name="sqlSessionFactory" ref="sqlSessionFactory4" />	
+	    <property name="parameterValues" ref="provisioningStepParams"/>
+    </bean>
+    
+    <bean id="promotionListener" class="org.springframework.batch.core.listener.ExecutionContextPromotionListener">
+    	<property name="keys" value="param"/>
+    </bean>
+        
+</beans>

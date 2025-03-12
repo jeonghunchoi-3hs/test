@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.bbs.faq.BbsFaqDAO">
+
+    <select id="list" resultType="CustomBbsFaqVO" parameterType="CustomBbsFaqVO">
+		select 
+			a.faq_no
+			, a.faq_type
+			, a.title
+			, a.content			
+			, a.reg_datetime
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2 /* 등록 일시*/
+			, a.reg_user_id
+			, a.mod_datetime
+			, a.mod_user_id
+			, a.del_flag
+			,(SELECT code_name FROM cmm_code WHERE  code_id=a.faq_type AND code_key_id='FAQ_TYPE' ) AS code_name
+			,hit_count
+		from
+			bbs_faq a 
+    	where 1=1
+    	<if test="delFlag != 'all'">
+    	and
+    		del_flag = #{delFlag}
+    	</if>
+		<if test="searchKind == 'title' and keyword != ''">
+		and 
+			title like CONCAT('%',#{keyword},'%')	
+		</if>
+		<if test="searchKind == 'content' and keyword != ''">
+		and 
+			content like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'searchAll' and keyword != ''">
+		and (
+			title like CONCAT('%',#{keyword},'%')
+		or 
+			content like CONCAT('%',#{keyword},'%')
+			)	
+		</if>
+		order by a.faq_no
+		desc
+    	<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if> 
+    </select>
+    
+	<select id="detail" resultType="CustomBbsFaqVO" parameterType="CustomBbsFaqVO">
+			select 
+				a.faq_no
+				, a.faq_type
+				, a.title
+				, a.content			
+				, a.reg_datetime
+				, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2
+				, (select user_name from cmm_user where user_id=a.reg_user_id) AS user_name
+				, a.mod_datetime
+				, a.mod_user_id
+				, a.del_flag
+				,(SELECT code_name FROM cmm_code WHERE  code_id=faq_type AND code_key_id='FAQ_TYPE' ) AS code_name
+			from
+				bbs_faq a
+			where faq_no =  #{faqNo}
+			order by 
+				faq_no
+			desc
+			
+    </select>
+    
+    <insert id="insert" parameterType="CustomBbsFaqVO">
+		INSERT INTO bbs_faq(
+			faq_type,  
+			title,  
+			content,			
+			reg_datetime, 
+			reg_user_id
+		)VALUES(
+			#{faqType}, 
+			#{title}, 
+			#{content},			
+			NOW(), 
+			#{regUserId}
+		)
+    </insert>
+    
+    <update id="update" parameterType="CustomBbsFaqVO">
+		UPDATE bbs_faq 
+		SET			
+			faq_type = #{faqType}, 
+			title = #{title}, 
+			content = #{content}, 			
+			mod_datetime = NOW(), 
+			mod_user_id = #{modUserId}
+		WHERE
+		faq_no = #{faqNo}
+    </update>
+    
+    <update id="delete" parameterType="CustomBbsFaqVO">
+		UPDATE bbs_faq 
+		SET			
+			del_flag = 'Y' 
+		WHERE
+		faq_no = #{faqNo}
+    </update>
+    
+    
+    
+    
+    <select id="faqList" resultType="CustomBbsFaqVO" >
+		select 
+			a.faq_no
+			, a.faq_type
+			, a.title
+			, a.content			
+			, a.reg_datetime
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS reg_datetime2, /* 등록 일시*/
+			 CASE a.faq_type
+			 WHEN 'CD00001' THEN '[클라우드]' 
+			  WHEN 'CD00002' THEN '[요금]' 
+			  WHEN 'CD00003' THEN '[회원가입]' 
+			  ELSE '0' END AS type_name 
+			, a.reg_user_id
+			, a.mod_datetime
+			, a.mod_user_id
+			, a.del_flag
+			,(SELECT code_name FROM cmm_code WHERE  code_id=a.faq_type AND code_key_id='FAQ_TYPE' ) AS code_name
+		from
+			bbs_faq a 
+    	where 1=1
+<!--     	and del_flag = ''
+ -->    </select>
+    
+      	<!-- 공지사항 타입 리스트-->
+    <select id="getNoticeBbscodeList" resultType="CustomBbsFaqVO">
+	SELECT 	code_id, 
+		code_name 
+	FROM 
+		cmm_code 
+	where code_key_id=#{codeKeyId} and parent_code_id=#{codeKeyId}
+	order by code_id asc
+  	</select>
+  	
+  	<update id="updateHitCount" parameterType="CustomBbsFaqVO">
+		update 
+			bbs_faq
+		set
+			hit_count = hit_count + 1
+		where
+			faq_no = #{faqNo}		
+	</update>
+  	
+  	
+
+</mapper>

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ivucenter.cloud.portal.oss.disk.OssDiskDAO">
+
+    <select id="list" parameterType="CustomOssDiskVO" resultType="CustomOssDiskVO">
+		SELECT
+			a.*
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+			, DATE_FORMAT(a.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+			, b.vm_uuid
+			, b.hostname
+			, b.hostname_alias
+			, c.disk_type
+			, d.code_name AS disk_type_name
+			, d.code_value AS disk_type_code
+			, oc.cloud_type AS cloud_type
+			, oc.cloud_id AS cloud_id
+			, oc.cloud_name AS cloud_name
+	    FROM
+	    	oss_disk a
+		LEFT OUTER JOIN oss_vm b
+		                    ON a.vm_uuid = b.vm_uuid
+		LEFT OUTER JOIN bss_product_disk c
+		                    ON a.disk_product_seq = c.product_seq
+	    LEFT OUTER JOIN (SELECT code_id,code_name,code_value FROM cmm_code WHERE parent_code_id = 'ITEMCATE_DISK') d
+		                    ON c.disk_type = d.code_id
+		INNER JOIN oss_project op
+		            ON a.project_id = op.project_id
+		INNER JOIN oss_cloud oc
+		            ON op.cloud_id = oc.cloud_id
+
+		WHERE
+			1 = 1
+    		AND	op.project_box_id = #{projectBoxId}
+    		<if test="diskType == 'block'">
+    		AND RIGHT(a.disk_alias,2) != 'OS' //Boot device제외
+    		AND disk_alias != 'boot-disk'
+    		</if>
+    		AND 	a.del_flag = 'N'
+    		<if test="searchKind == 'searchAll' and keyword != ''">
+    		AND (
+    			disk_alias  like CONCAT('%',#{keyword},'%')
+    			OR
+    			hostname  like CONCAT('%',#{keyword},'%')
+    			)
+    		</if>
+		<if test="searchKind == 'disk_alias' and keyword != ''">
+			AND
+				disk_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'hostname' and keyword != ''">
+			AND
+				hostname like CONCAT('%',#{keyword},'%')
+		</if>
+
+		ORDER BY
+			a.disk_alias asc
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+    <select id="detail" parameterType="CustomOssDiskVO" resultType="CustomOssDiskVO">
+    	SELECT
+			*
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+			, code_name AS disk_type_name
+	    FROM
+	    	(select * from oss_disk where del_flag='N') a
+	    LEFT JOIN
+	    	oss_project b
+	    	ON a.project_id = b.project_id
+	    LEFT JOIN
+	    	cmm_department c
+	    	ON b.dept_code = c.dept_code
+    	LEFT JOIN (SELECT code_name, code_value FROM cmm_code WHERE parent_code_id = 'ITEMCATE_DISK') d
+	     	ON a.volume_type = d.code_value
+	    INNER JOIN cmm_customer e
+	        ON b.customer_id = e.customer_id
+    	WHERE
+    		disk_id = #{diskId}
+
+	</select>
+
+
+    <update id="updateAlias" parameterType="CustomOssDiskVO">
+        UPDATE oss_disk SET
+			disk_alias	= #{diskAlias}
+			<if test ="description != null">
+			, description = #{description}
+			</if>
+		    , mod_datetime = now()
+		    , mod_user_id = #{modUserId}
+        WHERE disk_id = #{diskId}
+    </update>
+
+    <select id="snapshotDiskList" parameterType="CustomOssDiskVO" resultType="CustomOssDiskVO">
+		SELECT
+			a.*
+			, DATE_FORMAT(a.reg_datetime, '%Y-%m-%d %H:%i') AS regDatetime2
+			, DATE_FORMAT(a.create_datetime, '%Y-%m-%d %H:%i') AS create_datetime2
+			, b.hostname_alias
+			, c.disk_type
+			, d.code_name AS disk_type_name
+			, d.code_value AS disk_type_code
+			, oc.cloud_type AS cloud_type
+			, oc.cloud_id AS cloud_id
+			, oc.cloud_name AS cloud_name
+	    FROM
+	    	oss_disk a
+		LEFT OUTER JOIN oss_vm b
+		                    ON a.vm_uuid = b.vm_uuid
+		LEFT OUTER JOIN bss_product_disk c
+		                    ON a.disk_product_seq = c.product_seq
+	    LEFT OUTER JOIN (SELECT code_id,code_name,code_value FROM cmm_code WHERE parent_code_id = 'ITEMCATE_DISK') d
+		                    ON c.disk_type = d.code_id
+		INNER JOIN oss_project op
+		            ON a.project_id = op.project_id
+		INNER JOIN oss_cloud oc
+		            ON op.cloud_id = oc.cloud_id
+
+		WHERE
+			1 = 1
+    		AND	op.project_box_id = #{projectBoxId}
+    		AND (RIGHT(a.disk_alias,2) = 'OS' //Boot device제외
+    		OR disk_alias = 'boot-disk')
+    		AND 	a.del_flag = 'N'
+    		<if test="searchKind == 'searchAll' and keyword != ''">
+    		AND (
+    			disk_alias  like CONCAT('%',#{keyword},'%')
+    			OR
+    			hostname  like CONCAT('%',#{keyword},'%')
+    			)
+    		</if>
+		<if test="searchKind == 'disk_alias' and keyword != ''">
+			AND
+				disk_alias like CONCAT('%',#{keyword},'%')
+		</if>
+		<if test="searchKind == 'hostname' and keyword != ''">
+			AND
+				hostname like CONCAT('%',#{keyword},'%')
+		</if>
+		ORDER BY
+			a.disk_alias asc
+		<if test="!length.equals(0)">
+			LIMIT #{start}, #{length}
+		</if>
+	</select>
+
+
+</mapper>

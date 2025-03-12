@@ -1,0 +1,2184 @@
+package com.ivucenter.cloud.batch.provisioning;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.time.DateFormatUtils;
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.springframework.batch.item.ItemWriter;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.reflect.TypeToken;
+import com.ivucenter.cloud.api.common.batch.BatchProcessor;
+import com.ivucenter.cloud.api.common.utils.SystemCalculatorInfo;
+import com.ivucenter.cloud.api.nutanix.NutanixObject;
+import com.ivucenter.cloud.api.nutanix.NutanixPowerState;
+import com.ivucenter.cloud.api.nutanix.NutanixUtils;
+import com.ivucenter.cloud.api.openshift.object.OpsApiOptionService;
+import com.ivucenter.cloud.api.openstack.exception.InvaildOpenStackException;
+import com.ivucenter.cloud.api.openstack.exception.NotConnectGatewayException;
+import com.ivucenter.cloud.api.openstack.exception.NotSupportGatewayException;
+import com.ivucenter.cloud.api.openstack.interfaces.AbstractFactory;
+import com.ivucenter.cloud.api.openstack.interfaces.FlavorIF;
+import com.ivucenter.cloud.api.openstack.interfaces.PortIF;
+import com.ivucenter.cloud.api.openstack.interfaces.ServerIF;
+import com.ivucenter.cloud.api.openstack.interfaces.VolumeIF;
+import com.ivucenter.cloud.api.openstack.object.FixedIPS;
+import com.ivucenter.cloud.api.openstack.object.Flavor;
+import com.ivucenter.cloud.api.openstack.object.Network;
+import com.ivucenter.cloud.api.openstack.object.Port;
+import com.ivucenter.cloud.api.openstack.object.Project;
+import com.ivucenter.cloud.api.openstack.object.Resize;
+import com.ivucenter.cloud.api.openstack.object.Server;
+import com.ivucenter.cloud.api.openstack.object.Volume;
+import com.ivucenter.cloud.api.openstack.object.VolumeAttachment;
+import com.ivucenter.cloud.api.vRealize.connector.vraRestResponse;
+import com.ivucenter.cloud.api.vRealize.interfaces.vraAbstractFactory;
+import com.ivucenter.cloud.api.vRealize.interfaces.vraDiskIF;
+import com.ivucenter.cloud.api.vRealize.interfaces.vraNetworkIF;
+import com.ivucenter.cloud.api.vRealize.interfaces.vraServerIF;
+import com.ivucenter.cloud.api.vRealize.object.vraAttachDisk;
+import com.ivucenter.cloud.api.vRealize.object.vraBlockDevice;
+import com.ivucenter.cloud.api.vRealize.object.vraContent;
+import com.ivucenter.cloud.api.vRealize.object.vraDataStoreContent;
+import com.ivucenter.cloud.api.vRealize.object.vraDiskContent;
+import com.ivucenter.cloud.api.vRealize.object.vraInputs;
+import com.ivucenter.cloud.api.vRealize.object.vraJsonObject;
+import com.ivucenter.cloud.api.vRealize.object.vraMachineDisks;
+import com.ivucenter.cloud.api.vRealize.object.vraNetworkInterfaces;
+import com.ivucenter.cloud.api.vRealize.object.vraNetworks;
+import com.ivucenter.cloud.api.vRealize.object.vraProjectObject;
+import com.ivucenter.cloud.api.vRealize.object.vraServer;
+import com.ivucenter.cloud.api.vRealize.object.vraServerDeploy;
+import com.ivucenter.cloud.api.vRealize.object.vraServerObject;
+import com.ivucenter.cloud.api.vRealize.object.vraServerRequest;
+import com.ivucenter.cloud.api.vmware.interfaces.VmAbstractFactory;
+import com.ivucenter.cloud.api.vmware.interfaces.VmDiskIF;
+import com.ivucenter.cloud.api.vmware.interfaces.VmHardwareCpuIF;
+import com.ivucenter.cloud.api.vmware.interfaces.VmHardwareMemIF;
+import com.ivucenter.cloud.api.vmware.interfaces.VmServerIF;
+import com.ivucenter.cloud.api.vmware.object.DiskBacking;
+import com.ivucenter.cloud.api.vmware.object.DiskInfo;
+import com.ivucenter.cloud.api.vmware.object.DiskSpec;
+import com.ivucenter.cloud.api.vmware.object.VmCapacity;
+import com.ivucenter.cloud.api.vmware.object.VmCpuUpdate;
+import com.ivucenter.cloud.api.vmware.object.VmDiskStorage;
+import com.ivucenter.cloud.api.vmware.object.VmDiskToUpdate;
+import com.ivucenter.cloud.api.vmware.object.VmDisks;
+import com.ivucenter.cloud.api.vmware.object.VmHardwareCpuSpecVO;
+import com.ivucenter.cloud.api.vmware.object.VmHardwareCpuVO;
+import com.ivucenter.cloud.api.vmware.object.VmHardwareCustomization;
+import com.ivucenter.cloud.api.vmware.object.VmHardwareMemSpecVO;
+import com.ivucenter.cloud.api.vmware.object.VmHardwareMemVO;
+import com.ivucenter.cloud.api.vmware.object.VmMemoryUpdate;
+import com.ivucenter.cloud.api.vmware.object.VmNics;
+import com.ivucenter.cloud.api.vmware.object.VmPlacement;
+import com.ivucenter.cloud.api.vmware.object.VmServer;
+import com.ivucenter.cloud.api.vmware.object.VmSpec;
+import com.ivucenter.cloud.api.vmware.object.VmWareJsonObject;
+import com.ivucenter.cloud.batch.entity.BatchOssPortVO;
+import com.ivucenter.cloud.batch.entity.BatchProvisioningVO;
+import com.ivucenter.cloud.portal.cmm.cloud.CustomOssCloudVO;
+import com.ivucenter.cloud.portal.cmm.cloud.OssCloudService;
+import com.ivucenter.cloud.portal.oss.project.CustomOssProjectVO;
+import com.ivucenter.cloud.portal.oss.project.OssProjectDAO;
+import com.ivucenter.cloud.portal.oss.project.OssProjectService;
+import com.ivucenter.cloud.portal.req.customer.CustomReqCustomerVO;
+import com.ivucenter.cloud.portal.req.product.CustomReqProductVO;
+import com.ivucenter.cloud.portal.req.project.CustomReqProjectVO;
+import com.ivucenter.cloud.portal.req.project.ReqProjectService;
+import com.ivucenter.cloud.portal.util.CodeUtil;
+
+import io.fabric8.kubernetes.api.model.HasMetadata;
+import io.fabric8.kubernetes.api.model.KubernetesList;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
+import io.fabric8.kubernetes.api.model.Quantity;
+import io.fabric8.openshift.api.model.DeploymentConfig;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class ProvisioningWriter implements ItemWriter<BatchProvisioningVO> {
+
+	private final String batchProvisioningDAO = "com.ivucenter.cloud.batch.provisioning.BatchProvisioningDAO.";
+//	private final String reqProductDAO				= "com.ivucenter.cloud.portal.req.product.ReqProductDAO.";
+
+	private final String updateProvisioning = batchProvisioningDAO + "updateProvisioning";
+	private final String detailBssOrderProductVm = batchProvisioningDAO + "detailBssOrderProductVm";
+	private final String detailBssOrderProductDisk = batchProvisioningDAO + "detailBssOrderProductDisk";
+	private final String detailBssOrderProductAPP = batchProvisioningDAO + "detailBssOrderProductAPP";
+	private final String insertOssVm = batchProvisioningDAO + "insertOssVm";
+	private final String updateOssVm = batchProvisioningDAO + "updateOssVm";
+	private final String deleteOssVm = batchProvisioningDAO + "deleteOssVm";
+	private final String deleteOssApp = batchProvisioningDAO + "deleteOssApp";
+	private final String insertOssVmNetwork = batchProvisioningDAO + "insertOssVmNetwork";
+	private final String insertOssPort = batchProvisioningDAO + "insertOssPort";
+	private final String insertOssApp = batchProvisioningDAO + "insertOssApp";
+	private final String deleteOssPort = batchProvisioningDAO + "deleteOssPort";
+	private final String insertOssDisk = batchProvisioningDAO + "insertOssDisk";
+	private final String updateOssDisk = batchProvisioningDAO + "updateOssDisk";
+	private final String deleteOssDisk = batchProvisioningDAO + "deleteOssDisk";
+	private final String deleteOssDiskVmUuid = batchProvisioningDAO + "deleteOssDiskVmUuid";
+	private final String getOssDiskList = batchProvisioningDAO + "getDiskList";
+	private final String getBackupNetwork = batchProvisioningDAO + "getBackupNetwork";
+	private final String getDataStore = batchProvisioningDAO + "getDataStore";
+	private final String getOssDiskAt = batchProvisioningDAO + "getOssDiskAt";
+
+	@Autowired
+	private OssProjectDAO dao;
+
+	@Autowired
+	private OssProjectService service;
+
+	@Autowired
+	private ReqProjectService reqProjectService;
+
+	@Autowired
+	private BatchAlarmService batchAlarmService;
+
+	@Autowired
+	private OssCloudService ossCloudService;
+
+	@Autowired
+	OpsApiOptionService opsApiOptionService;
+
+	@Setter
+	private SqlSessionFactory sqlSessionFactory;
+
+	@Setter
+	private Map<String, Object> parameterValues;
+
+	private SqlSessionTemplate sqlSessionTemplate;
+//    private OssDiskService service;
+	private int count = 10;
+//    private int limit = 1;
+//    private int errorCount = 0;
+
+	class InCloudList {
+		private List<CustomOssCloudVO> list = null;
+
+		public void setCloudList(List<CustomOssCloudVO> inList) {
+			this.list = inList;
+		}
+
+		public CustomOssCloudVO getCloudVo(String cloudId) {
+			for (CustomOssCloudVO vo : this.list) {
+				if (vo.getCloudId().equals(cloudId)) {
+					return vo;
+				}
+			}
+			return null;
+		}
+	}
+
+	private InCloudList inCloudList = null;
+
+	@Override
+	public void write(List<? extends BatchProvisioningVO> items) throws Exception {
+		this.sqlSessionTemplate = new SqlSessionTemplate(this.sqlSessionFactory, ExecutorType.BATCH);
+		SystemCalculatorInfo systemCalculatorInfo = new SystemCalculatorInfo();
+		String orderProductSeq;
+		String sProduct;
+		String sRequestType;
+		String orderUserId;
+		CustomReqProductVO res = new CustomReqProductVO();
+		int sleepTime = Integer.parseInt(systemCalculatorInfo.getSleepTime());
+		this.inCloudList = new InCloudList();
+		this.inCloudList.setCloudList(ossCloudService.getCloudList());
+
+		for (BatchProvisioningVO item : items) {
+
+			CustomOssCloudVO cloudVo = this.inCloudList.getCloudVo(item.getCloudId());
+
+			item.setProvisioningStatus("PROVISIONING_ONGOING");
+			item.setRegUserId("BATCH_SYSTEM");
+
+			this.sqlSessionTemplate.update(updateProvisioning, item);
+
+			orderProductSeq = item.getOrderProductSeq();
+			sProduct = item.getProductCategory();
+			sRequestType = item.getRequestType();
+			orderUserId = item.getOrderUserId();
+
+			log.debug("OrderProductSeq={},productCategory={},RequestType={},orderUserId={}", orderProductSeq, sProduct,
+					sRequestType, orderUserId);
+			if (item.getProductCategory().equals("PRODCATE_PROJECT")) {
+				CustomOssProjectVO projectRes = new CustomOssProjectVO();
+				projectRes = createProject(item);
+				BatchProvisioningVO insertVO = new BatchProvisioningVO();
+				insertVO.setProvisioningSeq(item.getProvisioningSeq());
+				insertVO.setRegUserId("BATCH_SYSTEM");
+				insertVO.setProvisioningStatus(projectRes.getErrorStatus());
+				if ("PROVISIONING_FAIL".equals(projectRes.getErrorStatus())) {
+					insertVO.setProvisioningStatusMessage(projectRes.getErrorMsg());
+				} else if ("PROVISIONING_SUCCESS".equals(projectRes.getErrorStatus())) {
+					// sendMessageToCustomer(item);
+				}
+				this.sqlSessionTemplate.update(updateProvisioning, insertVO);
+				Thread.sleep(sleepTime);
+
+			} else if (item.getProductCategory().equals("ITEMCATE_APP")) {
+
+				res = productByOpenShift(orderProductSeq, sProduct, sRequestType, orderUserId, cloudVo);
+				BatchProvisioningVO insertVO = new BatchProvisioningVO();
+				insertVO.setProvisioningSeq(item.getProvisioningSeq());
+				insertVO.setRegUserId("BATCH_SYSTEM");
+				insertVO.setProvisioningStatus(res.getErrorStatus());
+				if ("PROVISIONING_FAIL".equals(res.getErrorStatus())) {
+					insertVO.setProvisioningStatusMessage(res.getErrorMsg());
+				} else if ("PROVISIONING_SUCCESS".equals(res.getErrorStatus())) {
+					sendMessageToCustomer(item);
+				}
+				this.sqlSessionTemplate.update(updateProvisioning, insertVO);
+				Thread.sleep(sleepTime);
+
+			} else if(item.getProductCategory().equals("PRODCATE_APP")) {
+				res = productByOpenShift(orderProductSeq, sProduct, sRequestType, orderUserId, cloudVo);
+				BatchProvisioningVO insertVO = new BatchProvisioningVO();
+				insertVO.setProvisioningSeq(item.getProvisioningSeq());
+				insertVO.setRegUserId("BATCH_SYSTEM");
+				insertVO.setProvisioningStatus(res.getErrorStatus());
+				if ("PROVISIONING_FAIL".equals(res.getErrorStatus())) {
+					insertVO.setProvisioningStatusMessage(res.getErrorMsg());
+				} else if ("PROVISIONING_SUCCESS".equals(res.getErrorStatus())) {
+					sendMessageToCustomer(item);
+				}
+				this.sqlSessionTemplate.update(updateProvisioning, insertVO);
+				Thread.sleep(sleepTime);
+			} else {
+
+				if (cloudVo.getCloudType().equals("openstack")) {
+					res = productByOpenSteak(orderProductSeq, sProduct, sRequestType, orderUserId, cloudVo);
+				} else if (cloudVo.getCloudType().equals("vmware")) {
+					// res = productByVmWare(orderProductSeq , sProduct, sRequestType, orderUserId,
+					// cloudVo);
+					res = productByVra(orderProductSeq, sProduct, sRequestType, orderUserId, cloudVo);
+				} else if (cloudVo.getCloudType().equals("nutanix")) {
+
+					res = productByNutanix(orderProductSeq, sProduct, sRequestType, orderUserId, cloudVo);
+
+				}
+
+
+				BatchProvisioningVO insertVO = new BatchProvisioningVO();
+				insertVO.setProvisioningSeq(item.getProvisioningSeq());
+				insertVO.setRegUserId("BATCH_SYSTEM");
+				insertVO.setProvisioningStatus(res.getErrorStatus());
+				if ("PROVISIONING_FAIL".equals(res.getErrorStatus())) {
+					insertVO.setProvisioningStatusMessage(res.getErrorMsg());
+				} else if ("PROVISIONING_SUCCESS".equals(res.getErrorStatus())) {
+					sendMessageToCustomer(item);
+				}
+				this.sqlSessionTemplate.update(updateProvisioning, insertVO);
+				Thread.sleep(sleepTime);
+			}
+		}
+	}
+
+	private void sendMessageToCustomer(BatchProvisioningVO provisioningVO) {
+		String orderProductSeq = provisioningVO.getOrderProductSeq();
+		String receiverId = provisioningVO.getOrderUserId();
+		String productCategory = provisioningVO.getProductCategory();
+		String productName = "";
+
+		CustomReqProductVO res = new CustomReqProductVO();
+		if (productCategory.equals(CodeUtil.CMM_CODE_PRODCATE_VM)) {
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductVm, orderProductSeq);
+			productName = res.getHostnameAlias();
+		} else if (productCategory.equals(CodeUtil.CMM_CODE_PRODCATE_DISK)) {
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductDisk, orderProductSeq);
+			productName = res.getDiskName();
+		}
+
+		batchAlarmService.sendAlarmMessage("0037", receiverId, productName, orderProductSeq);
+	}
+
+	private CustomReqProductVO productByOpenSteak(String orderProductSeq, String sProduct, String sRequestType,
+			String orderUserId, CustomOssCloudVO cloudVo) {
+		CustomReqProductVO res = new CustomReqProductVO();
+//		errorCount = 0;
+		res.setCloudId(cloudVo.getCloudId());
+
+		log.debug("orderProductSeq=" + orderProductSeq);
+
+		if (sProduct.equals(CodeUtil.CMM_CODE_PRODCATE_VM)) {
+
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductVm, orderProductSeq);
+			res.setOrderUserId(orderUserId);
+			res.setErrorStatus("PROVISIONING_SUCCESS");
+
+			if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_NEW)) {
+				res = createVM(res, cloudVo);
+			} // 신규
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_CHANGE)) {
+				res = changeVM(res, cloudVo);
+			} // 변경
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_EXPR)) {
+				res = deleteVM(res, cloudVo);
+			} // 삭제
+
+		} else if (sProduct.equals(CodeUtil.CMM_CODE_PRODCATE_DISK)) {
+
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductDisk, orderProductSeq);
+			res.setOrderUserId(orderUserId);
+			res.setErrorStatus("PROVISIONING_SUCCESS");
+
+			if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_NEW)) {
+				res = createDisk(res, cloudVo);
+			} // 신규 생성
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_CHANGE)) {
+				res = changeDisk(res, cloudVo);
+			} // 변경
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_EXPR)) {
+				res = deleteDisk(res, cloudVo);
+			} // 삭제
+		}
+
+		return res;
+	}
+
+	private CustomReqProductVO productByOpenShift(String orderProductSeq, String sProduct, String sRequestType,
+			String orderUserId, CustomOssCloudVO cloudVo) {
+		CustomReqProductVO res = new CustomReqProductVO();
+//		errorCount = 0;
+		res.setCloudId(cloudVo.getCloudId());
+
+		log.debug("orderProductSeq=" + orderProductSeq);
+		log.debug("sProduct=" + sProduct);
+
+		if (sProduct.equals(CodeUtil.CMM_CODE_PRODCATE_APP) || sProduct.equals( CodeUtil.CMM_CODE_UPDATE_APP)) {
+
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductAPP, orderProductSeq);
+			res.setOrderUserId(orderUserId);
+			res.setErrorStatus("PROVISIONING_SUCCESS");
+
+			if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_NEW)) {
+			//	KubernetesList response = opsApiOptionService.opsCreateApplication(res, cloudVo);
+			//	List<HasMetadata> items = response.getItems();
+			//	for (HasMetadata item : items) {
+			//		if (item.getKind().equals("DeploymentConfig")) {
+			//			ObjectMeta meta = item.getMetadata();
+
+			//			res.setAppUid(meta.getUid());
+			//			res.setApiVersion(item.getApiVersion());
+			//			res.setKind(item.getKind());
+			//			res.setAppName(meta.getName());
+			//			res.setAppNameSpace(meta.getNamespace());
+			//			res.setCreateDatetime(meta.getCreationTimestamp());
+			//			this.sqlSessionTemplate.insert(insertOssApp, res);
+			//		}
+			//	}
+
+				Map returnMap = opsApiOptionService.opsCreateApplicationMap(res, cloudVo);
+				if( returnMap != null) {
+					if( returnMap.get("deploymentConfig") != null) {
+						DeploymentConfig dp = (DeploymentConfig) returnMap.get("deploymentConfig");
+						KubernetesList template = (KubernetesList) returnMap.get("template");
+						ObjectMeta meta = dp.getMetadata();
+						res.setAppUid(meta.getUid());
+						res.setApiVersion( dp.getApiVersion());
+						res.setKind( dp.getKind());
+						res.setAppName(meta.getName());
+						res.setAppNameSpace(meta.getNamespace());
+						res.setCreateDatetime(meta.getCreationTimestamp());
+						this.sqlSessionTemplate.insert(insertOssApp, res);
+					}
+
+				}
+
+			}else if( sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_CHANGE)) { //업데이트
+				res = this.sqlSessionTemplate.selectOne(detailBssOrderProductAPP, orderProductSeq);
+				res.setOrderUserId(orderUserId);
+				res.setErrorStatus("PROVISIONING_SUCCESS");
+
+				int podCount = res.getPodCnt();
+				opsApiOptionService.podCountUpdate(cloudVo, res.getProjectName(), res.getAppName(), podCount);
+			}else if( sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_EXPR)) {
+				res = this.sqlSessionTemplate.selectOne(detailBssOrderProductAPP, orderProductSeq);
+				res.setOrderUserId(orderUserId);
+				res.setErrorStatus("PROVISIONING_SUCCESS");
+
+				opsApiOptionService.templateDelete(cloudVo, res.getProjectName(), res.getAppName());
+				this.sqlSessionTemplate.delete(deleteOssApp, res);
+
+			}
+
+		}
+
+		return res;
+	}
+
+	private CustomReqProductVO createVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		try {
+			// Create VM STEP 1 - Flaver id Check
+			req.setStep("1");
+			String sFlaverId;
+			if (req.getFlavorId() == null) {
+				sFlaverId = setFlaver(req, cloudVo);
+			} else {
+				sFlaverId = req.getFlavorId();
+			}
+
+			req.setStep("2");
+			// Create VM STEP 2 - Create Port
+			Port ipObj = setIp(req, cloudVo);
+			req.setPortNetworkId(ipObj.getId());
+			// Backup IP 있을경우
+			Port backupIpObj = null;
+			if (req.getBackupNetworkFlag().equals("Y")) {
+				backupIpObj = setBackupIp(req, cloudVo);
+				req.setPortBackupNetworkId(backupIpObj.getId());
+			}
+
+			req.setStep("3");
+			// Create VM STEP 3 - Create Bootable Disk
+			Volume diskObj = setBootableDisk(req, cloudVo);
+			req.setDiskId(diskObj.getId());
+
+			// Create VM STEP 4 - Sessting Server Network
+			req.setStep("4");
+			List<Network> networks = new LinkedList<Network>();
+			Network network = new Network();
+			network.setPort(ipObj.getId());
+			networks.add(network);
+
+			if (req.getBackupNetworkFlag().equals("Y")) {
+				Network network2 = new Network();
+				network2.setPort(backupIpObj.getId());
+				networks.add(network2);
+			}
+
+			req.setStep("5");
+			// Create VM STEP 5 - Create VM
+			Server server = new Server();
+			server.setName(req.getHostname());
+			server.setFlavorRef(sFlaverId);
+			server.setImageRef(req.getVmImageId());
+			server.setOS_DCF_diskConfig("AUTO");
+			server.setNetworks(networks);
+			server.setAvailability_zone(req.getAzName());
+			server.setImageRef(diskObj.getId());
+			Server obj12 = BatchProcessor.createServer(req.getProjectName(), server, cloudVo);
+			req.setVmUuid(obj12.getId());
+
+			// OSS_VM 저장
+			CustomReqProductVO vm = new CustomReqProductVO();
+			vm.setVmUuid(obj12.getId());
+			vm.setProjectId(req.getProjectId());
+			vm.setHostname(req.getHostname());
+			vm.setHostnameAlias(req.getHostnameAlias());
+			vm.setFlavorId(req.getFlavorId());
+			vm.setVcpus(req.getVcpus());
+			vm.setMemGb(req.getMemGb());
+			vm.setDiskGb(req.getDiskGb());
+			vm.setImageId(diskObj.getId());
+			vm.setVolumeType(req.getVolumeType());
+			vm.setAzName(req.getAzName());
+			vm.setVmProductSeq(req.getVmProductSeq());
+			vm.setOsProductSeq(req.getOsProductSeq());
+			vm.setVmCatalogSeq(req.getVmCatalogSeq());
+			vm.setOrderUserId(req.getOrderUserId());
+			vm.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+					: DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+			vm.setRegUserId(CodeUtil.SYNC_ADMIN);
+			insertOssVm(vm);
+
+			// OSS_VM_NETWORK 저장
+			vm.setNetworkId(req.getDefaultNetworkId());
+			vm.setBackupNetworkId(req.getBackupNetworkId());
+			vm.setPortNetworkId(ipObj.getId());
+			if (req.getBackupNetworkFlag().equals("Y")) {
+				vm.setPortBackupNetworkId(backupIpObj.getId());
+			} else {
+				vm.setPortBackupNetworkId("");
+			}
+			insertOssVmNetwork(vm);
+
+			// OSS_PORT 정보저장
+			BatchOssPortVO port = new BatchOssPortVO();
+			port.setPortId(ipObj.getId());
+			port.setPortName(ipObj.getName());
+			port.setFixedIps(ipObj.getFixed_ips().get(0).getIp_address());
+			port.setMacAddress(ipObj.getMac_address());
+			port.setProjectId(req.getProjectId());
+			port.setNetworkId(ipObj.getNetwork_id());
+			port.setSubnetId(ipObj.getFixed_ips().get(0).getSubnet_id());
+			port.setDeviceOwner(ipObj.getDevice_owner());
+			port.setDeviceId(obj12.getId());
+			insertOssPort(port);
+
+			if (req.getBackupNetworkFlag().equals("Y")) {
+				BatchOssPortVO backupPort = new BatchOssPortVO();
+				backupPort.setPortId(backupIpObj.getId());
+				backupPort.setPortName(backupIpObj.getName());
+				backupPort.setFixedIps(backupIpObj.getFixed_ips().get(0).getIp_address());
+				backupPort.setMacAddress(backupIpObj.getMac_address());
+				backupPort.setProjectId(req.getProjectId());
+				backupPort.setNetworkId(backupIpObj.getNetwork_id());
+				backupPort.setSubnetId(backupIpObj.getFixed_ips().get(0).getSubnet_id());
+				backupPort.setDeviceOwner(backupIpObj.getDevice_owner());
+				backupPort.setDeviceId(obj12.getId());
+				insertOssPort(backupPort);
+			}
+
+			// OSS_DISK 저장
+			CustomReqProductVO disk = new CustomReqProductVO();
+			disk.setDiskId(diskObj.getId());
+			disk.setVmUuid(obj12.getId());
+			disk.setProjectId(req.getProjectId());
+			disk.setDiskName(req.getHostname() + "-OS");
+			disk.setDiskGb(req.getDiskGb());
+			disk.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+					: DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+			disk.setOrderUserId(req.getOrderUserId());
+			disk.setDescription(req.getDescription());
+			disk.setDiskCatalogSeq(req.getDiskCatalogSeq());
+			disk.setDiskProductSeq(req.getDiskProductSeq());
+			disk.setVolumeType(req.getDiskType());
+
+			this.sqlSessionTemplate.insert(insertOssDisk, disk);
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException
+				| NullPointerException e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+			if (req.getStep().equals("3")) {
+				try {
+					if (deleteIp(req, cloudVo) == true) {
+						this.sqlSessionTemplate.delete(deleteOssPort, req);
+						if (req.getBackupNetworkFlag() == "Y") {
+							if (deleteBackupIp(req, cloudVo) == true) {
+								this.sqlSessionTemplate.delete(deleteOssPort, req);
+							}
+						}
+					}
+				} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			}
+			if (req.getStep().equals("4")) {
+				deleteDisk(req, cloudVo);
+				try {
+					if (deleteIp(req, cloudVo) == true) {
+						this.sqlSessionTemplate.delete(deleteOssPort, req);
+						if (req.getBackupNetworkFlag() == "Y") {
+							if (deleteBackupIp(req, cloudVo) == true) {
+								this.sqlSessionTemplate.delete(deleteOssPort, req);
+							}
+						}
+					}
+				} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			}
+			if (req.getStep().equals("5")) {
+				if (req.getVmUuid() != null) {
+					deleteVM(req, cloudVo);
+				} else {
+					deleteDisk(req, cloudVo);
+					try {
+						if (deleteIp(req, cloudVo) == true) {
+							this.sqlSessionTemplate.delete(deleteOssPort, req);
+							if (req.getBackupNetworkFlag() == "Y") {
+								if (deleteBackupIp(req, cloudVo) == true) {
+									this.sqlSessionTemplate.delete(deleteOssPort, req);
+								}
+							}
+						}
+					} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
+				}
+			}
+		}
+
+		return req;
+	}
+
+	private CustomReqProductVO changeVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		try {
+
+			ServerIF serverIF = AbstractFactory.getServerIF(req.getProjectName(), cloudVo);
+			Resize resize = new Resize();
+			resize.setServer_id(req.getVmUuid());
+			String sFlaverId;
+			if (req.getFlavorId().equals(null)) {
+				sFlaverId = setFlaver(req, cloudVo);
+			} else {
+				sFlaverId = req.getFlavorId();
+			}
+			resize.setFlavorRef(sFlaverId);
+			serverIF.resizeServer(resize);
+			this.sqlSessionTemplate.update(updateOssVm, req);
+
+			for (int i = 0; i < count; i++) {
+
+				Server server = serverIF.getServer(req.getVmUuid());
+				log.debug("VM Status ================>>>>" + " VM UUID={}, Status={}", req.getVmUuid(),
+						server.getStatus());
+
+				if (server.getStatus().equals("VERIFY_RESIZE")) {
+					serverIF.actionServer(req.getVmUuid(), "confirmResize");
+					break;
+				}
+				Thread.sleep(30000);
+			}
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException
+				| InterruptedException e) {
+			e.printStackTrace();
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return req;
+	}
+
+	private CustomReqProductVO deleteVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		try {
+			BatchProcessor.deleteServer(req.getProjectName(), req.getVmUuid(), cloudVo);
+
+			req.setDiskId(req.getImageId());
+			this.sqlSessionTemplate.delete(deleteOssVm, req);
+			this.sqlSessionTemplate.delete(deleteOssDisk, req);
+
+			// IP 삭제 부분
+			if (deleteIp(req, cloudVo) == true) {
+				this.sqlSessionTemplate.delete(deleteOssPort, req);
+			}
+
+			// Backup IP 삭제 부분
+			if (req.getBackupNetworkFlag() == "Y") {
+				if (deleteBackupIp(req, cloudVo) == true) {
+					this.sqlSessionTemplate.delete(deleteOssPort, req);
+				}
+			}
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e) {
+			e.printStackTrace();
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	private CustomReqProductVO createDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		try {
+			VolumeIF volumeIF = AbstractFactory.getVolumeIF(req.getProjectName(), cloudVo);
+			Volume volume = new Volume();
+			volume.setSize(Integer.parseInt(req.getDiskGb()));
+			volume.setName(req.getDiskName());
+			volume.setVolume_type(req.getDiskType());
+			Volume obj = volumeIF.createVolume(volume);
+			req.setStep("1");
+			req.setDiskId(obj.getId());
+			req.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+					: DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+			req.setVolumeType(req.getDiskType());
+			this.sqlSessionTemplate.insert(insertOssDisk, req);
+
+			if (req.getVmUuid() == null || req.getVmUuid() == "" || req.getVmUuid().length() <= 0) {
+				return req;
+			}
+
+			for (int i = 0; i < count; i++) {
+				obj = volumeIF.getVolume(req.getDiskId());
+				log.debug("Disk ================>>>> Disk Status={}", obj.getStatus());
+				if (obj.getStatus().equals("available")) {
+					attachVolume(req, cloudVo);
+					break;
+				}
+				Thread.sleep(30000);
+			}
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException
+				| InterruptedException e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+			if (req.getStep().equals("1")) {
+				deleteDisk(req, cloudVo);
+			}
+		}
+
+		return req;
+	}
+
+	private CustomReqProductVO changeDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		try {
+			VolumeIF volumeIF = AbstractFactory.getVolumeIF(req.getProjectName(), cloudVo);
+			Volume obj = volumeIF.getVolume(req.getDiskId());
+
+			log.debug("Disk size ================>>>>" + obj.getAttachments().size());
+
+			if (obj.getAttachments().size() > 0) {
+				detachVolume(req, cloudVo);
+
+				for (int i = 0; i < count; i++) {
+					obj = volumeIF.getVolume(req.getDiskId());
+					log.debug("Disk ================>>>>" + " Disk Aetach=" + obj.getAttachments().size());
+
+					if (obj.getAttachments().size() <= 0) {
+						break;
+					}
+					Thread.sleep(30000);
+				}
+			}
+
+			// volumeIF.extendVolume(req.getDiskId(), 2); //2017.11.13 고정크기 2에서 입력값으로 변경
+			volumeIF.extendVolume(req.getDiskId(), Integer.parseInt(req.getDiskGb()));
+
+			this.sqlSessionTemplate.update(updateOssDisk, req);
+
+			if (req.getVmUuid() == null || req.getVmUuid() == "" || req.getVmUuid().length() <= 0) {
+				return req;
+			}
+
+			for (int i = 0; i < count; i++) {
+
+				obj = volumeIF.getVolume(req.getDiskId());
+				log.debug("Disk ================>>>> Disk Status=" + obj.getStatus());
+
+				if (obj.getStatus().equals("available")) {
+					attachVolume(req, cloudVo);
+					break;
+				}
+
+				Thread.sleep(30000);
+			}
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException
+				| InterruptedException e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return req;
+	}
+
+	private CustomReqProductVO deleteDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		try {
+			VolumeIF volumeIF = AbstractFactory.getVolumeIF(req.getProjectName(), cloudVo);
+			Volume obj = volumeIF.getVolume(req.getDiskId());
+
+			log.debug("Disk size ================>>>>" + obj.getAttachments().size());
+
+			if (obj.getAttachments().size() > 0) {
+				detachVolume(req, cloudVo);
+
+				for (int i = 0; i < count; i++) {
+					obj = volumeIF.getVolume(req.getDiskId());
+					log.debug("Disk ================>>>>" + " Disk Aetach=" + obj.getAttachments().size());
+
+					if (obj.getAttachments().size() <= 0) {
+						break;
+					}
+					Thread.sleep(30000);
+				}
+			}
+
+			volumeIF.deleteVolume(req.getDiskId());
+			this.sqlSessionTemplate.delete(deleteOssDisk, req);
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException
+				| InterruptedException e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	private CustomReqProductVO vcreateDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		try {
+			DiskBacking diskBacking = new DiskBacking();
+			diskBacking.setType("VMDK_FILE");
+			diskBacking.setVmdkFile(req.getVmdkFile());
+
+			DiskInfo diskInfo = new DiskInfo();
+			diskInfo.setType(req.getDiskType());
+			diskInfo.setBacking(diskBacking);
+
+			DiskSpec diskSpec = new DiskSpec();
+			diskSpec.setSpec(diskInfo);
+
+			VmDiskIF vmDiskIF = AbstractFactory.getDiskVmware(req, cloudVo);
+			DiskSpec obj = vmDiskIF.createDisk(diskSpec, req.getDiskId());
+
+			String reqDiskSeq = DateFormatUtils.format(new Date(), "yyyyMMddHHmmss");
+			req.setDiskId(obj.getValue() + "-" + reqDiskSeq);
+			req.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+					: DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+
+			this.sqlSessionTemplate.insert(insertOssDisk, req);
+
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return req;
+	}
+
+	private CustomReqProductVO vdeleteDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		try {
+			DiskSpec diskSpec = new DiskSpec();
+			String[] wmwareDiskId = req.getDiskId().split("-");
+			String diskId = wmwareDiskId[0];
+			String diskUuid = wmwareDiskId[1];
+			req.setDiskId(diskId);
+			VmDiskIF vmDiskIF = AbstractFactory.getDiskVmware(req, cloudVo);
+			vmDiskIF.deleteDisk(diskSpec, req.getDiskId());
+			req.setDiskId(diskId + "-" + diskUuid);
+
+			this.sqlSessionTemplate.delete(deleteOssDisk, req);
+
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	/**
+	 * 오픈스택에 동일한 Flaver가 있는지 검색 하고, 없으면 새로 생성을 한다.
+	 */
+	public String setFlaver(CustomReqProductVO req, CustomOssCloudVO cloudVo)
+			throws NotConnectGatewayException, NotSupportGatewayException, InvaildOpenStackException {
+
+		int iMemory = Integer.parseInt(req.getMemGb()) * 1024;
+		req.setDiskGb(req.getDiskGb());
+
+		String sFlaverId = "";
+		FlavorIF flavorIF = AbstractFactory.getFlavorIF(cloudVo);
+		List<Flavor> flavors = flavorIF.getFlavors();
+		for (Flavor flavor : flavors) {
+			if (req.getVcpus().equals(flavor.getVcpus().toString()) && (iMemory + "").equals(flavor.getRam().toString())
+					&& req.getDiskGb().equals(flavor.getDisk().toString())) {
+
+				sFlaverId = flavor.getId();
+				break;
+			}
+		}
+
+		// 기존 Flaover가 없는 경우 새로 생성한다.
+		if (sFlaverId.equals("")) {
+			StringBuffer nameBuf = new StringBuffer();
+			nameBuf.append("c" + StringUtils.leftPad(req.getVcpus(), 2, "0"));
+			nameBuf.append("m" + StringUtils.leftPad(req.getMemGb(), 3, "0"));
+			nameBuf.append("d" + StringUtils.leftPad(req.getDiskGb(), 4, "0"));
+
+			Flavor flavor = new Flavor();
+			flavor.setName(nameBuf.toString());
+			flavor.setVcpus(Integer.parseInt(req.getVcpus()));
+			flavor.setRam(iMemory);
+			flavor.setDisk(Integer.parseInt(req.getDiskGb()));
+			Flavor obj1 = flavorIF.createFlavor(flavor);
+			sFlaverId = obj1.getId();
+		}
+
+		return sFlaverId;
+	}
+
+	/**
+	 * Bootable OS 블록디스크 생성
+	 */
+	public Volume setBootableDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo)
+			throws NotConnectGatewayException, NotSupportGatewayException, InvaildOpenStackException {
+		String sBootableDiskId = "";
+		String sBootableDiskStatus = "";
+		Volume obj = null;
+
+		VolumeIF volumeIF = AbstractFactory.getVolumeIF(req.getProjectName(), cloudVo);
+		Volume volume = new Volume();
+		volume.setSize(Integer.parseInt(req.getDiskGb()));
+		// volume.setAvailability_zone(req.getAzName());
+		volume.setName(req.getDiskName());
+		volume.setImageRef(req.getVmImageId());
+		// volume.setVolume_type("hitachi-g900");
+		volume.setVolume_type(req.getVolumeType());
+		volume.setName(req.getHostname() + "-OS");
+		obj = volumeIF.createVolume(volume);
+		sBootableDiskId = obj.getId();
+		obj = volumeIF.getVolume(sBootableDiskId);
+		sBootableDiskStatus = obj.getStatus();
+
+		while (!sBootableDiskStatus.equals("available")) {
+			if (sBootableDiskStatus.equals("available")) {
+				log.debug("Created Volumes");
+				continue;
+			} else {
+				log.debug("Creating Volumes");
+				obj = volumeIF.getVolume(sBootableDiskId);
+				sBootableDiskStatus = obj.getStatus();
+			}
+		}
+		return obj;
+	}
+
+	/**
+	 * Port IP 생성
+	 */
+	public Port setIp(CustomReqProductVO req, CustomOssCloudVO cloudVo)
+			throws NotConnectGatewayException, NotSupportGatewayException, InvaildOpenStackException {
+
+		PortIF portIF = AbstractFactory.getPortIF(cloudVo);
+
+		Port port = new Port();
+		port.setNetwork_id(req.getDefaultNetworkId());
+		port.setName(req.getDefaultNetworkIp());
+		// port.setDevice_owner("");
+		port.setProject_id(req.getProjectId());
+
+		List<FixedIPS> listFixedIps = new LinkedList<FixedIPS>();
+		FixedIPS fixedIps = new FixedIPS();
+		fixedIps.setSubnet_id(req.getSubnetId());
+		fixedIps.setIp_address(req.getDefaultNetworkIp());
+		listFixedIps.add(fixedIps);
+		port.setFixed_ips(listFixedIps);
+
+		Port obj = portIF.createPort(port);
+
+		return obj;
+	}
+
+	/**
+	 * Port Backup IP 생성
+	 */
+	public Port setBackupIp(CustomReqProductVO req, CustomOssCloudVO cloudVo)
+			throws NotConnectGatewayException, NotSupportGatewayException, InvaildOpenStackException {
+
+		Port obj = null;
+		String cloudId = cloudVo.getCloudId();
+		CustomReqProductVO res = this.sqlSessionTemplate.selectOne(getBackupNetwork, cloudId);
+		try {
+			PortIF portIF = AbstractFactory.getPortIF(cloudVo);
+			Port port = new Port();
+			port.setNetwork_id(res.getNetworkId());
+			port.setName(req.getBackupNetworkIp());
+			// port.setDevice_owner("");
+			port.setProject_id(req.getProjectId());
+
+			List<FixedIPS> listFixedIps = new LinkedList<FixedIPS>();
+			FixedIPS fixedIps = new FixedIPS();
+			fixedIps.setSubnet_id(res.getSubnetId());
+			fixedIps.setIp_address(req.getBackupNetworkIp());
+			listFixedIps.add(fixedIps);
+
+			port.setFixed_ips(listFixedIps);
+
+			obj = portIF.createPort(port);
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return obj;
+	}
+
+	/**
+	 * Port IP 삭제
+	 */
+	public boolean deleteIp(CustomReqProductVO req, CustomOssCloudVO cloudVo)
+			throws NotConnectGatewayException, NotSupportGatewayException, InvaildOpenStackException {
+
+		try {
+			PortIF portIF = AbstractFactory.getPortIF(cloudVo);
+			Port port = new Port();
+			port.setId(req.getPortNetworkId());
+			port.setProject_id(req.getProjectId());
+
+			portIF.deletePort(port);
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return true;
+	}
+
+	/**
+	 * Port IP 삭제
+	 */
+	public boolean deleteBackupIp(CustomReqProductVO req, CustomOssCloudVO cloudVo)
+			throws NotConnectGatewayException, NotSupportGatewayException, InvaildOpenStackException {
+
+		try {
+			PortIF portIF = AbstractFactory.getPortIF(cloudVo);
+			Port port = new Port();
+			port.setId(req.getPortBackupNetworkId());
+
+			portIF.deletePort(port);
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return true;
+	}
+
+	private String insertOssVm(CustomReqProductVO vm) {
+
+		return this.sqlSessionTemplate.insert(insertOssVm, vm) + "";
+	}
+
+	private String insertOssVmNetwork(CustomReqProductVO vm) {
+
+		return this.sqlSessionTemplate.insert(insertOssVmNetwork, vm) + "";
+	}
+
+	private String insertOssPort(BatchOssPortVO port) {
+
+		return this.sqlSessionTemplate.insert(insertOssPort, port) + "";
+	}
+
+	private boolean detachVolume(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		ServerIF serverIF = AbstractFactory.getServerIF(req.getProjectName(), cloudVo);
+		boolean result = false;
+		try {
+			log.debug("detachVolume ===>>>> vmuuid= {}, diskid= {}", req.getVmUuid(), req.getDiskId());
+
+			result = serverIF.detachVolumeAttachments(req.getVmUuid(), req.getDiskId());
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e) {
+			log.error(e.getMessage());
+			result = false;
+		}
+		return result;
+	}
+
+	private boolean attachVolume(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		ServerIF serverIF = AbstractFactory.getServerIF(req.getProjectName(), cloudVo);
+		boolean result = false;
+
+		try {
+			log.debug("attachVolume ===>>>> vmuuit= {}, diskid= {}", req.getVmUuid(), req.getDiskId());
+			VolumeAttachment vol = serverIF.attachVolumeAttachments(req.getVmUuid(), req.getDiskId());
+			if (vol != null) {
+				result = true;
+			}
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e) {
+			log.error(e.getMessage());
+			result = false;
+		}
+
+		return result;
+	}
+
+	private CustomReqProductVO productByVmWare(String orderProductSeq, String sProduct, String sRequestType,
+			String orderUserId, CustomOssCloudVO cloudVo) {
+
+		CustomReqProductVO res = new CustomReqProductVO();
+		res.setCloudId(cloudVo.getCloudId());
+
+		if (sProduct.equals(CodeUtil.CMM_CODE_PRODCATE_VM)) {
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductVm, orderProductSeq);
+			res.setOrderUserId(orderUserId);
+			res.setErrorStatus("PROVISIONING_SUCCESS");
+			if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_NEW)) {
+				res = vCreateVM(res, cloudVo);
+			} // 신규
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_CHANGE)) {
+				res = changeVM_vmWare(res, cloudVo);
+			} // 변경
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_EXPR)) {
+				res = deleteVM_vmWare(res, cloudVo);
+			} // 삭제
+		} else if (sProduct.equals(CodeUtil.CMM_CODE_PRODCATE_DISK)) {
+
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductDisk, orderProductSeq);
+			res.setOrderUserId(orderUserId);
+			res.setErrorStatus("PROVISIONING_SUCCESS");
+			if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_NEW)) {
+				res = vcreateDisk(res, cloudVo);
+			} // 신규
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_EXPR)) {
+				res = vdeleteDisk(res, cloudVo);
+			} // 삭제
+
+		}
+
+		return res;
+	}
+
+	private CustomReqProductVO productByVra(String orderProductSeq, String sProduct, String sRequestType,
+			String orderUserId, CustomOssCloudVO cloudVo) {
+		CustomReqProductVO res = new CustomReqProductVO();
+		res.setCloudId(cloudVo.getCloudId());
+
+		if (sProduct.equals(CodeUtil.CMM_CODE_PRODCATE_VM)) {
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductVm, orderProductSeq);
+			res.setOrderUserId(orderUserId);
+			res.setErrorStatus("PROVISIONING_SUCCESS");
+			if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_NEW)) {
+				res = vraCreateVM(res, cloudVo);
+			} // 신규
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_CHANGE)) {
+				res = vraChangeVM(res, cloudVo);
+			} // 변경
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_EXPR)) {
+				res = vraDeleteVM(res, cloudVo);
+			} // 삭제
+		} else if (sProduct.equals(CodeUtil.CMM_CODE_PRODCATE_DISK)) {
+
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductDisk, orderProductSeq);
+			res.setOrderUserId(orderUserId);
+			res.setErrorStatus("PROVISIONING_SUCCESS");
+			if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_NEW)) {
+				res = vraCreateDisk(res, cloudVo);
+			} // 신규
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_CHANGE)) {
+				res = vraChangeDisk(res, cloudVo);
+			} // 변경
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_EXPR)) {
+				res = vraDeleteDisk(res, cloudVo);
+			} // 삭제
+
+		}
+
+		return res;
+	}
+
+	private CustomReqProductVO productByNutanix(String orderProductSeq, String sProduct, String sRequestType,
+			String orderUserId, CustomOssCloudVO cloudVo) throws Exception {
+		CustomReqProductVO res = new CustomReqProductVO();
+		res.setCloudId(cloudVo.getCloudId());
+
+		if (sProduct.equals(CodeUtil.CMM_CODE_PRODCATE_VM)) {
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductVm, orderProductSeq);
+			res.setOrderUserId(orderUserId);
+			res.setErrorStatus("PROVISIONING_SUCCESS");
+			if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_NEW)) {
+				res = nutanixCreateVM(res, cloudVo);
+			} // 신규
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_CHANGE)) {
+				res = nutanixChangeVM(res, cloudVo);
+			} // 변경
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_EXPR)) {
+				res = nutanixDeleteVM(res, cloudVo);
+			} // 삭제
+		} else if (sProduct.equals(CodeUtil.CMM_CODE_PRODCATE_DISK)) {
+
+			res = this.sqlSessionTemplate.selectOne(detailBssOrderProductDisk, orderProductSeq);
+			res.setOrderUserId(orderUserId);
+			res.setErrorStatus("PROVISIONING_SUCCESS");
+			if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_NEW)) {
+				res = nutanixCreateDisk(res, cloudVo);
+			} // 신규
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_CHANGE)) {
+				res = nutanixChangeDisk(res, cloudVo);
+			} // 변경
+			else if (sRequestType.equals(CodeUtil.CMM_CODE_REQTYPE_EXPR)) {
+				res = nutanixDeleteDisk(res, cloudVo);
+			} // 삭제
+
+		}
+
+		return res;
+	}
+
+	private CustomReqProductVO vCreateVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		try {
+			VmServerIF serverIF = VmAbstractFactory.getServerIF(req.getProjectName(), cloudVo);
+
+			VmCpuUpdate cpuUpdate = new VmCpuUpdate();
+			cpuUpdate.setNumCpus(req.getVcpus()); // cpu 갯수를 넣어 적용
+
+			VmMemoryUpdate memoryUpdate = new VmMemoryUpdate();
+			int memoryMb = Integer.parseInt(req.getMemGb()) * 1024;
+			memoryUpdate.setMemory(Integer.toString(memoryMb)); // memory mb단위를 넣어 적용
+
+			VmCapacity capacity = new VmCapacity();
+			long DiskByte = Integer.parseInt(req.getDiskGb()) * 1073741824L;
+			capacity.setCapacity(Long.toString(DiskByte));
+
+			List<VmDiskToUpdate> diskList = new ArrayList<VmDiskToUpdate>();
+
+			VmDiskToUpdate diskToUpdate = new VmDiskToUpdate();
+			diskToUpdate.setKey(req.getVolumeType()); // 기존 template에 속한 Disk의 Key값
+			diskToUpdate.setValue(capacity); // Disk Byte단위를 넣어 적용 기존 Disk보다 용량이 적으면 실패
+			diskList.add(diskToUpdate);
+
+			VmHardwareCustomization hardwareCustomization = new VmHardwareCustomization();
+			hardwareCustomization.setCpuUpdate(cpuUpdate);
+			hardwareCustomization.setMemoryUpdate(memoryUpdate);
+			hardwareCustomization.setDiskToUpdate(diskList);
+
+			VmDiskStorage datastore = new VmDiskStorage();
+			datastore.setDatastore(req.getDatastoreId());
+
+			VmPlacement placement = new VmPlacement();
+			placement.setFolder("group-v3"); // 생성 폴더 선택 (required)
+			placement.setCluster(req.getDefaultNetworkId()); // 생성 Cluster 선택 (Cluster,Host,Resource_pool 중 택1)
+
+			VmServer vmServer = new VmServer();
+			vmServer.setName(req.getHostname());
+			vmServer.setPoweredOn(true); // vm 생성시 전원 on/off
+			vmServer.setPlacement(placement);
+			vmServer.setHardwareCustomization(hardwareCustomization);
+			vmServer.setDiskStorage(datastore);
+			VmSpec vmSpec = new VmSpec();
+			vmSpec.setSpec(vmServer);
+
+			String libraryId = req.getVmImageId();
+
+			// Create VM
+
+			vmSpec = serverIF.createServer(vmSpec, libraryId);
+
+			VmWareJsonObject JsonObject = new VmWareJsonObject();
+			JsonObject = serverIF.getServer(vmSpec.getValue());
+
+			VmDisks vmDisks = JsonObject.getValue().getDisks().get(0);
+			VmNics vmNics = JsonObject.getValue().getNics().get(0);
+			// OSS_VM 저장
+			CustomReqProductVO vm = new CustomReqProductVO();
+			vm.setVmUuid(vmSpec.getValue());
+			vm.setProjectId(req.getProjectId());
+			vm.setHostname(req.getHostname());
+			vm.setHostnameAlias(req.getHostnameAlias());
+			vm.setFlavorId(req.getFlavorId());
+			vm.setVcpus(req.getVcpus());
+			vm.setMemGb(req.getMemGb());
+			vm.setDiskGb(req.getDiskGb());
+			vm.setImageId(vmDisks.getKey());
+			vm.setVolumeType(req.getVolumeType());
+			vm.setAzName(req.getAzName());
+			vm.setVmProductSeq(req.getVmProductSeq());
+			vm.setOsProductSeq(req.getOsProductSeq());
+			vm.setVmCatalogSeq(req.getVmCatalogSeq());
+			vm.setOrderUserId(req.getOrderUserId());
+			vm.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+					: DateFormatUtils.format(new Date(), "yyyyMMddHHmmss"));
+			vm.setRegUserId(CodeUtil.SYNC_ADMIN);
+			insertOssVm(vm);
+
+			// OSS_VM_NETWORK 저장
+			vm.setNetworkId(req.getDefaultNetworkId());
+			vm.setBackupNetworkId(req.getBackupNetworkId());
+			vm.setPortNetworkId(vmSpec.getValue() + "-" + vmNics.getKey());
+			/*
+			 * if(req.getBackupNetworkFlag().equals("Y") ) {
+			 * vm.setPortBackupNetworkId(backupIpObj.getId()); } else {
+			 * vm.setPortBackupNetworkId(""); }
+			 */
+			insertOssVmNetwork(vm);
+
+			// OSS_PORT 정보저장
+			BatchOssPortVO port = new BatchOssPortVO();
+			port.setPortId(vmSpec.getValue() + "-" + vmNics.getKey());
+			port.setPortName(vmNics.getValue().getBacking().getNetworkName());
+			port.setFixedIps(req.getDefaultNetworkIp());
+			port.setMacAddress(vmNics.getValue().getMacAddress());
+			port.setProjectId(req.getProjectId());
+			port.setNetworkId(vmSpec.getValue() + "-" + vmNics.getKey());
+			// port.setSubnetId(ipObj.getFixed_ips().get(0).getSubnet_id());
+			// port.setDeviceOwner(ipObj.getDevice_owner());
+			// port.setDeviceId(obj12.getId());
+			insertOssPort(port);
+			// OSS_DISK 저장
+			CustomReqProductVO disk = new CustomReqProductVO();
+			disk.setDiskId(vmSpec.getValue() + "-" + vmDisks.getKey());
+			disk.setVmUuid(vmSpec.getValue());
+			disk.setProjectId(req.getProjectId());
+			disk.setDiskName(req.getHostname() + "-OS");
+			disk.setDiskGb(req.getDiskGb());
+			disk.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+					: DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+			disk.setOrderUserId(req.getOrderUserId());
+			disk.setDescription(req.getDescription());
+			disk.setDiskCatalogSeq(req.getDiskCatalogSeq());
+			disk.setDiskProductSeq(req.getDiskProductSeq());
+			disk.setVolumeType(req.getDiskType());
+
+			this.sqlSessionTemplate.insert(insertOssDisk, disk);
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException
+				| NullPointerException e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	private CustomReqProductVO changeVM_vmWare(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		String vmId = req.getVmUuid();
+		String projectName = req.getProjectName();
+
+		try {
+			VmHardwareCpuIF vmHardwareCpu = VmAbstractFactory.getVmHardwareCpuIF(cloudVo);
+			VmHardwareMemIF vmHardwareMem = VmAbstractFactory.getVmHardwareMemIF(projectName, vmId, cloudVo);
+
+			// STEP 1. CPU UPDATE
+			// VO생성
+			VmHardwareCpuVO vmCpu = new VmHardwareCpuVO();
+			VmHardwareCpuSpecVO vmCpuSpec = new VmHardwareCpuSpecVO();
+
+			// openstack에 socket부분 없음. default = 1
+			vmCpuSpec.setCores_per_socket(1L);
+			vmCpuSpec.setCount(Long.parseLong(req.getVcpus()));
+
+			vmCpu.setSpec(vmCpuSpec);
+
+			// API 호출
+			vmHardwareCpu.updateCpu(vmCpu, vmId);
+
+			// STEP 2. MEM UPDATE
+			// VO생성
+			VmHardwareMemVO vmMem = new VmHardwareMemVO();
+			VmHardwareMemSpecVO vmMemSpec = new VmHardwareMemSpecVO();
+
+			// openstack에 socket부분 없음. default = 1
+			vmMemSpec.setSize_MiB((Integer.parseInt(req.getMemGb()) * 1024));
+
+			vmMem.setSpec(vmMemSpec);
+
+			// API 호출
+			vmHardwareMem.updateMem(vmMem, vmId);
+
+			// OSS 정보 Update
+			this.sqlSessionTemplate.update(updateOssVm, req);
+
+			/*
+			 * for(int i = 0 ; i < count; i++) {
+			 *
+			 * Server server = serverIF.getServer(req.getVmUuid());
+			 * log.debug("VM Status ================>>>>"+" VM UUID={}, Status={}",
+			 * req.getVmUuid(), server.getStatus());
+			 *
+			 * if(server.getStatus().equals("VERIFY_RESIZE")){
+			 * serverIF.actionServer(req.getVmUuid(), "confirmResize"); break; }
+			 * Thread.sleep(30000); }
+			 */
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException
+				| NullPointerException e) {
+			e.printStackTrace();
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return req;
+	}
+
+	private CustomReqProductVO deleteVM_vmWare(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		String vmId = req.getVmUuid();
+		String projectName = req.getProjectName();
+
+		try {
+			VmServerIF vmServerIF = VmAbstractFactory.getServerIF(cloudVo);
+
+			// 1. API 호출
+			vmServerIF.deleteServer(vmId);
+			// 2. API 호출
+
+			// OSS 정보 Update
+
+			req.setDiskId(req.getImageId());
+			this.sqlSessionTemplate.delete(deleteOssVm, req);
+			this.sqlSessionTemplate.delete(deleteOssDisk, req);
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e) {
+			e.printStackTrace();
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	private CustomReqProductVO vraCreateVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		vraServerIF vraServerIF = vraAbstractFactory.getServerIF(cloudVo);
+		vraNetworkIF networkIF = vraAbstractFactory.getNetworkIF(cloudVo);
+		vraDiskIF diskIF = vraAbstractFactory.getDiskIF(cloudVo);
+		vraServerObject VraServerObject = new vraServerObject();
+		String deploymentId = "";
+		vraInputs vraServerInputs = new vraInputs();
+		try {
+			String catalogId = req.getVmImageId();
+			if (req.getBackupNetworkFlag().equals("Y")) {
+				vraServerInputs.setBackup("YES");
+			} else {
+				vraServerInputs.setBackup("NO");
+			}
+			VraServerObject.setDeploymentName(req.getHostname());
+			// 추후 작업
+			VraServerObject.setBulkRequestCount("1");
+			VraServerObject.setReason("");
+			VraServerObject.setProjectId(req.getProjectId());
+			vraServerInputs.setDiskSize(req.getDiskGb());
+			vraServerInputs.setFlavor(req.getFlavorId());
+			// vraServerInputs.setImage(req.getVmImageName());
+			vraServerInputs.setVmName(req.getHostname());
+
+			List<CustomReqProductVO> getDataStores = this.sqlSessionTemplate.selectList(getDataStore, cloudVo);
+			Collections.shuffle(getDataStores);
+			for (CustomReqProductVO dataStore : getDataStores) {
+				vraDataStoreContent ds = diskIF.getDataStore(dataStore.getDatastoreId());
+				if (ds.getFreeSizeGB() > Integer.parseInt(req.getDiskGb())) {
+					vraServerInputs.setDatastore(ds.getTags().get(0).getKey());
+					break;
+				}
+			}
+			vraServerInputs.setIp(req.getDefaultNetworkIp());
+			vraServerInputs.setCluster(req.getAzName());
+			vraServerInputs.setNetwork(req.getDefaultNetworkId());
+			if (req.getBackupNetworkFlag().equals("Y")) {
+				vraServerInputs.setBackupip(req.getBackupNetworkIp());
+			} else {
+				vraServerInputs.setBackupip("NULL");
+			}
+			VraServerObject.setInputs(vraServerInputs);
+
+			vraRestResponse response = vraServerIF.createServer(VraServerObject, catalogId);
+			Gson gson2 = new Gson();
+			TypeToken<List<vraServerDeploy>> typeToken = new TypeToken<List<vraServerDeploy>>() {
+			};
+			List<vraServerDeploy> deploys = gson2.fromJson(response.getMessage(), typeToken.getType());
+			for (vraServerDeploy deploy : deploys) {
+				deploymentId = deploy.getDeploymentId();
+
+				List<vraServerRequest> serverRequest = vraServerIF.getServerRequest(deploymentId, "").getContent();
+
+				for (vraServerRequest server : serverRequest) {
+					if (server.getName().equals("Create")) {
+						while (!server.getStatus().equals("SUCCESSFUL")) {
+							if (server.getStatus().equals("FAILED")) {
+								req.setErrorStatus("PROVISIONING_FAIL");
+								req.setErrorMsg(server.getDetails());
+								if (!deploymentId.equals("")) {
+									vraServerIF.deleteVm(deploymentId);
+								}
+								break;
+							} else {
+								server = vraServerIF.getServerRequest(deploymentId, server.getId());
+								Thread.sleep(30000);
+							}
+						}
+					}
+				}
+				// OSS_VM 저장
+
+				vraServer depInfo = vraServerIF.getDepInfo(deploymentId);
+				List<vraContent> contents = depInfo.getContent();
+				for (vraContent content : contents) {
+					if (content.getType().equals("Cloud.vSphere.Machine")) {
+						CustomReqProductVO vm = new CustomReqProductVO();
+						vm.setCloudId(cloudVo.getCloudId());
+						vm.setVmUuid(deploymentId);
+						vm.setProjectId(req.getProjectId());
+						vm.setHostname(req.getHostname());
+						vm.setHostnameAlias(req.getHostnameAlias());
+						vm.setFlavorId(req.getFlavorId());
+						vm.setVcpus(req.getVcpus());
+						vm.setMemGb(req.getMemGb());
+						vm.setDiskGb(req.getDiskGb());
+						vm.setImageId(catalogId);
+						vm.setVolumeType(req.getVolumeType());
+						vm.setAzName(req.getAzName());
+						vm.setVmProductSeq(req.getVmProductSeq());
+						vm.setOsProductSeq(req.getOsProductSeq());
+						vm.setVmCatalogSeq(req.getVmCatalogSeq());
+						vm.setOrderUserId(req.getOrderUserId());
+						vm.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+								: DateFormatUtils.format(new Date(), "yyyyMMddHHmmss"));
+						vm.setRegUserId(CodeUtil.SYNC_ADMIN);
+						insertOssVm(vm);
+
+						// OSS_VM_NETWORK 저장
+						BatchOssPortVO port = new BatchOssPortVO();
+						List<vraNetworks> networkList = content.getProperties().getNetworks();
+						for (vraNetworks network : networkList) {
+							String portId = network.getName();
+							String networkAry[] = network.getId().split("/");
+							String networkId = networkAry[3];
+							String subnetAry[] = networkIF.getComputeNetworks(network.getNetwork()).getSubnetLink()
+									.split("/");
+							String subnetId = subnetAry[3];
+							vraNetworkInterfaces networkInterfaces = networkIF.getNetworks(content.getId(), networkId);
+							if (!network.getName().equals("OA-Backup")) {
+								vm.setNetworkId(portId);
+								vm.setPortNetworkId(networkId);
+								port.setPortId(networkId);
+								port.setPortName(portId);
+								port.setFixedIps(req.getDefaultNetworkIp());
+								port.setMacAddress(network.getMac_address());
+								port.setProjectId(req.getProjectId());
+								port.setNetworkId(portId);
+								port.setSubnetId(subnetId);
+								port.setDeviceOwner(networkInterfaces.getOwner());
+								port.setBindingHostId(networkInterfaces.getExternalRegionId());
+								port.setDeviceId(deploymentId);
+								port.setStatus("ACTIVE");
+								insertOssPort(port);
+							}
+							if (req.getBackupNetworkFlag().equals("Y") && network.getName().equals("OA-Backup")) {
+								vm.setBackupNetworkId(portId);
+								vm.setPortBackupNetworkId(networkId);
+								BatchOssPortVO backupPort = new BatchOssPortVO();
+								backupPort.setPortId(networkId);
+								backupPort.setPortName(portId);
+								backupPort.setFixedIps(req.getBackupNetworkIp());
+								backupPort.setMacAddress(network.getMac_address());
+								backupPort.setProjectId(req.getProjectId());
+								backupPort.setNetworkId(portId);
+								backupPort.setDeviceId(deploymentId);
+								backupPort.setSubnetId(subnetId);
+								backupPort.setDeviceOwner(networkInterfaces.getOwner());
+								backupPort.setBindingHostId(networkInterfaces.getExternalRegionId());
+								backupPort.setStatus("ACTIVE");
+								insertOssPort(backupPort);
+							}
+						}
+						insertOssVmNetwork(vm);
+						// port.setSubnetId(ipObj.getFixed_ips().get(0).getSubnet_id());
+						// port.setDeviceOwner(ipObj.getDevice_owner());
+						// port.setDeviceId(obj12.getId());
+
+						vraDiskIF vraDiskIF = vraAbstractFactory.getDiskIF(cloudVo);
+						vraMachineDisks machineDisks = vraDiskIF.getDiskInfo(content.getId());
+						vraDiskContent diskContent = machineDisks.getContent().get(0);
+						CustomReqProductVO disk = new CustomReqProductVO();
+						disk.setDiskId(diskContent.getId());
+						disk.setVmUuid(deploymentId);
+						disk.setProjectId(req.getProjectId());
+						disk.setDiskName(req.getHostname() + "-OS");
+						disk.setDiskGb(req.getDiskGb());
+						disk.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+								: DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+						disk.setOrderUserId(req.getOrderUserId());
+						disk.setDescription(req.getDescription());
+						disk.setDiskCatalogSeq(req.getDiskCatalogSeq());
+						disk.setDiskProductSeq(req.getDiskProductSeq());
+						disk.setVolumeType(req.getVolumeType());
+
+						this.sqlSessionTemplate.insert(insertOssDisk, disk);
+					}
+				}
+
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			if (!deploymentId.equals("")) {
+				try {
+					vraServerIF.deleteVm(deploymentId);
+				} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e1) {
+					req.setErrorStatus("PROVISIONING_FAIL");
+					req.setErrorMsg(e.getMessage());
+				}
+			}
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	private CustomReqProductVO vraChangeVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		vraServerIF vraServerIF = vraAbstractFactory.getServerIF(cloudVo);
+		vraServer depInfo;
+		try {
+
+			depInfo = vraServerIF.getDepInfo(req.getVmUuid());
+			List<vraContent> contents = depInfo.getContent();
+			for (vraContent content : contents) {
+				if (content.getType().equals("Cloud.vSphere.Machine")) {
+					String machineId = content.getId();
+					String flavorId = req.getFlavorId();
+					vraJsonObject res = vraServerIF.changeMachine(machineId, flavorId);
+					vraJsonObject Tracker = vraServerIF.tracker(res.getId());
+					while (!Tracker.getStatus().equals("FINISHED")) {
+						Tracker = vraServerIF.tracker(res.getId());
+						Thread.sleep(1500);
+					}
+					if (!Tracker.getMessage().equals("success")) {
+						req.setErrorStatus("PROVISIONING_FAIL");
+						req.setErrorMsg(Tracker.getMessage());
+					} else {
+						this.sqlSessionTemplate.update(updateOssVm, req);
+					}
+				}
+			}
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	private CustomReqProductVO vraDeleteVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		vraServerIF vraServerIF = vraAbstractFactory.getServerIF(cloudVo);
+		vraDiskIF vraDiskIF = vraAbstractFactory.getDiskIF(cloudVo);
+		try {
+			String MachineId = "";
+			vraServer depInfo = vraServerIF.getDepInfo(req.getVmUuid());
+			List<vraContent> contents = depInfo.getContent();
+			for (vraContent content : contents) {
+				if (content.getType().equals("Cloud.vSphere.Machine")) {
+					MachineId = content.getId();
+				}
+			}
+			for (vraContent content : contents) {
+				if (content.getType().equals("Cloud.Volume")) {
+					vraJsonObject detach = vraServerIF.detachDisk(MachineId, content.getId());
+					vraJsonObject blockTracker = vraDiskIF.blockTracker(detach.getId());
+					while (!blockTracker.getStatus().equals("FINISHED")) {
+						blockTracker = vraDiskIF.blockTracker(detach.getId());
+						Thread.sleep(1500);
+					}
+					if (blockTracker.getMessage().equals("success")) {
+						vraJsonObject deleteDisk = vraDiskIF.deleteDisk(content.getId());
+						vraJsonObject blockTracker2 = vraDiskIF.blockTracker(deleteDisk.getId());
+						while (!blockTracker2.getStatus().equals("FINISHED")) {
+							blockTracker2 = vraDiskIF.blockTracker(deleteDisk.getId());
+							Thread.sleep(1500);
+						}
+						if (!blockTracker2.getMessage().equals("Resource does not exist anymore")) {
+							req.setErrorStatus("PROVISIONING_FAIL");
+							req.setErrorMsg(blockTracker.getMessage());
+						} else {
+							this.sqlSessionTemplate.delete(deleteOssDisk, req);
+						}
+					}
+				}
+			}
+
+			vraJsonObject res = vraServerIF.deleteVm(req.getVmUuid());
+			this.sqlSessionTemplate.delete(deleteOssVm, req);
+			this.sqlSessionTemplate.delete(deleteOssDiskVmUuid, req);
+			this.sqlSessionTemplate.delete(deleteOssPort, req);
+			if (req.getBackupNetworkFlag() == "Y") {
+				if (deleteBackupIp(req, cloudVo) == true) {
+					this.sqlSessionTemplate.delete(deleteOssPort, req);
+				}
+			}
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	private CustomReqProductVO vraCreateDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		vraServerIF vraServerIF = vraAbstractFactory.getServerIF(cloudVo);
+		vraDiskIF vraDiskIF = vraAbstractFactory.getDiskIF(cloudVo);
+		try {
+			vraBlockDevice BlockDevice = new vraBlockDevice();
+			BlockDevice.setCapacityInGB(req.getDiskGb());
+			BlockDevice.setDeploymentId(req.getVmUuid());
+			BlockDevice.setName(req.getDiskName());
+			BlockDevice.setDescription(req.getDescription());
+			BlockDevice.setProjectId(req.getProjectId());
+
+			vraJsonObject res = vraDiskIF.createBlockDevice(BlockDevice);
+
+			vraJsonObject blockTracker = vraDiskIF.blockTracker(res.getId());
+			while (!blockTracker.getStatus().equals("FINISHED")) {
+				blockTracker = vraDiskIF.blockTracker(res.getId());
+				Thread.sleep(1500);
+			}
+
+			if (blockTracker.getMessage().equals("success")) {
+				for (String id : blockTracker.getResources()) {
+					String[] resIdary = id.split("/");
+					String blockDiskId = resIdary[4];
+
+					vraServer depInfo = vraServerIF.getDepInfo(req.getVmUuid());
+					List<vraContent> contents = depInfo.getContent();
+					for (vraContent content : contents) {
+						if (content.getType().equals("Cloud.vSphere.Machine")) {
+							String MachineId = content.getId();
+							vraAttachDisk VraAttachDisk = new vraAttachDisk();
+							VraAttachDisk.setBlockDeviceId(blockDiskId);
+							VraAttachDisk.setName(req.getDiskName());
+							VraAttachDisk.setDescription(req.getDescription());
+							vraJsonObject res2 = vraDiskIF.attachDisk(VraAttachDisk, MachineId);
+
+							vraJsonObject blockTracker2 = vraDiskIF.blockTracker(res2.getId());
+							while (!blockTracker2.getStatus().equals("FINISHED")) {
+								blockTracker2 = vraDiskIF.blockTracker(res2.getId());
+								Thread.sleep(1500);
+							}
+							if (!blockTracker2.getMessage().equals("success")) {
+								req.setErrorStatus("PROVISIONING_FAIL");
+								req.setErrorMsg(blockTracker.getMessage());
+							} else {
+								vraBlockDevice blockDevice = vraDiskIF.getBlockDevice(blockDiskId);
+								req.setStep("1");
+								req.setDiskId(blockDevice.getId());
+								req.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+										: DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+								req.setVolumeType(req.getDiskType());
+								this.sqlSessionTemplate.insert(insertOssDisk, req);
+							}
+						}
+					}
+				}
+			} else {
+				req.setErrorStatus("PROVISIONING_FAIL");
+				req.setErrorMsg(blockTracker.getMessage());
+			}
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return req;
+	}
+
+	private CustomReqProductVO vraChangeDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		vraDiskIF vraDiskIF = vraAbstractFactory.getDiskIF(cloudVo);
+		try {
+			vraJsonObject res = vraDiskIF.changeDisk(req.getDiskId(), req.getDiskGb());
+			vraJsonObject blockTracker = vraDiskIF.blockTracker(res.getId());
+			while (!blockTracker.getStatus().equals("FINISHED")) {
+				blockTracker = vraDiskIF.blockTracker(res.getId());
+				Thread.sleep(1500);
+			}
+			if (!blockTracker.getMessage().equals("success")) {
+				req.setErrorStatus("PROVISIONING_FAIL");
+				req.setErrorMsg(blockTracker.getMessage());
+			} else {
+				this.sqlSessionTemplate.update(updateOssDisk, req);
+			}
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	private CustomReqProductVO vraDeleteDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		vraServerIF vraServerIF = vraAbstractFactory.getServerIF(cloudVo);
+		vraDiskIF vraDiskIF = vraAbstractFactory.getDiskIF(cloudVo);
+		try {
+			vraServer depInfo = vraServerIF.getDepInfo(req.getVmUuid());
+			List<vraContent> contents = depInfo.getContent();
+			for (vraContent content : contents) {
+				if (content.getType().equals("Cloud.vSphere.Machine")) {
+					String MachineId = content.getId();
+					vraJsonObject detach = vraServerIF.detachDisk(MachineId, req.getDiskId());
+					vraJsonObject blockTracker = vraDiskIF.blockTracker(detach.getId());
+					while (!blockTracker.getStatus().equals("FINISHED")) {
+						blockTracker = vraDiskIF.blockTracker(detach.getId());
+						Thread.sleep(1500);
+					}
+					if (blockTracker.getMessage().equals("success")) {
+						vraJsonObject deleteDisk = vraDiskIF.deleteDisk(req.getDiskId());
+						vraJsonObject blockTracker2 = vraDiskIF.blockTracker(deleteDisk.getId());
+						while (!blockTracker2.getStatus().equals("FINISHED")) {
+							blockTracker2 = vraDiskIF.blockTracker(deleteDisk.getId());
+							Thread.sleep(1500);
+						}
+						if (!blockTracker2.getMessage().equals("Resource does not exist anymore")) {
+							req.setErrorStatus("PROVISIONING_FAIL");
+							req.setErrorMsg(blockTracker.getMessage());
+						} else {
+							this.sqlSessionTemplate.delete(deleteOssDisk, req);
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+	private CustomOssProjectVO createProject(BatchProvisioningVO item) {
+		CustomOssProjectVO projectVO = new CustomOssProjectVO();
+		projectVO.setErrorStatus("PROVISIONING_SUCCESS");
+		CustomReqProjectVO getProjectView = reqProjectService.getProjectView(item.getOrderProductSeq());
+
+		projectVO.setRegUserId(getProjectView.getRegUserId());
+		projectVO.setModUserId(getProjectView.getModUserId());
+		projectVO.setCustomerId(getProjectView.getCustomerId());
+		projectVO.setProjectManagerId(getProjectView.getProjectManagerId());
+		projectVO.setProjectName(getProjectView.getReqProjectName());
+		projectVO.setProjectAlias(getProjectView.getProjectAlias());
+		projectVO.setDescription(getProjectView.getDescription());
+		projectVO.setProjectDeptCode(getProjectView.getProjectDeptCode());
+		projectVO.setProjectPrice(getProjectView.getProjectPrice());
+		projectVO.setProjectStartDatetime(getProjectView.getProjectStartDatetime());
+		projectVO.setProjectEndDatetime(getProjectView.getProjectEndDatetime());
+		projectVO.setReqProjectSeq(item.getOrderProductSeq());
+		projectVO.setProjectBoxId(UUID.randomUUID().toString());
+		projectVO.setPaas(getProjectView.getPaas());
+
+		projectVO.setCpuLimit(getProjectView.getCpuLimit());
+		projectVO.setMemLimit(getProjectView.getMemLimit());
+		projectVO.setCpuReq(getProjectView.getCpuReq());
+		projectVO.setMemReq(getProjectView.getMemReq());
+		projectVO.setVolumeReq(getProjectView.getVolumeReq());
+		projectVO.setPodReq(getProjectView.getPodReq());
+		String projectId = projectVO.getProjectId();
+		String res = "";
+
+		projectVO.setProjectBoxId(UUID.randomUUID().toString());
+		String sRet = dao.boxInsert(projectVO) + "";
+		try {
+
+			// 신청시 선택한 클라우드  REQ_PROJECT_CLOUD  > OSS_PROJECT 테이블 데이터 생성
+			List<CustomOssCloudVO> getCloudList = ossCloudService.getCloudListByReqProjectSeq(item.getOrderProductSeq());
+
+			for (CustomOssCloudVO cloud : getCloudList) {
+				CustomOssCloudVO cloudVo = ossCloudService.getCloudInfo(cloud.getCloudId());
+
+				if (getProjectView.getQuotaYn().equals("Y") && cloudVo.getCloudType().equals("openshift")) {
+					projectVO.setQuotaYn("Y");
+				} else {
+					projectVO.setQuotaYn("N");
+				}
+
+				// project create
+				projectVO.setCloudId(cloud.getCloudId());
+				projectVO.setCloudType(cloud.getCloudType());
+				if (cloudVo.getCloudType().equals("openstack")) {
+					Project project = BatchProcessor.createProject(projectVO.getProjectName(), null, cloudVo);
+					projectVO.setProjectId(project.getId());
+					sRet = dao.insert(projectVO) + "";
+				} else if (cloudVo.getCloudType().equals("vmware")) {
+					vraProjectObject project = BatchProcessor.vRaCreateProject(projectVO.getProjectName(), null,
+							cloudVo);
+					projectVO.setProjectId(project.getId());
+					sRet = dao.insert(projectVO) + "";
+				} else if (cloudVo.getCloudType().equals("openshift")) {
+					// 20220303 주석 if (projectVO.getPaas().equals("Y")) {
+						io.fabric8.openshift.api.model.Project project = opsApiOptionService.opsCreateProject(projectVO, null, cloudVo);
+						//쿼터 생성부분
+						if( "Y".equals( projectVO.getQuotaYn())) {
+							Map<String, Quantity> quotaOptionName = new HashMap();
+							quotaOptionName.put( "limits.memory", new Quantity( projectVO.getMemLimit()));
+							quotaOptionName.put( "limits.cpu", new Quantity( projectVO.getCpuLimit()));
+							quotaOptionName.put( "persistentvolumeclaims", new Quantity( projectVO.getVolumeReq()));
+							quotaOptionName.put( "pods", new Quantity( projectVO.getPodReq()));
+							quotaOptionName.put( "requests.cpu", new Quantity( projectVO.getCpuReq()));
+							quotaOptionName.put( "requests.memory", new Quantity( projectVO.getMemReq()));
+							opsApiOptionService.createProjectQuota(cloudVo, quotaOptionName, projectVO.getProjectName());
+						}
+
+						projectVO.setProjectId(project.getMetadata().getUid());
+						sRet = dao.insert(projectVO) + "";
+
+				} else if (cloudVo.getCloudType().equals("nutanix")) {
+
+					String uuid = UUID.randomUUID().toString();
+				    projectVO.setProjectId(uuid);
+					sRet = dao.insert(projectVO) + "";
+
+				}
+
+				// 20220303 주석 }
+			}
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e) {
+			projectVO.setErrorStatus("PROVISIONING_FAIL");
+			projectVO.setErrorMsg(e.getMessage());
+		}
+		reqProjectService.reqProjectStatusUpdate04(projectVO.getProjectBoxId());
+
+		List<CustomReqCustomerVO> managerList = reqProjectService.reqManagerList(projectVO.getReqProjectSeq());
+		for (CustomReqCustomerVO vo : managerList) {
+
+			vo.setProjectId(projectVO.getProjectBoxId());
+			try {
+				res = service.insertManager(vo);
+			} catch (NotSupportGatewayException e) {
+				// TODO Auto-generated catch block
+				projectVO.setErrorStatus("PROVISIONING_FAIL");
+				projectVO.setErrorMsg(e.getMessage());
+			}
+		}
+		return projectVO;
+	}
+
+	private CustomReqProductVO nutanixCreateVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) throws Exception {
+
+
+		String blueprint_uuid = req.getOsProductSeq();
+		String app_profile_reference_uuid = req.getDefaultNetworkId();
+		String app_name = req.getHostnameAlias();
+
+		String app_description = req.getReqMessage();
+		String app_profile_reference_name = null;
+		String app_profile_reference_kind = null;
+
+		NutanixObject blueprintResourceList = NutanixUtils.getBlueprint(cloudVo, blueprint_uuid);
+
+		for (NutanixObject nutanixObject : blueprintResourceList.getBlueprintResources()) {
+			app_profile_reference_name = (String) nutanixObject.getObject("app_profile_reference").getValue("name");
+			app_profile_reference_kind = (String) nutanixObject.getObject("app_profile_reference").getValue("kind");
+	}
+
+		// 뉴타닉스 블루프린트 생성
+		NutanixObject nutanixObject = NutanixUtils.launchBlueprint(cloudVo, blueprint_uuid, app_profile_reference_name,	app_profile_reference_uuid, app_profile_reference_kind, app_name, app_description);
+
+		String request_id =  (String) nutanixObject.getObject("status").getValue("request_id");
+
+      	NutanixObject getBlueprintStatus = NutanixUtils.getBlueprintStatus(cloudVo, blueprint_uuid, request_id);
+      	
+      	
+		long diskGb = Long.parseLong(req.getDiskGb());
+		long mb_size = diskGb*1024;
+      	
+
+      	// 어플리케이션  ID get
+        String application_uuid = (String) getBlueprintStatus.getObject("status").getValue("application_uuid");
+
+      	Thread.sleep(30000);
+
+        // vm_uuid get
+      	NutanixObject getAppDetail = NutanixUtils.getAppDetail(cloudVo, application_uuid);
+      	String vm_uuid = (String) getAppDetail.getObject("status").getObject("resources").getArray("deployment_list").get(0).getObject("substrate_configuration").getArray("element_list").get(0).getValue("instance_id");
+
+      	
+      	NutanixObject vmdetail = NutanixUtils.getVmDetail(cloudVo, vm_uuid);
+      	// vm 정보 get
+      	String host_uuid = (String) vmdetail.getValue("host_uuid");
+      	String mem_gb = (String) vmdetail.getValue("memory_mb");
+      	String vcpus = (String) vmdetail.getValue("num_vcpus");
+      	String power_state = (String) vmdetail.getValue("power_state");
+      	
+      	
+		try {
+				CustomReqProductVO vm = new CustomReqProductVO();
+				vm.setCloudId(cloudVo.getCloudId());
+				vm.setVmUuid(vm_uuid);
+				vm.setApplicationUuid(application_uuid);
+				
+				vm.setHostUuid(host_uuid);
+				vm.setPowerState(power_state);
+				vm.setProjectId(req.getProjectId());
+				vm.setHostname(req.getHostname());
+				vm.setHostnameAlias(req.getHostnameAlias());
+				vm.setFlavorId(req.getFlavorId());
+				vm.setVcpus(vcpus);
+				vm.setMemGb(mem_gb);
+				vm.setDiskGb(req.getDiskGb());
+				vm.setVolumeType(req.getVolumeType());
+				vm.setAzName(req.getAzName());
+				vm.setVmProductSeq(req.getVmProductSeq());
+				vm.setOsProductSeq(req.getOsProductSeq());
+				vm.setVmCatalogSeq(req.getVmCatalogSeq());
+				vm.setOrderUserId(req.getOrderUserId());
+				vm.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+						: DateFormatUtils.format(new Date(), "yyyyMMddHHmmss"));
+				vm.setRegUserId(CodeUtil.SYNC_ADMIN);
+				insertOssVm(vm);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return req;
+	}
+
+
+
+	private CustomReqProductVO nutanixCreateDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) throws Exception {
+
+		try {
+			CustomReqProductVO res = new CustomReqProductVO();
+			String vm_uuid = req.getVmUuid();
+			String storage_container_uuid = null;
+			long diskGb = Long.parseLong(req.getDiskGb());
+			long mb_size = diskGb*1024;
+
+			NutanixObject vmdetail = NutanixUtils.getVmDetail(cloudVo, vm_uuid);
+
+			List<NutanixObject> vmDisk = vmdetail.getVDisks();
+			storage_container_uuid = (String) vmDisk.get(0).getValue("storage_container_uuid");
+
+			NutanixObject attachDiskResult = NutanixUtils.attachDisk(cloudVo, vm_uuid, storage_container_uuid, mb_size);
+
+			String result = (String) attachDiskResult.getValue("task_uuid");
+
+			List<NutanixObject> vmDiskList = vmdetail.getVDisks();
+
+
+			if(result != null) {
+				for (NutanixObject nutanix : vmDiskList) {
+
+					String vmdisk_uuid  = (String) nutanix.getObject("disk_address").getValue("vmdisk_uuid");
+					String device_uuid = (String) nutanix.getObject("disk_address").getValue("device_uuid");
+
+					res = this.sqlSessionTemplate.selectOne(getOssDiskAt, vmdisk_uuid);
+
+					if(res == null) {
+						req.setDiskId(vmdisk_uuid);
+						req.setVmUuid(vm_uuid);
+                        req.setDeviceUuid(device_uuid);
+                        req.setStorageContainerUuid(storage_container_uuid);
+						req.setProjectId(req.getProjectId());
+						req.setDiskGb(req.getDiskGb());
+						req.setOrderUserId(req.getOrderUserId());
+						req.setDescription(req.getDescription());
+						req.setDiskCatalogSeq(req.getDiskCatalogSeq());
+						req.setDiskProductSeq(req.getDiskProductSeq());
+						req.setCreateDatetime(req.getOnDemandFlag().equals("N") ? req.getApplyDatetime()
+								: DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+						req.setVolumeType(req.getDiskType());
+						this.sqlSessionTemplate.insert(insertOssDisk, req);
+					}
+				 }
+		 }
+
+		} catch (NotConnectGatewayException | NotSupportGatewayException | InvaildOpenStackException e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+		return req;
+	}
+
+
+	private CustomReqProductVO nutanixChangeDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+        String vm_uuid = req.getVmUuid();
+        String vmdisk_uuid = req.getDiskId();
+        String device_uuid = req.getDeviceUuid();
+        String storage_container_uuid = req.getStorageContainerUuid();
+        long diskGb = Long.parseLong(req.getDiskGb());
+		long mb_size = diskGb*1024;
+
+		NutanixObject nutanixUpdateDiskObject;
+		try {
+			nutanixUpdateDiskObject = NutanixUtils.updateDisk(cloudVo, vm_uuid, vmdisk_uuid, device_uuid, storage_container_uuid, mb_size);
+			String task_uuid = (String) nutanixUpdateDiskObject.getValue("task_uuid");
+
+			if(task_uuid != null) {
+				this.sqlSessionTemplate.update(updateOssDisk, req);
+			}
+
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+
+
+	private CustomReqProductVO nutanixDeleteDisk(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		String vm_uuid = req.getVmUuid();
+		String vmdisk_uuid = req.getDiskId();
+		String device_uuid = req.getDeviceUuid();
+
+		try {
+			NutanixObject nutanixDetachDiskObject = NutanixUtils.detachDisk(cloudVo, vm_uuid, vmdisk_uuid, device_uuid);
+
+			String task_uuid = (String) nutanixDetachDiskObject.getValue("task_uuid");
+			if(task_uuid != null) {
+				this.sqlSessionTemplate.delete(deleteOssDisk, req);
+			}
+
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+
+
+		return req;
+	}
+	
+	private CustomReqProductVO nutanixDeleteVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+
+		String app_uuid = req.getApplicationUuid();
+		
+		try {
+			NutanixObject nutanixObject = NutanixUtils.deleteApp(cloudVo, app_uuid);
+			String task_uuid = (String) nutanixObject.getValue("task_uuid");
+			
+		    if(task_uuid != null) {
+		    	this.sqlSessionTemplate.delete(deleteOssVm, req);
+		    	this.sqlSessionTemplate.delete(deleteOssDisk, req);
+		    }
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+	
+	private CustomReqProductVO nutanixChangeVM(CustomReqProductVO req, CustomOssCloudVO cloudVo) {
+		
+		try {
+			String vm_uuid = req.getVmUuid();
+//			String host_uuid = req.getHostUuid();
+			Integer memory_mb =  Integer.parseInt(req.getMemGb());
+			Integer num_vcpus =  Integer.parseInt(req.getVcpus());
+			
+//			int before_memory_mb =  Integer.parseInt(req.getBeforeMemGb());
+//			int before_num_vcpus =  Integer.parseInt(req.getBeforeVcpus());
+			
+//			if(memory_mb - before_memory_mb < 0   || num_vcpus - before_num_vcpus < 0) {
+//				Thread.sleep(1500);
+//				NutanixObject nutanixPowerStateOff = NutanixUtils.updateVmPowerState(cloudVo, vm_uuid, host_uuid, NutanixPowerState.OFF);
+//				Thread.sleep(1500);
+//				NutanixObject nutanixVcpus = NutanixUtils.updateVmVcpus(cloudVo, vm_uuid, num_vcpus);
+//				Thread.sleep(1500);
+//				NutanixObject nutanixVmMemory = NutanixUtils.updateVmMemory(cloudVo, vm_uuid, memory_mb);
+//				Thread.sleep(1500);
+//				NutanixObject nutanixPowerStateOn = NutanixUtils.updateVmPowerState(cloudVo, vm_uuid, host_uuid, NutanixPowerState.ON);	
+//			}
+			
+			NutanixObject nutanixVcpus = NutanixUtils.updateVmVcpus(cloudVo, vm_uuid, num_vcpus);
+			String task_vm_uuid = (String) nutanixVcpus.getValue("task_uuid");
+			
+			NutanixObject nutanixVmMemory = NutanixUtils.updateVmMemory(cloudVo, vm_uuid, memory_mb);
+			String task_memory_uuid = (String) nutanixVmMemory.getValue("task_uuid");
+			
+			if(task_vm_uuid != null && task_memory_uuid != null) {
+				this.sqlSessionTemplate.update(updateOssVm, req);
+			}
+			
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			req.setErrorStatus("PROVISIONING_FAIL");
+			req.setErrorMsg(e.getMessage());
+		}
+		return req;
+	}
+	
+}
