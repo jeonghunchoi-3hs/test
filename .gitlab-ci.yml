@@ -2,45 +2,29 @@ stages:
   - build
   - deploy
 
-# ✅ 1. Build 단계: Maven 빌드
 build-job:
   stage: build
   script:
-    - echo "Building the project..."
-    - cd /app/git/k-cloud-20250113-dev/iVuCenter_Cloud_Was
-    - mvn clean package -DskipTests  # 빌드 수행
-  tags:
-    - test  # Runner 실행을 위한 태그 추가
-  artifacts:
-    paths:
-      - /app/git/k-cloud-20250113-dev/iVuCenter_Cloud_Was/target/*.war  # 빌드 결과물을 저장
+    - echo "🔧 Building the project on 101 server"
+    - ssh -o StrictHostKeyChecking=no root@192.168.100.101 "
+        cd /app/git/k-cloud-20250113-dev/iVuCenter_Cloud_Was &&
+        git pull origin main &&
+        /usr/local/maven/bin/mvn clean package -DskipTests
+      "
   only:
     - main
 
-# ✅ 2. Deploy 단계: Tomcat으로 배포
 deploy-job:
   stage: deploy
   script:
-    - echo "Deploying to Tomcat..."
-    - |
-      ssh -o StrictHostKeyChecking=no root@192.168.100.101 << 'EOF'
-        # 최신 소스 코드 가져오기
-        cd /app/git/k-cloud-20250113-dev &&
-        git pull gitlab main
-
-        # 기존 Tomcat의 배포된 애플리케이션 제거
-        rm -rf /home/3hs/server/tomcat/tomcat9/kcloud/webapps/ROOT
-
-        # 새로운 빌드된 WAR 파일을 Tomcat webapps로 이동
-        mv /app/git/k-cloud-20250113-dev/iVuCenter_Cloud_Was/target/*.war /home/3hs/server/tomcat/tomcat9/kcloud/webapps/ROOT.war
-
-        # Tomcat 재시작
-        sh /home/3hs/server/tomcat/tomcat9/kcloud/bin/shutdown.sh || true
-        sleep 5
+    - echo "🚀 Deploying to Tomcat on 101 server"
+    - ssh -o StrictHostKeyChecking=no root@192.168.100.101 "
+        rm -rf /home/3hs/server/tomcat/tomcat9/kcloud/webapps/ROOT &&
+        mv /app/git/k-cloud-20250113-dev/iVuCenter_Cloud_Was/target/*.war /home/3hs/server/tomcat/tomcat9/kcloud/webapps/ROOT.war &&
+        sh /home/3hs/server/tomcat/tomcat9/kcloud/bin/shutdown.sh || true &&
+        sleep 5 &&
         sh /home/3hs/server/tomcat/tomcat9/kcloud/bin/startup.sh
-      EOF
-
-  tags:
-    - test
+      "
   only:
     - main
+
