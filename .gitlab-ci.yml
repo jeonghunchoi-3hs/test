@@ -1,0 +1,45 @@
+# GitLab CI/CD Pipeline 설정 파일
+
+stages:
+  - build
+  - test
+  - deploy
+
+# ✅ 1. Build 단계 (Maven 빌드)
+build-job:
+  stage: build
+  script:
+    - echo "Building the project..."
+    - mvn clean package -DskipTests
+  tags:
+    - test
+  artifacts:
+    paths:
+      - target/*.war  # 빌드 결과물을 저장
+  timeout: 30m  # 최대 실행 시간 30분 설정
+
+# ✅ 2. Test 단계 (Maven 테스트 실행)
+test-job:
+  stage: test
+  script:
+    - echo "Running tests..."
+    - mvn test
+  tags:
+    - test
+  timeout: 30m  # 최대 실행 시간 30분 설정
+
+# ✅ 3. Deploy 단계 (1번 서버 배포)
+deploy-job:
+  stage: deploy
+  script:
+    - echo "Deploying to production server..."
+    - ssh -o StrictHostKeyChecking=no root@192.168.100.101 "
+        cd /app/git/k-cloud-20250113-dev &&
+        git pull gitlab main &&
+        systemctl restart myapp"
+  tags:
+    - test
+  only:
+    - main  # main 브랜치에서만 실행
+  timeout: 1h  # 최대 실행 시간 1시간 설정
+
