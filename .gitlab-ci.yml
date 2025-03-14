@@ -22,25 +22,25 @@ deploy-job:
   stage: deploy
   script:
     - echo "Deploying to Tomcat..."
-    - ssh -o StrictHostKeyChecking=no root@192.168.100.101 "
+    - |
+      ssh -o StrictHostKeyChecking=no root@192.168.100.101 << 'EOF'
         # 최신 소스 코드 가져오기
         cd /app/git/k-cloud-20250113-dev &&
-        git pull gitlab main &&
+        git pull gitlab main
 
-        # 기존 Tomcat의 배포된 애플리케이션 삭제
-        rm -rf /home/3hs/server/tomcat/tomcat9/kcloud/webapps/ROOT &&
+        # 기존 Tomcat의 배포된 애플리케이션 제거
+        rm -rf /home/3hs/server/tomcat/tomcat9/kcloud/webapps/ROOT
 
-        # 새로 빌드된 WAR 파일을 Tomcat webapps로 이동
-        mv /app/git/k-cloud-20250113-dev/iVuCenter_Cloud_Was/target/*.war /home/3hs/server/tomcat/tomcat9/kcloud/webapps/ROOT.war &&
+        # 새로운 빌드된 WAR 파일을 Tomcat webapps로 이동
+        mv /app/git/k-cloud-20250113-dev/iVuCenter_Cloud_Was/target/*.war /home/3hs/server/tomcat/tomcat9/kcloud/webapps/ROOT.war
 
         # Tomcat 재시작
-        sh /home/3hs/server/tomcat/tomcat9/kcloud/bin/shutdown.sh || true &&
-        sleep 5 &&
+        sh /home/3hs/server/tomcat/tomcat9/kcloud/bin/shutdown.sh || true
+        sleep 5
         sh /home/3hs/server/tomcat/tomcat9/kcloud/bin/startup.sh
-      "
+      EOF
+
   tags:
-    - test  # Runner 실행을 위한 태그 추가
+    - test
   only:
     - main
-  timeout: 30m
-
