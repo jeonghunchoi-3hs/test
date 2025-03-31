@@ -40,20 +40,20 @@ public class MbrMonitorEventController{
 		return "mbr/monitor/event/monitorSmsAnal";
 	}
 
-	@RequestMapping(value="/view")
-	@Secured( {"ROLE_CUSTOM_ADMIN","ROLE_CUSTOM_USER", "ROLE_CUSTOM_PM"} )
-	public String MbrMonitorEventView(Model model, CustomMonitorEventVO req) {
-		Map<String, String> map = service.getMetrics(req);
-
-		model.addAttribute("hostname", req.getHostname());
-		model.addAttribute("hostnameAlias", req.getHostnameAlias());
-		if(map != null){
-			service.measuresData(req, map.get("cpu_util"), model, "CPU");
-			service.measuresData(req, map.get("memory.usage"), model, "MEM");
-		}
-
-		return "mbr/monitor/event/monitorEventView";
-	}
+//	@RequestMapping(value="/view")
+//	@Secured( {"ROLE_CUSTOM_ADMIN","ROLE_CUSTOM_USER", "ROLE_CUSTOM_PM"} )
+//	public String MbrMonitorEventView(Model model, CustomMonitorEventVO req) {
+//		Map<String, String> map = service.getMetrics(req);
+//
+//		model.addAttribute("hostname", req.getHostname());
+//		model.addAttribute("hostnameAlias", req.getHostnameAlias());
+//		if(map != null){
+//			service.measuresData(req, map.get("cpu_util"), model, "CPU");
+//			service.measuresData(req, map.get("memory.usage"), model, "MEM");
+//		}
+//
+//		return "mbr/monitor/event/monitorEventView";
+//	}
 
 	/**
 	 *	ACTION
